@@ -1,0 +1,2 @@
+﻿  Example.cpp
+C:\Users\Marcel Bruckner\Documents\Volumetric-Fusion\VolumetricFusion\VolumetricFusion\Example.cpp(1,10): fatal error C1083: Cannot open include file: 'GLFW/glfw3.h': No such file or directory
