@@ -1,2 +1,6 @@
-﻿  Main.cpp
+﻿C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppBuild.targets(452,5): warning MSB8028: The intermediate directory (x64\Debug\) contains files shared from another project (pointcloud.vcxproj).  This can lead to incorrect clean and rebuild behavior.
+  rs-pointcloud.cpp
   VolumetricFusion.vcxproj -> C:\Users\Marcel Bruckner\Documents\Volumetric-Fusion\VolumetricFusion\x64\Debug\VolumetricFusion.exe
+  Copy Intel RealSense SDK 2.0 shared module next to the application
+  C:\Program Files (x86)\Intel RealSense SDK 2.0\bin\x64\realsense2.dll
+  1 Datei(en) kopiert
