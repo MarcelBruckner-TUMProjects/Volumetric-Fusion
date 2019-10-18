@@ -25,6 +25,9 @@ A multi-view RGB-D Capture Setup is built using 4 [Intel® RealSense™ Depth Ca
 - [Fusion4D: Real-time Performance Capture of Challenging Scenes [Dou et al.]](https://www.samehkhamis.com/dou-siggraph2016.pdf) 
 - [DynamicFusion: Reconstruction and Tracking of Non-rigid Scenes in Real-Time [Newcombe et al.]](https://rse-lab.cs.washington.edu/papers/dynamic-fusion-cvpr-2015.pdf)
 
+- [RealSense Multiple Camera WhitePaper](https://www.intel.com/content/dam/support/us/en/documents/emerging-technologies/intel-realsense-technology/RealSense_Multiple_Camera_WhitePaper.pdf)
+- [Volumetric Capture](https://github.com/VCL3D/VolumetricCapture)
+
 ---
 
 # Progress
@@ -49,6 +52,9 @@ This section gives a short overview over the progress of the project and about w
   - Get in touch with OpenGL and GLFW by doing the [OpenGL tutorial](https://learnopengl.com) to implement a visualization program for the reconstructed scene
   - Basic window rendering and vertex buffer, vertex array and vertex index setup working
   - Basic shader program added to render the scene
+- [Intel RealSense SDK](https://dev.intelrealsense.com/docs/docs-get-started)
+  - Get to know the API
+  - Explore examples and setup Volumetric Fusion project for our needs based on the pointcloud example project
 
 ## Planned
 - [OpenGL](https://www.opengl.org/) and [GLFW](https://www.glfw.org/)
@@ -70,3 +76,13 @@ This section gives a short overview over the progress of the project and about w
 ## Ongoing tasks
 - Optimization of implemented algorithms
 - Migration of CPU code to GPU
+
+---
+
+# Deployment
+1. Clone the repository
+2. Switch into repository folder
+3. Switch into *VolumetricFusion* folder
+4. Open *VolumetricFusion.sln* with VisualStudio 2019 (Tested with: Microsoft Visual Studio Community 2019, Version 16.3.5)
+5. Right-click *VolumetricFusion* project in Solution Explorer > *Set as Startup Project*
+6. Run
