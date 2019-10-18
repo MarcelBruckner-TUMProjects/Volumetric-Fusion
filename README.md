@@ -24,7 +24,6 @@ A multi-view RGB-D Capture Setup is built using 4 [Intel® RealSense™ Depth Ca
 - [Motion2Fusion: Real-time Volumetric Performance Capture [Dou et al.]](http://library.usc.edu.ph/ACM/TOG%2036/content/papers/246-0008-dou.pdf)
 - [Fusion4D: Real-time Performance Capture of Challenging Scenes [Dou et al.]](https://www.samehkhamis.com/dou-siggraph2016.pdf) 
 - [DynamicFusion: Reconstruction and Tracking of Non-rigid Scenes in Real-Time [Newcombe et al.]](https://rse-lab.cs.washington.edu/papers/dynamic-fusion-cvpr-2015.pdf)
-
 - [RealSense Multiple Camera WhitePaper](https://www.intel.com/content/dam/support/us/en/documents/emerging-technologies/intel-realsense-technology/RealSense_Multiple_Camera_WhitePaper.pdf)
 - [Volumetric Capture](https://github.com/VCL3D/VolumetricCapture)
 
