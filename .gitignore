@@ -384,3 +384,6 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+
+# IntelliSense DB
+Browse.VC.db
