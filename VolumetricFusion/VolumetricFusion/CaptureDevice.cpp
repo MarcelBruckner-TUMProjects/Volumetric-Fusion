@@ -45,19 +45,19 @@ void CaptureDevice::acquireFrame()
 
 }
 
-rs2::frameset* CaptureDevice::getFrames()
+rs2::frameset CaptureDevice::getFrames()
 {
-	return &frames;
+	return frames;
 }
 
-rs2::video_frame* CaptureDevice::getColorFrame()
+rs2::video_frame CaptureDevice::getColorFrame()
 {
-	return &frames.get_color_frame();
+	return frames.get_color_frame();
 }
 
-rs2::depth_frame* CaptureDevice::getDepthFrame()
+rs2::depth_frame CaptureDevice::getDepthFrame()
 {
-	return  &frames.get_depth_frame();
+	return  frames.get_depth_frame();
 }
 
 unsigned long long CaptureDevice::getFrameNumber()

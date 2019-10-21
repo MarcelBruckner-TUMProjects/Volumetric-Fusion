@@ -25,12 +25,12 @@ void Recorder::addToQueue()
 	for (auto device : devices) {
 		try {
 			rs2::points points = device->getPoints();
-			rs2::video_frame* colorFrame = device->getColorFrame();
+			rs2::video_frame colorFrame = device->getColorFrame();
 			std::string serialNr = device->getSerialNr();
 			auto frameNr = device->getFrameNumber();
 			std::string filename = baseDir + "\\" + serialNr + "\\" + std::to_string(frameNr) + ".ply";
 
-			queue.push(PointsQueueInstance(&points, filename, colorFrame));
+			queue.push(PointsQueueInstance(&points, filename, &colorFrame));
 		}
 		catch (const rs2::error & e)
 		{

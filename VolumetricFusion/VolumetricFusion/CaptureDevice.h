@@ -27,9 +27,9 @@ public:
 
 	void acquireFrame();
 
-	rs2::frameset* getFrames();
-	rs2::video_frame* getColorFrame();
-	rs2::depth_frame* getDepthFrame();
+	rs2::frameset getFrames();
+	rs2::video_frame getColorFrame();
+	rs2::depth_frame getDepthFrame();
 	unsigned long long getFrameNumber();
 
 	std::string getSerialNr();
