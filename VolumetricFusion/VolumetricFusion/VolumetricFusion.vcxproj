@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="CaptureDevice.cpp" />
     <ClCompile Include="MainWindow.cpp" />
+    <ClCompile Include="Recorder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.md" />
@@ -32,6 +33,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CaptureDevice.h" />
+    <ClInclude Include="Recorder.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9D1F0672-47E2-4248-921C-BE9731E71B70}</ProjectGuid>

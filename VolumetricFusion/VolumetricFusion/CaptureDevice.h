@@ -5,7 +5,7 @@
 class CaptureDevice
 {
 private:
-	const char* serialNr;
+	std::string serialNr;
 	rs2::pipeline pipeline;
 	rs2::pointcloud pointcloud;
 	rs2::points points;
@@ -13,6 +13,10 @@ private:
 	rs2::config cfg;
 	rs2::frameset frames;
 
+	/*rs2::video_frame color;
+	rs2::depth_frame depth;*/
+
+	
 public:
 	CaptureDevice(rs2::context ctx, rs2::device device);
 	rs2::pipeline_profile start();
@@ -23,8 +27,11 @@ public:
 
 	void acquireFrame();
 
-	rs2::frameset getFrames();
-	rs2::video_frame getColorFrame();
-	rs2::depth_frame getDepthFrame();
+	rs2::frameset* getFrames();
+	rs2::video_frame* getColorFrame();
+	rs2::depth_frame* getDepthFrame();
+	unsigned long long getFrameNumber();
+
+	std::string getSerialNr();
 };
 

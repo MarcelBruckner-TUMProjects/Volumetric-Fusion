@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "CaptureDevice.h"
+#include "Recorder.h"
 
 // Helper functions
 void register_glfw_callbacks(window& app, glfw_state& app_state);
@@ -28,6 +29,7 @@ int main(int argc, char* argv[]) try
 
 	std::vector<CaptureDevice*>		devices;
 
+
 	// Start a streaming pipe per each connected device
 	for (auto&& dev : ctx.query_devices())
 	{
@@ -35,16 +37,22 @@ int main(int argc, char* argv[]) try
 		devices.push_back(device);
 		device->start();
 	}
-	
+
+	Recorder* recorder = new Recorder(devices);
+	recorder->clearPersistentPointsFolder();
+	recorder->start();
+
 	// Main app loop
 	while (app)
 	{
 		for (auto device : devices) {
 			device->acquireFrame();
 
+			recorder->addToQueue();
+
 			// TODO merge pointclouds
 
-			app_state.tex.upload(device->getColorFrame());
+			app_state.tex.upload(*device->getColorFrame());
 			draw_pointcloud(app.width(), app.height(), app_state, device->getPoints());
 		}
 	}
