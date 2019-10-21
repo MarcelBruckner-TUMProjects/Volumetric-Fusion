@@ -19,7 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="rs-pointcloud.cpp" />
+    <ClCompile Include="CaptureDevice.cpp" />
+    <ClCompile Include="MainWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.md" />
@@ -28,6 +29,9 @@
     <ProjectReference Include="..\..\third-party\glfw-imgui\src\glfw-imgui.vcxproj">
       <Project>{ea621509-198f-4b16-99da-aa911b721536}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CaptureDevice.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9D1F0672-47E2-4248-921C-BE9731E71B70}</ProjectGuid>
