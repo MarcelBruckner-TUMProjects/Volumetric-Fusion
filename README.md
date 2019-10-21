@@ -55,7 +55,8 @@ This section gives a short overview over the progress of the project and about w
   - Get to know the API
   - Explore examples and setup Volumetric Fusion project for our needs based on the pointcloud example project
 - Basic Setup & Camera setup, Recordings, Visualization code
-  - Multicamera pointcloud rendering working
+  - Multicamera pointcloud rendering 
+  - Basic persistent saving of pointclouds (No loading)
   
 ## Planned
 - [OpenGL](https://www.opengl.org/) and [GLFW](https://www.glfw.org/)
