@@ -54,7 +54,9 @@ This section gives a short overview over the progress of the project and about w
 - [Intel RealSense SDK](https://dev.intelrealsense.com/docs/docs-get-started)
   - Get to know the API
   - Explore examples and setup Volumetric Fusion project for our needs based on the pointcloud example project
-
+- Basic Setup & Camera setup, Recordings, Visualization code
+  - Multicamera pointcloud rendering working
+  
 ## Planned
 - [OpenGL](https://www.opengl.org/) and [GLFW](https://www.glfw.org/)
   - Gather further knowledge over OpenGL and GLFW by doing the [OpenGL tutorial](https://learnopengl.com) 
