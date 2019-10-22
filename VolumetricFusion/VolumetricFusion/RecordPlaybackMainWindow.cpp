@@ -23,6 +23,13 @@ void draw_seek_bar(rs2::playback& playback, int* seek_pos, float2& location, flo
 // Helper functions
 void register_glfw_callbacks(window& app, glfw_state& app_state);
 
+enum RenderState {
+	POINTCLOUD ,
+	DEPTH_AND_COLOR ,
+	/*DEPTH ,
+	COLOR */
+};
+
 int main(int argc, char * argv[]) try
 {
     // Create a simple OpenGL window for rendering:
@@ -33,11 +40,15 @@ int main(int argc, char * argv[]) try
 	// register callbacks to allow manipulation of the pointcloud
 	register_glfw_callbacks(app, app_state);
 
+	// Recordings filename
 	std::string filename = "recording.bag";
 
     // Create booleans to control GUI (recorded - allow play button, recording - show 'recording to file' text)
     bool recorded = file_access::exists_test(filename);
     bool recording = false;
+
+	// The render state
+	RenderState renderState = POINTCLOUD;
 
 	// Declare a texture for the depth image on the GPU
 	texture depth_image;
@@ -53,10 +64,7 @@ int main(int argc, char * argv[]) try
 	rs2::pointcloud pc;
 	// We want the points object to be persistent so we can display the last cloud when a frame drops
 	rs2::points points;
-
-	// We'll keep track of the last frame of each stream available to make the presentation persistent
-	std::map<int, rs2::frame> render_frames;
-
+	
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
 
@@ -93,8 +101,8 @@ int main(int argc, char * argv[]) try
 			depth = frames.get_depth_frame(); // Find and colorize the depth data
 			color = frames.get_color_frame(); // Get the color data
 
-			render_frames[depth.get_profile().unique_id()] = depth;
-			render_frames[color.get_profile().unique_id()] = color;
+			//render_frames[depth.get_profile().unique_id()] = depth;
+			//render_frames[color.get_profile().unique_id()] = color;
         }
 
         // Set options for the ImGui buttons
@@ -195,9 +203,6 @@ int main(int argc, char * argv[]) try
             {
 				depth = frames.get_depth_frame(); // Find and colorize the depth data for rendering
 				color = frames.get_color_frame(); // Get the color data for rendering
-
-				render_frames[depth.get_profile().unique_id()] = depth;
-				render_frames[color.get_profile().unique_id()] = color;
 			}
 
             // Render a seek bar for the player
@@ -220,28 +225,44 @@ int main(int argc, char * argv[]) try
             }
         }
 
+		ImGui::SetCursorPos({ app.width() - 60, app.height() - 60 });
+		if (ImGui::Button("switch\n view", { 50, 50 }))
+		{
+			int s = (int)renderState;
+			s++;
+			s %= 4;
+			renderState = (RenderState)s;
+		}
+
         ImGui::PopStyleColor(4);
         ImGui::PopStyleVar();
 
         ImGui::End();
         ImGui::Render();
 		
+		switch (renderState)
+		{
+		case POINTCLOUD:
+			// Tell pointcloud object to map to this color frame
+			pc.map_to(color);
 
-		// Tell pointcloud object to map to this color frame
-		pc.map_to(color);
-		
-		// Generate the pointcloud and texture mappings
-		points = pc.calculate(depth);
+			// Generate the pointcloud and texture mappings
+			points = pc.calculate(depth);
 
-		// Upload the color frame to OpenGL
-		app_state.tex.upload(color);
+			// Upload the color frame to OpenGL
+			app_state.tex.upload(color);
 
-		// Draw the pointcloud
-		draw_pointcloud(app.width(), app.height(), app_state, points);
+			// Draw the pointcloud
+			draw_pointcloud(app.width(), app.height(), app_state, points);
+			break;
+		case DEPTH_AND_COLOR:
+			// Render depth frames from the default configuration, the recorder or the playback
+			depth_image.render(color_map.process(depth), { app.width() * 0.25f, app.height() * 0.25f, app.width() * 0.5f, app.height() * 0.75f });
 
-        // Render depth frames from the default configuration, the recorder or the playback
-        depth_image.render(depth, { app.width() * 0.25f, app.height() * 0.25f, app.width() * 0.5f, app.height() * 0.75f  });
-    }
+			break;
+		default:
+			break;
+		}    }
     return EXIT_SUCCESS;
 }
 catch (const rs2::error & e)
