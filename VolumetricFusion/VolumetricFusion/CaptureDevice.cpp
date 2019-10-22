@@ -68,6 +68,7 @@ unsigned long long CaptureDevice::getFrameNumber()
 	catch (const rs2::error & e)
 	{
 		std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
+		return -2;
 	}
 	catch (const std::exception & e) {
 		return -1;
