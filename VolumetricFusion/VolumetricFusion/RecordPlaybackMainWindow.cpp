@@ -2,7 +2,11 @@
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
+#if APPLE
+#include "../example.hpp"          // Include short list of convenience functions for rendering
+#else
 #include "example.hpp"          // Include short list of convenience functions for rendering
+#endif
 #include <chrono>
 
 #include <imgui.h>
@@ -13,7 +17,11 @@
 #include <iostream>
 #include <iomanip>
 
+#if APPLE
+#include "FileAccess.hpp"
+#else
 #include "VolumetricFusion/FileAccess.hpp"
+#endif
 
 // Helper function for dispaying time conveniently
 std::string pretty_time(std::chrono::nanoseconds duration);
