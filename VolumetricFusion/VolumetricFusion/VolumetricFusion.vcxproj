@@ -19,8 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\record-playback\RecordPlaybackMainWindow.cpp" />
     <ClCompile Include="CaptureDevice.cpp" />
-    <ClCompile Include="MainWindow.cpp" />
     <ClCompile Include="Recorder.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -33,6 +33,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CaptureDevice.h" />
+    <ClInclude Include="FileAccess.hpp" />
     <ClInclude Include="Recorder.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

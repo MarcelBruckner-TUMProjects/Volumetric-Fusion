@@ -3,7 +3,7 @@
 
 #include <string>
 #include <vector>
-#include <VolumetricFusion\CaptureDevice.h>
+#include "VolumetricFusion/CaptureDevice.h"
 #include <filesystem>
 #include <cstdio>
 #include <experimental/filesystem>
