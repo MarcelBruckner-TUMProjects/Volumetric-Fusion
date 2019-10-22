@@ -19,9 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\record-playback\RecordPlaybackMainWindow.cpp" />
     <ClCompile Include="CaptureDevice.cpp" />
     <ClCompile Include="Recorder.cpp" />
+    <ClCompile Include="RecordPlaybackMainWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.md" />
