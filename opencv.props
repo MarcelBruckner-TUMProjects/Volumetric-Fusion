@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <opencvDir>$(librealsenseSDK)\third-party\opencv-3.4\</opencvDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>
+	  $(opencvDir)\include;
+      $(opencvDir)\include\opencv;
+      $(opencvDir)\modules\core\include;
+      $(opencvDir)\modules\flann\include;
+	  $(opencvDir)\modules\imgproc\include;
+	  $(opencvDir)\modules\ml\include;
+	  $(opencvDir)\modules\objdetect\include;
+	  $(opencvDir)\modules\photo\include;
+	  $(opencvDir)\modules\video\include;
+	  $(opencvDir)\modules\dnn\include;
+	  $(opencvDir)\modules\imgcodecs\include;
+	  $(opencvDir)\modules\shape\include;
+	  $(opencvDir)\modules\videoio\include;
+	  $(opencvDir)\modules\highgui\include;
+	  $(opencvDir)\modules\superres\include;
+	  $(opencvDir)\modules\ts\include;
+	  $(opencvDir)\modules\features2d\include;
+	  $(opencvDir)\modules\calib3d\include;
+	  $(opencvDir)\modules\stitching\include;
+	  $(opencvDir)\modules\videostab\include;
+	  %(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>$(opencvDir)\lib\$(PlatformShortName)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opencv_highgui341.lib;opencv_core341.lib;opencv_imgproc341.lib;opencv_dnn341.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+	  xcopy /y "$(librealsenseSDK)\bin\$(PlatformShortName)\realsense2.dll" "$(OutDir)"
+	  xcopy /y "$(opencvDir)\bin\$(PlatformShortName)\$(Configuration)\*.dll" "$(OutDir)"
+	  xcopy /y "$(opencvDir)\data\*.*" "$(OutDir)"
+	  xcopy /y "$(opencvDir)\data\*.*" "$(ProjectDir)"</Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Copy OpenCV and RealSense SDK shared modules next to the application</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <BuildMacro Include="opencvDir">
+      <Value>$(opencvDir)</Value>
+    </BuildMacro>
+  </ItemGroup>
+</Project>
