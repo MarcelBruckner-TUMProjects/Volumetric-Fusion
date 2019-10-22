@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <sys/stat.h>
 
 namespace file_access {
 	bool exists_test(const std::string& name) {
