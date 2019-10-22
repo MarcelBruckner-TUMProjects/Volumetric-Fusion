@@ -387,3 +387,35 @@ MigrationBackup/
 
 # IntelliSense DB
 Browse.VC.db
+
+#  IntelliJ
+.idea
+
+# CMake
+CMakeLists.txt.user
+**/CMakeCache.txt
+*/CMakeCache.txt
+CMakeCache.txt
+CMakeFiles
+**/CMakeFiles/
+**/CMakeFiles
+CMakeScripts
+Testing
+Makefile
+**/Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+*.make
+*.cbp
+
+# Mac OS gitignore
+VolumetricFusion/VolumetricFusion/VolumetricFusion
+VolumetricFusion/CMakeCache.txt
+VolumetricFusion/VolumetricFusion/CMakeCache.txt
+VolumetricFusion/CMakeFiles/**
+VolumetricFusion/CMakeFiles/3.15.4/CMakeCXXCompiler.cmake
+VolumetricFusion/VolumetricFusion/CMakeFiles
+VolumetricFusion/**/CMakeFiles
