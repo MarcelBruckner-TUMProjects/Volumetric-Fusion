@@ -48,6 +48,11 @@ int main(int argc, char * argv[]) try
     rs2::frameset frames;
 	rs2::frame depth;
 	rs2::frame color;
+	
+	// Declare pointcloud object, for calculating pointclouds and texture mappings
+	rs2::pointcloud pc;
+	// We want the points object to be persistent so we can display the last cloud when a frame drops
+	rs2::points points;
 
 	// We'll keep track of the last frame of each stream available to make the presentation persistent
 	std::map<int, rs2::frame> render_frames;
@@ -85,7 +90,7 @@ int main(int argc, char * argv[]) try
         if (!device.as<rs2::playback>())
         {
             frames = pipe->wait_for_frames(); // wait for next set of frames from the camera
-			depth = color_map.process(frames.get_depth_frame()); // Find and colorize the depth data
+			depth = frames.get_depth_frame(); // Find and colorize the depth data
 			color = frames.get_color_frame(); // Get the color data
 
 			render_frames[depth.get_profile().unique_id()] = depth;
@@ -188,7 +193,7 @@ int main(int argc, char * argv[]) try
             rs2::playback playback = device.as<rs2::playback>();
             if (pipe->poll_for_frames(&frames)) // Check if new frames are ready
             {
-				depth = color_map.process(frames.get_depth_frame()); // Find and colorize the depth data for rendering
+				depth = frames.get_depth_frame(); // Find and colorize the depth data for rendering
 				color = frames.get_color_frame(); // Get the color data for rendering
 
 				render_frames[depth.get_profile().unique_id()] = depth;
@@ -221,8 +226,21 @@ int main(int argc, char * argv[]) try
         ImGui::End();
         ImGui::Render();
 		
+
+		// Tell pointcloud object to map to this color frame
+		pc.map_to(color);
+		
+		// Generate the pointcloud and texture mappings
+		points = pc.calculate(depth);
+
+		// Upload the color frame to OpenGL
+		app_state.tex.upload(color);
+
+		// Draw the pointcloud
+		draw_pointcloud(app.width(), app.height(), app_state, points);
+
         // Render depth frames from the default configuration, the recorder or the playback
-        depth_image.render(depth, { app.width() * 0.25f, app.height() * 0.25f, app.width() * 0.5f, app.height() * 0.75f  });
+        //depth_image.render(depth, { app.width() * 0.25f, app.height() * 0.25f, app.width() * 0.5f, app.height() * 0.75f  });
     }
     return EXIT_SUCCESS;
 }
