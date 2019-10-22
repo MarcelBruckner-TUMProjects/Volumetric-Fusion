@@ -1,0 +1,28 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/lilith/Google Drive/Uni TUM/Practical 3D Scanning & Spatial Learning/third-party/lz4/lz4.c
+lz4.h
+/Users/lilith/Google Drive/Uni TUM/Practical 3D Scanning & Spatial Learning/third-party/lz4/lz4.h
+intrin.h
+-
+stdlib.h
+-
+string.h
+-
+stdint.h
+-
+stdio.h
+-
+
+/Users/lilith/Google Drive/Uni TUM/Practical 3D Scanning & Spatial Learning/third-party/lz4/lz4.h
+stddef.h
+-
+stdint.h
+-
+

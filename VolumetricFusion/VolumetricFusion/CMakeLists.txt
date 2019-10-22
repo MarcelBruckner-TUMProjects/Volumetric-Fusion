@@ -6,7 +6,7 @@ set(CMAKE_CONFIGURATION_TYPES "Debug;Release"
     CACHE STRING "Configuration types" FORCE)
 
 add_executable(VolumetricFusion
-  rs-pointcloud.cpp
+  MainWindow.cpp
 )
 # Additional include directories
 set_property(TARGET VolumetricFusion
@@ -43,3 +43,4 @@ if (MSVC)
     ""
   )
 endif ()
+

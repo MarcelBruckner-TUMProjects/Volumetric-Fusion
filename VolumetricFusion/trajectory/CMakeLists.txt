@@ -17,10 +17,10 @@ set_property(TARGET trajectory
   APPEND PROPERTY INCLUDE_DIRECTORIES
   $<$<CONFIG:Debug>:
     ${CMAKE_SOURCE_DIR};
-    ..\..\third-party\lz4>
+    ../..\third-party/lz4>
   $<$<CONFIG:Release>:
     ${CMAKE_SOURCE_DIR};
-    ..\..\third-party\lz4>
+    ../..\third-party/lz4>
 )
 
 # Preprocessor definitions

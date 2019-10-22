@@ -1,0 +1,20 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/lilith/Google Drive/Uni TUM/Practical 3D Scanning & Spatial Learning/VolumetricFusion/motion/rs-motion.cpp
+librealsense2/rs.hpp
+-
+mutex
+-
+example.hpp
+/Users/lilith/Google Drive/Uni TUM/Practical 3D Scanning & Spatial Learning/VolumetricFusion/motion/example.hpp
+cstring
+-
+d435.h
+/Users/lilith/Google Drive/Uni TUM/Practical 3D Scanning & Spatial Learning/VolumetricFusion/motion/d435.h
+

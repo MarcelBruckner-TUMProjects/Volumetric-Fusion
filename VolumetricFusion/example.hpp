@@ -3,6 +3,10 @@
 
 #pragma once
 
+#if KEVIN_MACOS
+#pragma message("Included on Mac OS")
+#endif
+
 #include <librealsense2/rs.hpp>
 
 #define GL_SILENCE_DEPRECATION
