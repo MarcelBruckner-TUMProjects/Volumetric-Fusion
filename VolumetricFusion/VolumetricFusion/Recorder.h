@@ -6,7 +6,7 @@
 #if APPLE
 #include "CaptureDevice.h"
 #else
-#include <VolumetricFusion\CaptureDevice.h>
+#include "VolumetricFusion/CaptureDevice.h"
 #endif
 #include <filesystem>
 #include <cstdio>
