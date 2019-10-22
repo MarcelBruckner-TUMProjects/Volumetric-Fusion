@@ -397,6 +397,7 @@ CMakeLists.txt.user
 */CMakeCache.txt
 CMakeCache.txt
 CMakeFiles
+CMakeFiles/
 **/CMakeFiles/
 **/CMakeFiles
 CMakeScripts
@@ -409,6 +410,7 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 *.make
+*.cmake
 *.cbp
 
 # Mac OS gitignore
