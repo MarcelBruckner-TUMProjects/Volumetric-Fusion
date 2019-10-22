@@ -2,6 +2,13 @@ cmake_minimum_required(VERSION 3.12.2)
 
 project(VolumetricFusion)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+add_compile_options(-Wall -Wextra)
+set(CMAKE_C_FLAGS_DEBUG "-D_DEBUG")
+set(CMAKE_BUILD_TYPE Debug)
+
 if (APPLE)
   message(STATUS "Compiling for Mac OS")
   find_package(realsense2 REQUIRED)
@@ -11,18 +18,7 @@ if (APPLE)
     /usr/local/Cellar/librealsense/2.29.0/include 
     /usr/local/Cellar/glfw/3.3/include
   )
-  #set_source_files_properties(
-   #MainWindow.cpp
-   #Recorder.cpp
-   #CaptureDevice.cpp)
-#  set(SOURCE_FILES
-#    VolumetricFusion/MainWindow.cpp
-#    VolumetricFusion/Recorder.cpp
-#    VolumetricFusion/CaptureDevice.cpp)
-#  add_executable(VolumetricFusion ${SOURCE_FILES})
   add_definitions(-DAPPLE)
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 endif (APPLE)
 
 add_executable(VolumetricFusion
