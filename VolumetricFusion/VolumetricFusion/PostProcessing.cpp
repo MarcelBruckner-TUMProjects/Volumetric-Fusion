@@ -6,9 +6,11 @@
 #if APPLE
 #include "../example.hpp"
 #include "FileAccess.hpp"
+#include "CaptureDevice.h"
 #else
 #include "example.hpp"
 #include "VolumetricFusion/FileAccess.hpp"
+#include "VolumetricFusion/CaptureDevice.h"
 #endif
 
 #include <map>
@@ -27,10 +29,6 @@ void update_data(rs2::frame_queue& data, rs2::frame& depth, rs2::points& points,
 
 int main(int argc, char * argv[]) try
 {
-    // Create a simple OpenGL window for rendering:
-    window app(1280, 720, "VolumetricFusion Post-Processing");
-    ImGui_ImplGlfw_Init(app, false);
-
     // Recordings filename
     std::string filename = "recording_peace_kevin.bag";
     auto recorded = file_access::exists_test(filename);
@@ -38,9 +36,16 @@ int main(int argc, char * argv[]) try
         throw std::runtime_error("Missing file: " + filename);
     }
 
-    // Construct objects to manage view state
-    glfw_state original_view_orientation{};
-    glfw_state filtered_view_orientation{};
+    // Create a simple OpenGL window for rendering:
+    window app(1280, 720, "VolumetricFusion Post-Processing");
+
+    ImGui_ImplGlfw_Init(app, false);
+
+
+    // Construct an object to manage view state
+    glfw_state view_orientation{};
+    // Let the user control and manipulate the scenery orientation
+    register_glfw_callbacks(app, view_orientation);
 
     // Declare pointcloud objects, for calculating pointclouds and texture mappings
     rs2::pointcloud original_pc;
@@ -51,19 +56,22 @@ int main(int argc, char * argv[]) try
     rs2::config cfg;
     // Use a configuration object to request only depth from the pipeline
     //cfg.enable_stream(RS2_STREAM_DEPTH, 640, 0, RS2_FORMAT_Z16, 30);
-    //cfg.enable_stream(RS2_STREAM_DEPTH, 640, 0);
     cfg.enable_device_from_file(filename);
 
     // Start streaming with the above configuration
     pipe.start(cfg);
 
+    rs2::context ctx;
+    rs2::device device = pipe.get_active_profile().get_device();
+    CaptureDevice*  capture_device = new CaptureDevice(ctx, device);
+
     // Declare filters
-    //rs2::decimation_filter dec_filter;  // Decimation - reduces depth frame density
+    rs2::decimation_filter dec_filter(5);  // Decimation - reduces depth frame density
     rs2::threshold_filter thr_filter(0.3f, 2.3f);   // Threshold  - removes values outside recommended range
     //rs2::spatial_filter spat_filter;    // Spatial    - edge-preserving spatial smoothing
     //rs2::temporal_filter temp_filter;   // Temporal   - reduces temporal noise
 
-                                        // Declare disparity transform from depth to disparity and vice versa
+    // Declare disparity transform from depth to disparity and vice versa
     //const std::string disparity_filter_name = "Disparity";
     //rs2::disparity_transform depth_to_disparity(true);
     //rs2::disparity_transform disparity_to_depth(false);
@@ -72,13 +80,7 @@ int main(int argc, char * argv[]) try
     //std::vector<filter_options> filters;
     std::vector<rs2::filter*> filters;
     filters.emplace_back(&thr_filter);
-
-    // The following order of emplacement will dictate the orders in which filters are applied
-    //filters.emplace_back("Decimate", dec_filter);
-    //filters.emplace_back("Threshold", thr_filter);
-    //filters.emplace_back(disparity_filter_name, depth_to_disparity);
-    //filters.emplace_back("Spatial", spat_filter);
-    //filters.emplace_back("Temporal", temp_filter);
+    filters.emplace_back(&dec_filter);
 
     // Declaring two concurrent queues that will be used to enqueue and dequeue frames from different threads
     rs2::frame_queue original_data;
@@ -138,8 +140,8 @@ int main(int argc, char * argv[]) try
         render_ui(w, h);
 
         // Try to get new data from the queues and update the view with new texture
-        update_data(original_data, colored_depth, original_points, original_pc, original_view_orientation, color_map);
-        update_data(filtered_data, colored_filtered, filtered_points, filtered_pc, filtered_view_orientation, color_map);
+        update_data(original_data, colored_depth, original_points, original_pc, view_orientation, color_map);
+        update_data(filtered_data, colored_filtered, filtered_points, filtered_pc, view_orientation, color_map);
 
         draw_text(10, 50, "Original");
         draw_text(static_cast<int>(w / 2), 50, "Filtered");
@@ -148,30 +150,12 @@ int main(int argc, char * argv[]) try
         if (colored_depth && original_points)
         {
             glViewport(0, int(h) / 2, int(w) / 2, int(h) / 2);
-            draw_pointcloud(int(w) / 2, int(h) / 2, original_view_orientation, original_points);
+            draw_pointcloud(int(w) / 2, int(h) / 2, view_orientation, original_points);
         }
         if (colored_filtered && filtered_points)
         {
             glViewport(int(w) / 2, int(h) / 2, int(w) / 2, int(h) / 2);
-            draw_pointcloud(int(w) / 2, int(h) / 2, filtered_view_orientation, filtered_points);
-        }
-        // Update time of current frame's arrival
-        auto curr = std::chrono::high_resolution_clock::now();
-
-        // Time interval which must pass between movement of the pointcloud
-        const std::chrono::milliseconds rotation_delta(40);
-
-        // In order to calibrate the velocity of the rotation to the actual displaying speed, rotate
-        //  pointcloud only when enough time has passed between frames
-        if (curr - last_time > rotation_delta)
-        {
-            if (fabs(filtered_view_orientation.yaw) > max_angle)
-            {
-                rotation_velocity = -rotation_velocity;
-            }
-            original_view_orientation.yaw += rotation_velocity;
-            filtered_view_orientation.yaw += rotation_velocity;
-            last_time = curr;
+            draw_pointcloud(int(w) / 2, int(h) / 2, view_orientation, filtered_points);
         }
     }
 
