@@ -72,13 +72,14 @@ add_executable(VolumetricFusion
 )
 
 add_executable(PostProcessing
-  Recorder.cpp
-  CaptureDevice.cpp
-  PostProcessing.cpp
-  ../../third-party/glfw-imgui/src/imgui-fonts-fontawesome.hpp
-  ../../third-party/glfw-imgui/src/imgui-fonts-karla.hpp
-  ../../third-party/glfw-imgui/src/imgui.cpp
-  ../../third-party/glfw-imgui/src/imgui_impl_glfw.cpp
+        Recorder.cpp
+        CaptureDevice.cpp
+        PostProcessing.cpp
+        ../../third-party/glfw-imgui/src/imgui-fonts-fontawesome.hpp
+        ../../third-party/glfw-imgui/src/imgui-fonts-karla.hpp
+        ../../third-party/glfw-imgui/src/imgui.cpp
+        ../../third-party/glfw-imgui/src/imgui_impl_glfw.cpp
+        ../../third-party/glfw-imgui/src/imgui_draw.cpp
 )
 
 target_link_libraries(PostProcessing ${realsense2_LIBRARY})
