@@ -6,11 +6,11 @@
 #if APPLE
 #include "../example.hpp"
 #include "FileAccess.hpp"
-#include "CaptureDevice.h"
+//#include "CaptureDevice.h"
 #else
 #include "example.hpp"
 #include "VolumetricFusion/FileAccess.hpp"
-#include "VolumetricFusion/CaptureDevice.h"
+//#include "VolumetricFusion/CaptureDevice.h"
 #endif
 
 #include <map>
@@ -60,10 +60,6 @@ int main(int argc, char * argv[]) try
 
     // Start streaming with the above configuration
     pipe.start(cfg);
-
-    rs2::context ctx;
-    rs2::device device = pipe.get_active_profile().get_device();
-    CaptureDevice*  capture_device = new CaptureDevice(ctx, device);
 
     // Declare filters
     rs2::decimation_filter dec_filter(5);  // Decimation - reduces depth frame density
