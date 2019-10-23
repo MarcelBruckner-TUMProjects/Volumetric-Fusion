@@ -54,14 +54,19 @@ This section gives a short overview over the progress of the project and about w
 - [Intel RealSense SDK](https://dev.intelrealsense.com/docs/docs-get-started)
   - Get to know the API
   - Explore examples and setup Volumetric Fusion project for our needs based on the pointcloud example project
+  - Exploring filter techniques for background segmentation
 - Basic Setup & Camera setup, Recordings, Visualization code
-  - Multicamera pointcloud rendering 
-  - Basic persistent saving of pointclouds (No loading)
+  - Multicamera pointcloud rendering (broken)
+  - Advanced recording and replaying of depth and color data and pointclouds
+- Mac support
+  - Basic setup with cmake
   
 ## Planned
 - [OpenGL](https://www.opengl.org/) and [GLFW](https://www.glfw.org/)
   - Gather further knowledge over OpenGL and GLFW by doing the [OpenGL tutorial](https://learnopengl.com) 
   - Improve the visualization program to render dynamically generated scenes
+- [Intel RealSense SDK](https://dev.intelrealsense.com/docs/docs-get-started)
+  - Custom image pre/post-processing filters 
 - Basic Setup & Camera setup, Recordings, Visualization code
   - 17.10. – 24.10.
 - Camera calibration
