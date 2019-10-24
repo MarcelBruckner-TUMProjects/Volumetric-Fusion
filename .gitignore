@@ -422,6 +422,8 @@ VolumetricFusion/CMakeFiles/3.15.4/CMakeCXXCompiler.cmake
 VolumetricFusion/VolumetricFusion/CMakeFiles
 VolumetricFusion/**/CMakeFiles
 
+# Volumetric Fusion
+*.bag
 
 ## Core latex/pdflatex auxiliary files:
 *.aux
