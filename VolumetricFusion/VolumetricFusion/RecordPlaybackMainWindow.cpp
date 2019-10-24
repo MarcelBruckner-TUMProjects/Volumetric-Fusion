@@ -32,10 +32,11 @@ void draw_seek_bar(rs2::playback& playback, int* seek_pos, float2& location, flo
 void register_glfw_callbacks(window& app, glfw_state& app_state);
 
 enum RenderState {
-	POINTCLOUD ,
-	DEPTH_AND_COLOR ,
+	POINTCLOUD,
+	DEPTH_AND_COLOR,
 	/*DEPTH ,
 	COLOR */
+	COUNT
 };
 
 int main(int argc, char * argv[]) try
@@ -238,7 +239,7 @@ int main(int argc, char * argv[]) try
 		{
 			int s = (int)renderState;
 			s++;
-			s %= 4;
+			s %= RenderState::COUNT;
 			renderState = (RenderState)s;
 		}
 
@@ -265,7 +266,8 @@ int main(int argc, char * argv[]) try
 			break;
 		case DEPTH_AND_COLOR:
 			// Render depth frames from the default configuration, the recorder or the playback
-			depth_image.render(color_map.process(depth), { app.width() * 0.25f, app.height() * 0.25f, app.width() * 0.5f, app.height() * 0.75f });
+			depth_image.render(color_map.process(depth), { app.width() * 0.1f, app.height() * 0.1f, app.width() * 0.4f, app.height() * 0.75f });
+			color_image.render(color,					 { app.width() * 0.5f, app.height() * 0.1f, app.width() * 0.4f, app.height() * 0.75f });
 
 			break;
 		default:
