@@ -25,39 +25,6 @@
 // Helper functions for rendering the UI
 void render_ui(float w, float h);
 
-void render_app_state(float width, float height, glfw_state& app_state)
-{
-    // OpenGL commands that prep screen for the pointcloud
-    glLoadIdentity();
-    glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-    glClearColor(153.f / 255, 153.f / 255, 153.f / 255, 1);
-    glClear(GL_DEPTH_BUFFER_BIT);
-
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    gluPerspective(60, width / height, 0.01f, 10.0f);
-
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    gluLookAt(0, 0, 0, 0, 0, 1, 0, -1, 0);
-
-    glTranslatef(0, 0, +0.5f + app_state.offset_y*0.05f);
-    glRotated(app_state.pitch, 1, 0, 0);
-    glRotated(app_state.yaw, 0, 1, 0);
-    glTranslatef(0, 0, -0.5f);
-
-    glPointSize(width / 640);
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, app_state.tex.get_gl_handle());
-    float tex_border_color[] = { 0.8f, 0.8f, 0.8f, 0.8f };
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, tex_border_color);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, 0x812F); // GL_CLAMP_TO_EDGE
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, 0x812F); // GL_CLAMP_TO_EDGE
-    glBegin(GL_POINTS);
-}
-
 int main(int argc, char * argv[]) try {
     std::string figure_filenames[] = {
             "figure_front_20191026_211104.bag",
@@ -121,30 +88,27 @@ int main(int argc, char * argv[]) try {
     rs2::frame_queue queue;
     for (int i = 0; i < 4; ++i) {
         processing_threads[i] = std::thread([i, &stopped, &pipelines, &filters, &filtered_datas]() {
-            auto pipe = pipelines[i].second;
-            auto isi = pipelines[i].first == i;
-            while (!stopped) //While application is running
-            {
-                rs2::frameset data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
-                rs2::frame depth_frame = data.get_depth_frame(); //Take the depth frame from the frameset
-                if (!depth_frame) { // Should not happen but if the pipeline is configured differently
-                    return;       //  it might not provide depth and we don't want to crash
-                }
-                rs2::frame filtered = depth_frame; // Does not copy the frame, only adds a reference
+          auto pipe = pipelines[i].second;
+          auto isi = pipelines[i].first == i;
+          while (!stopped) //While application is running
+          {
+              rs2::frameset data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
+              rs2::frame depth_frame = data.get_depth_frame(); //Take the depth frame from the frameset
+              if (!depth_frame) { // Should not happen but if the pipeline is configured differently
+                  return;       //  it might not provide depth and we don't want to crash
+              }
+              rs2::frame filtered = depth_frame; // Does not copy the frame, only adds a reference
 
-                // Apply filters.
-                for (auto &&filter : filters) {
-                    filtered = filter->process(filtered);
-                }
+              // Apply filters.
+              for (auto &&filter : filters) {
+                  filtered = filter->process(filtered);
+              }
 
-                // Push filtered & original data to their respective queues
-                filtered_datas[i].enqueue(filtered);
-            }
+              // Push filtered & original data to their respective queues
+              filtered_datas[i].enqueue(filtered);
+          }
         });
     }
-
-    // We'll keep track of the last frame of each stream available to make the presentation persistent
-    std::map<int, rs2::frame> render_frames;
 
     std::vector<rs2::pointcloud> filtered_pc(4);
     std::vector<rs2::frame> filtered_colored(4);
@@ -157,6 +121,13 @@ int main(int argc, char * argv[]) try {
         const float h = static_cast<float>(app.height());
         const int w_half = w / 2;
         const int h_half = h / 2;
+
+        //render_ui(w, h);
+
+        draw_text(10, 50, figure_filenames[0].c_str());
+        draw_text(w_half, 50, figure_filenames[1].c_str());
+        draw_text(10, h_half + 10, figure_filenames[2].c_str());
+        draw_text(w_half, h_half + 10, figure_filenames[3].c_str());
 
         for (int i = 0; i < 4; ++i)
         {
@@ -173,41 +144,11 @@ int main(int argc, char * argv[]) try {
                     draw_pointcloud(int(w) / 2, int(h) / 2, view_orientation, filtered_points[i]);
                 }
             } else {
-                i -= 1; // avoid stuttering
+                i -= 1; // avoids stuttering
             }
         }
-        // 15 frames per second are what I recorded the video at (avoids stuttering
-        //nanosleep((const struct timespec[]){{0, 1000000000L / 15L}}, NULL);
-        //app.show(render_frames);
-
-        // Collect the new frames from all the connected devices
-        /*std::vector<std::pair<int, rs2::frame>> new_frames;
-        for (int i = 0; i < 4; ++i)
-        {
-            auto pipe_pair = pipelines[i];
-            auto pipe = pipe_pair.second;
-            rs2::frameset fs;
-            if (pipe.poll_for_frames(&fs))
-            {
-                for (const rs2::frame& f : fs) {
-                    new_frames.emplace_back(std::make_tuple(i, f));
-                }
-            }
-        }*/
-
-        // Convert the newly-arrived frames to render-friendly format
-        /*for (const auto& frame_info : new_frames)
-        {
-            auto id = frame_info.first;
-            auto frame = frame_info.second;
-
-            // Apply the colorizer of the matching device and store the colorized frame
-            auto colorized_depth = colorizers[id].process(frame);
-            render_frames[frame.get_profile().unique_id()] = colorized_depth;
-        }*/
-
-        // Present all the collected frames with openGl mosaic
-        //app.show(render_frames);
+        // 15 frames per second are what I recorded the video at (avoids stuttering and reduces cpu load)
+        nanosleep((const struct timespec[]){{0, 1000000000L / 15L}}, NULL);
     }
 
     stopped = true;
@@ -233,11 +174,11 @@ void render_ui(float w, float h)
 {
     // Flags for displaying ImGui window
     static const int flags = ImGuiWindowFlags_NoCollapse
-        | ImGuiWindowFlags_NoScrollbar
-        | ImGuiWindowFlags_NoSavedSettings
-        | ImGuiWindowFlags_NoTitleBar
-        | ImGuiWindowFlags_NoResize
-        | ImGuiWindowFlags_NoMove;
+                             | ImGuiWindowFlags_NoScrollbar
+                             | ImGuiWindowFlags_NoSavedSettings
+                             | ImGuiWindowFlags_NoTitleBar
+                             | ImGuiWindowFlags_NoResize
+                             | ImGuiWindowFlags_NoMove;
 
     ImGui_ImplGlfw_NewFrame(1);
     ImGui::SetNextWindowSize({ w, h });
