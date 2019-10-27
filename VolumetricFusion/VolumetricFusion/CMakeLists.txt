@@ -80,7 +80,23 @@ add_executable(PostProcessing
         ../../third-party/glfw-imgui/src/imgui.cpp
         ../../third-party/glfw-imgui/src/imgui_impl_glfw.cpp
         ../../third-party/glfw-imgui/src/imgui_draw.cpp
-)
+        )
+
+add_executable(MultiFileStream
+        Recorder.cpp
+        CaptureDevice.cpp
+        MultiFileStream.cpp
+        ../../third-party/glfw-imgui/src/imgui-fonts-fontawesome.hpp
+        ../../third-party/glfw-imgui/src/imgui-fonts-karla.hpp
+        ../../third-party/glfw-imgui/src/imgui.cpp
+        ../../third-party/glfw-imgui/src/imgui_impl_glfw.cpp
+        ../../third-party/glfw-imgui/src/imgui_draw.cpp
+        )
+
+target_link_libraries(MultiFileStream ${realsense2_LIBRARY})
+target_link_libraries(MultiFileStream glfw ${GLFW_LIBRARIES})
+target_include_directories(MultiFileStream PUBLIC ${OPENGL_INCLUDE_DIR})
+target_link_libraries(MultiFileStream ${OPENGL_gl_LIBRARY})
 
 target_link_libraries(PostProcessing ${realsense2_LIBRARY})
 target_link_libraries(PostProcessing glfw ${GLFW_LIBRARIES})
