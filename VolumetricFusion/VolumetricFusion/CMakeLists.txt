@@ -18,6 +18,7 @@ if (APPLE)
     /usr/local/Cellar/librealsense/2.29.0/include 
     /usr/local/Cellar/glfw/3.3/include
     ../../third-party/glfw-imgui/include
+    ../../third-party
     FileAccess.hpp
   )
   add_definitions(-DAPPLE)
