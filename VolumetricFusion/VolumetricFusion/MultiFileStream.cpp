@@ -35,6 +35,8 @@ int main(int argc, char * argv[]) try {
             "figure_180_clockwise_20191026_211134.bag",
             "figure_270_clockwise_20191026_211146.bag"
     };
+    //std::string figure_filenames[] = {"test.bag","test.bag","test.bag","test.bag"};
+
     for (auto filename : figure_filenames) {
         if (!file_access::exists_test(filename)) {
             throw std::runtime_error("Missing file: " + filename);
@@ -69,6 +71,7 @@ int main(int argc, char * argv[]) try {
         rs2::config cfg;
         //cfg.enable_device(dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
         cfg.enable_device_from_file(figure_filenames[i]);
+        cfg.enable_all_streams();
         pipe.start(cfg);
         auto profile = pipe.get_active_profile();
         //pipelines.emplace_back(std::make_tuple(i, pipe));
@@ -93,10 +96,12 @@ int main(int argc, char * argv[]) try {
     std::atomic_bool stopped(false);
     std::atomic_bool paused(false);
     std::vector<rs2::frame_queue> filtered_datas(4);
+    std::vector<rs2::frame> filtered_aligned_colors(4);
     std::vector<std::thread> processing_threads(4);
+    rs2::align align_to_color(RS2_STREAM_COLOR);
     rs2::frame_queue queue;
     for (int i = 0; i < 4; ++i) {
-        processing_threads[i] = std::thread([i, &stopped, &paused, &pipelines, &filters, &filtered_datas]() {
+        processing_threads[i] = std::thread([i, &stopped, &paused, &pipelines, &filters, &filtered_datas, &filtered_aligned_colors, &align_to_color]() {
           auto pipe = pipelines[i].second;
           auto isi = pipelines[i].first == i;
           while (!stopped) //While application is running
@@ -106,11 +111,17 @@ int main(int argc, char * argv[]) try {
               }
 
               rs2::frameset data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
+
+              data = align_to_color.process(data);
+
               rs2::frame depth_frame = data.get_depth_frame(); //Take the depth frame from the frameset
               if (!depth_frame) { // Should not happen but if the pipeline is configured differently
                   return;       //  it might not provide depth and we don't want to crash
               }
               rs2::frame filtered = depth_frame; // Does not copy the frame, only adds a reference
+
+              rs2::frame color_frame = data.get_color_frame();
+              filtered_aligned_colors[i] = color_frame;
 
               // Apply filters.
               for (auto &&filter : filters) {
@@ -127,6 +138,7 @@ int main(int argc, char * argv[]) try {
     std::vector<rs2::frame> active_frames(4);
     std::vector<rs2::points> filtered_points(4);
     std::vector<rs2::colorizer> color_maps(4);
+    texture color_image;
 
     bool align_frames = false;
 
@@ -137,15 +149,16 @@ int main(int argc, char * argv[]) try {
         const int w_half = w / 2;
         const int h_half = h / 2;
 
-        //render_ui(w, h);
+        // Retina display (Mac OS) have double the pixel density
+        int w2, h2;
+        glfwGetFramebufferSize(window_main, &w2, &h2);
+        const bool is_retina_display = w2 == w*2 && h2 == h*2;
 
         draw_text(10, 20, figure_filenames[0].c_str());
         draw_text(w_half, 20, figure_filenames[1].c_str());
         draw_text(10, h_half + 10, figure_filenames[2].c_str());
         draw_text(w_half, h_half + 10, figure_filenames[3].c_str());
 
-        //if (ImGui::IsKeyReleased(ImGui::GetKeyIndex(ImGuiKey_C))) {
-        //}
         // Flags for displaying ImGui window
         static const int flags = ImGuiWindowFlags_NoCollapse
                                  | ImGuiWindowFlags_NoScrollbar
@@ -153,7 +166,7 @@ int main(int argc, char * argv[]) try {
                                  | ImGuiWindowFlags_NoTitleBar
                                  | ImGuiWindowFlags_NoResize
                                  | ImGuiWindowFlags_NoMove;
-
+        // UI Rendering
         ImGui_ImplGlfw_NewFrame(1);
         ImGui::SetNextWindowSize({ w, h });
         ImGui::Begin("window_main", nullptr, flags);
@@ -171,12 +184,13 @@ int main(int argc, char * argv[]) try {
         ImGui::End();
         ImGui::Render();
 
+        // Draw the pointclouds
         for (int i = 0; i < 4; ++i) {
             rs2::frame f;
             if (!paused && filtered_datas[i].poll_for_frame(&f)) { // Try to take the depth and points from the queue
-                filtered_points[i] = filtered_pc[i].calculate(f); // Generate pointcloud from the depth data
-                active_frames[i] = color_maps[i].process(f);     // Colorize the depth frame with a color map
-                filtered_pc[i].map_to(active_frames[i]);         // Map the colored depth to the point cloud
+                filtered_points[i] = filtered_pc[i].calculate(f);  // Generate pointcloud from the depth data
+                active_frames[i] = color_maps[i].process(f);       // Colorize the depth frame with a color map
+                filtered_pc[i].map_to(active_frames[i]);           // Map the colored depth to the point cloud
             } else if (!paused) {
                 i -= 1; // avoids stuttering
                 continue;
@@ -184,8 +198,17 @@ int main(int argc, char * argv[]) try {
 
             if (active_frames[i] && filtered_points[i]) {
                 view_orientation.tex.upload(active_frames[i]);   //  and upload the texture to the view (without this the view will be B&W)
-                glViewport(w_half * (i % 2), h_half - (h_half * (i / 2)), w_half, h_half);
-                draw_pointcloud(int(w) / 2, int(h) / 2, view_orientation, filtered_points[i]);
+                if (is_retina_display) {
+                    glViewport(w * (i % 2), h - (h * (i / 2)), w, h);
+                } else {
+                    glViewport(w_half * (i % 2), h_half - (h_half * (i / 2)), w_half, h_half);
+                }
+
+                if (filtered_aligned_colors[i]) {
+                    draw_pointcloud_and_colors(w_half, h_half, view_orientation, filtered_points[i], filtered_aligned_colors[i], 0.2f);
+                } else {
+                    draw_pointcloud(w_half, h_half, view_orientation, filtered_points[i]);
+                }
             }
         }
 
@@ -220,6 +243,22 @@ int main(int argc, char * argv[]) try {
         }
 
         if (button_align_frames_pressed) {
+            paused = true;
+            auto points = filtered_points[0];
+
+            /*auto vertices = points.get_vertices();              // get vertices
+            auto tex_coords = points.get_texture_coordinates(); // and texture coordinates
+            for (int i = 0; i < points.size(); i++)
+            {
+                if (vertices[i].z)
+                {
+                    // upload the point and texture coordinates only for points we have depth data for
+                    glVertex3fv(vertices[i]);
+                    glTexCoord2fv(tex_coords[i]);
+                }
+            }*/
+
+            paused = false;
             std::cout << "Aligned the current lframes" << std::endl;
         }
 
@@ -244,23 +283,4 @@ catch (const std::exception& e)
 {
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
-}
-
-
-void render_ui(float w, float h)
-{
-    // Flags for displaying ImGui window
-    static const int flags = ImGuiWindowFlags_NoCollapse
-                             | ImGuiWindowFlags_NoScrollbar
-                             | ImGuiWindowFlags_NoSavedSettings
-                             | ImGuiWindowFlags_NoTitleBar
-                             | ImGuiWindowFlags_NoResize
-                             | ImGuiWindowFlags_NoMove;
-
-    ImGui_ImplGlfw_NewFrame(1);
-    ImGui::SetNextWindowSize({ w, h });
-    ImGui::Begin("app", nullptr, flags);
-
-    ImGui::End();
-    ImGui::Render();
 }

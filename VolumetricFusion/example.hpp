@@ -817,7 +817,7 @@ void draw_pointcloud(float width, float height, glfw_state& app_state, rs2::poin
     glPopAttrib();
 }
 
-void draw_pointcloud_and_colors(float width, float height, glfw_state& app_state, rs2::points& points, rs2::frame color_frame)
+void draw_pointcloud_and_colors(float width, float height, glfw_state& app_state, rs2::points& points, rs2::frame color_frame, float alpha)
 {
     if (!points)
         return;
@@ -843,18 +843,16 @@ void draw_pointcloud_and_colors(float width, float height, glfw_state& app_state
     glTranslatef(0, 0, -0.5f);
 
     glPointSize(width / 640);
+    glColor4f(1.0f, 1.0f, 1.0f, alpha);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, app_state.tex.get_gl_handle());
-    //float tex_border_color[] = { 0.8f, 0.8f, 0.8f, 0.8f };
-    //glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, tex_border_color);
+
+    // Alphs does not work :/
+    glColor4f(1.0f, 1.0f, 1.0f, alpha);
 
     // print the colors
     auto format = color_frame.get_profile().format();
-    //auto width = frame.get_width();
-    //auto height = frame.get_height();
-    //_stream_type = frame.get_profile().stream_type();
-    //_stream_index = frame.get_profile().stream_index();
     switch (format)
     {
         case RS2_FORMAT_RGB8:
@@ -870,8 +868,11 @@ void draw_pointcloud_and_colors(float width, float height, glfw_state& app_state
             glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, color_frame.get_data());
             break;
         default:
-            throw std::runtime_error("The requested format is not supported by this demo!");
+            throw std::runtime_error("The requested format is not supported!");
     }
+
+    //float tex_border_color[] = { 0.8f, 0.8f, 0.8f, 0.8f };
+    //glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, tex_border_color);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, 0x812F); // GL_CLAMP_TO_EDGE
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, 0x812F); // GL_CLAMP_TO_EDGE
