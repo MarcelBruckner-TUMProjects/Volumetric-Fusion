@@ -32,10 +32,10 @@ void render_ui(float w, float h);
 
 int main(int argc, char * argv[]) try {
     std::string figure_filenames[] = {
-            "figure_front_20191026_211104.bag",
-            "figure_90_clockwise_20191026_211121.bag",
-            "figure_180_clockwise_20191026_211134.bag",
-            "figure_270_clockwise_20191026_211146.bag"
+            "figure_recording/figure_0_20191028_172722.bag",
+            "figure_recording/figure_90_20191028_172807.bag",
+            "figure_recording/figure_180_20191028_172902.bag",
+            "figure_recording/figure_270_20191028_172927.bag"
     };
     //std::string figure_filenames[] = {"test.bag","test.bag","test.bag","test.bag"};
 
@@ -269,7 +269,6 @@ int main(int argc, char * argv[]) try {
 #if APPLE
 		nanosleep((const struct timespec[]){{0, 1000000000L / 15L}}, NULL);
 #else
-		Sleep(1000000000L / 15L);
 #endif
         //nanosleep((const struct timespec[]){{2, 0}}, NULL);
     }
