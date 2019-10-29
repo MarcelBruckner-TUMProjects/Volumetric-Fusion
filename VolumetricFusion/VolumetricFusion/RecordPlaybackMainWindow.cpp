@@ -72,13 +72,16 @@ int main(int argc, char* argv[]) try
 	std::vector<std::string> filenames;
 	std::map<std::string, std::string> pipeToFilenameMap;
 
-	file_access::iterateFilesInFolder(folder, [&](const auto& entry) { filenames.push_back(entry.path().filename().string()); }, true);
+	file_access::iterateFilesInFolder(folder, [&](const auto& entry) { 
+		auto path = entry.path();
+		std::string extension = path.extension().string();
+		if (extension == ".bag") {
+			filenames.push_back(path.filename().string());
+		}
+	}, true);
 
 	bool recorded = filenames.size() > 0;
-
-	// Create booleans to control GUI (recorded - allow play button, recording - show 'recording to file' text)
-	bool recording = false;
-
+	
 	// The render state
 	RenderState renderState = RenderState::POINTCLOUD;
 
@@ -93,6 +96,9 @@ int main(int argc, char* argv[]) try
 	// Declare a texture for the depth image on the GPU
 	std::map < std::string, texture> color_images;
 
+	// We'll keep track of the last frame of each stream available to make the presentation persistent
+	std::map<int, rs2::frame> render_frames;
+
 	// Declare frameset and frames which will hold the data from the camera
 	std::map < std::string, rs2::frameset> framesets;
 	std::map < std::string, rs2::frame> depths;
@@ -105,7 +111,8 @@ int main(int argc, char* argv[]) try
 
 	// Declare depth colorizer for pretty visualization of depth data
 	std::map < std::string, rs2::colorizer> colorizers;
-
+	
+	std::vector<std::string> physicalDeviceNames;
 	// Shared pointers to devices
 	std::map<std::string, std::shared_ptr<rs2::pipeline>> pipes_map;
 	for (auto&& dev : ctx.query_devices()) {
@@ -113,6 +120,8 @@ int main(int argc, char* argv[]) try
 		rs2::config cfg;
 		std::string device_name = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
 		cfg.enable_device(device_name);
+		pipe->start(cfg);
+
 		pipes_map[device_name] = pipe;
 		colorizers[device_name] = rs2::colorizer();
 		depth_images[device_name] = texture();
@@ -122,6 +131,7 @@ int main(int argc, char* argv[]) try
 		colors[device_name] = rs2::frame();
 		pointclouds[device_name] = rs2::pointcloud();
 		points[device_name] = rs2::points();
+		physicalDeviceNames.push_back(device_name);
 	}
 
 	// The number of pyhsical devices
@@ -143,6 +153,7 @@ int main(int argc, char* argv[]) try
 			rs2::config cfg;
 			std::string device_name = "__" + i + std::string("__");
 			cfg.enable_device_from_file(device_name);
+
 			pipes_map[device_name] = pipe;
 			colorizers[device_name] = rs2::colorizer();
 			depth_images[device_name] = texture();
@@ -156,22 +167,27 @@ int main(int argc, char* argv[]) try
 		}
 	}
 
+	std::vector<std::string> allDeviceNames;
+	for (const auto& entry : pipes_map) {
+		allDeviceNames.push_back(entry.first);
+	}
+
 	// Map devices to filenames for recording and replaying
 	int i = 0;
 	for each (const auto& entry in pipes_map)
 	{
 		if (i < filenames.size()) {
-			pipeToFilenameMap[entry.first] = folder + filenames[i++] + ".bag";
+			pipeToFilenameMap[entry.first] = folder + filenames[i++] ;
 		}
 		else {
 			pipeToFilenameMap[entry.first] = folder + entry.first + ".bag";
 		}
 	}
 
-	// Start streaming with the default configuration
-	for (auto& pipe_entry : pipes_map) {
-		pipe_entry.second->start();
-	}
+	//// Start streaming with the default configuration
+	//for (auto& pipe_entry : pipes_map) {
+	//	pipe_entry.second->start();
+	//}
 
 	// Create a variable to control the seek bar
 	int seek_pos;
@@ -192,45 +208,36 @@ int main(int argc, char* argv[]) try
 		ImGui::SetNextWindowSize({ app.width(), app.height() });
 		ImGui::Begin("app", nullptr, flags);
 
-		// The device number of the currently used device
-		int currentDeviceNumber = 0;
-		for (auto& pipe_entry : pipes_map) {
-			std::string device_name = pipe_entry.first;
-			std::string filename = pipeToFilenameMap[device_name];
+		/* ################################## IMGUI RENDERING ######################################## */
+		
+		// Set options for the ImGui buttons
+		ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, { 1, 1, 1, 1 });
+		ImGui::PushStyleColor(ImGuiCol_Button, { 36 / 255.f, 44 / 255.f, 51 / 255.f, 1 });
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 40 / 255.f, 170 / 255.f, 90 / 255.f, 1 });
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 36 / 255.f, 44 / 255.f, 51 / 255.f, 1 });
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12);
 
-			// Initialize a shared pointer to a device with the current device on the pipeline
-			rs2::device device = pipe_entry.second->get_active_profile().get_device();
-
-
-			// If the device is streaming live and not from a file
-			if (!device.as<rs2::playback>())
+		
+		if (captureState == CaptureState::STREAMING || captureState == CaptureState::RECORDING || captureState == CaptureState::RECORDING_PAUSED) // Disable recording while device is playing
+		{
+			if (captureState != CaptureState::RECORDING)
 			{
-				framesets[device_name] = pipe_entry.second->wait_for_frames(); // wait for next set of frames from the camera
-				depths[device_name] = framesets[device_name].get_depth_frame(); // Find and colorize the depth data
-				colors[device_name] = framesets[device_name].get_color_frame(); // Get the color data
-
-				//render_frames[depth.get_profile().unique_id()] = depth;
-				//render_frames[color.get_profile().unique_id()] = color;
+				ImGui::SetCursorPos({ app.width() / 2 - 250, app.height() - 80 });
+				ImGui::Text("Click 'record' to start recording");
 			}
-
-			// Set options for the ImGui buttons
-			ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, { 1, 1, 1, 1 });
-			ImGui::PushStyleColor(ImGuiCol_Button, { 36 / 255.f, 44 / 255.f, 51 / 255.f, 1 });
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 40 / 255.f, 170 / 255.f, 90 / 255.f, 1 });
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 36 / 255.f, 44 / 255.f, 51 / 255.f, 1 });
-			ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12);
-
-			if (!device.as<rs2::playback>()) // Disable recording while device is playing
+			ImGui::SetCursorPos({ app.width() / 2 - 250, app.height() - 60 });
+			if (ImGui::Button("record", { 50, 50 }))
 			{
-				if (!recording)
-				{
-					ImGui::SetCursorPos({ app.width() / 2 - 250, app.height() - 80 });
-					ImGui::Text("Click 'record' to start recording");
-				}
-				ImGui::SetCursorPos({ app.width() / 2 - 250, app.height() - 60 });
-				if (ImGui::Button("record", { 50, 50 }))
-				{
-					captureState = CaptureState::RECORDING;
+				file_access::resetFolder(folder);
+				recorded = false;
+
+				for (auto& pipe_entry : pipes_map) {
+					std::string device_name = pipe_entry.first;
+					std::string filename = pipeToFilenameMap[device_name];
+
+					// Initialize a shared pointer to a device with the current device on the pipeline
+					rs2::device device = pipe_entry.second->get_active_profile().get_device();
+
 					// If it is the start of a new recording (device is not a recorder yet)
 					if (!device.as<rs2::recorder>())
 					{
@@ -238,6 +245,8 @@ int main(int argc, char* argv[]) try
 						pipe_entry.second = std::make_shared<rs2::pipeline>();
 						rs2::config cfg; // Declare a new configuration
 						cfg.enable_record_to_file(filename);
+						cfg.enable_device(pipe_entry.first);
+
 						pipe_entry.second->start(cfg); //File will be opened at this point
 						device = pipe_entry.second->get_active_profile().get_device();
 					}
@@ -245,116 +254,195 @@ int main(int argc, char* argv[]) try
 					{ // If the recording is resumed after a pause, there's no need to reset the shared pointer
 						device.as<rs2::recorder>().resume(); // rs2::recorder allows access to 'resume' function
 					}
-					recording = true;
 				}
-
-				/*
-				When pausing, device still holds the file.
-				*/
-				if (device.as<rs2::recorder>())
-				{
-					if (recording)
-					{
-						ImGui::SetCursorPos({ app.width() / 2 - 250, app.height() - 80 });
-						std::string gui_text = "Recording to file '" + filename + "'";
-						ImGui::TextColored({ 255 / 255.f, 64 / 255.f, 54 / 255.f, 1 }, gui_text.c_str());
-					}
-
-					// Pause the playback if button is clicked
-					ImGui::SetCursorPos({ app.width() / 2 - 150, app.height() - 60 });
-					if (ImGui::Button("pause\nrecord", { 50, 50 }))
-					{
-						device.as<rs2::recorder>().pause();
-						recording = false;
-					}
-
-					ImGui::SetCursorPos({ app.width() / 2 - 50, app.height() - 60 });
-					if (ImGui::Button(" stop\nrecord", { 50, 50 }))
-					{
-						pipe_entry.second->stop(); // Stop the pipeline that holds the file and the recorder
-						pipe_entry.second = std::make_shared<rs2::pipeline>(); //Reset the shared pointer with a new pipeline
-						pipe_entry.second->start(); // Resume streaming with default configuration
-						device = pipe_entry.second->get_active_profile().get_device();
-						recorded = true; // Now we can run the file
-						recording = false;
-					}
-				}
+				captureState = CaptureState::RECORDING;
 			}
 
-			// After a recording is done, we can play it
-			if (recorded) {
-				ImGui::SetCursorPos({ app.width() / 2 + 100,  app.height() - 80 });
-				ImGui::Text("Click 'play' to start playing");
-				ImGui::SetCursorPos({ app.width() / 2 + 100, app.height() - 60 });
-				if (ImGui::Button("play", { 50, 50 }))
+			/*
+			When pausing, device still holds the file.
+			*/
+			if (captureState == CaptureState::RECORDING || captureState == CaptureState::RECORDING_PAUSED)
+			{
+				if (captureState == CaptureState::RECORDING)
 				{
-					if (!device.as<rs2::playback>())
-					{
-						pipe_entry.second->stop(); // Stop streaming with default configuration
+					ImGui::SetCursorPos({ app.width() / 2 - 250, app.height() - 80 });
+					std::string gui_text = "Recording to folder '" + folder + "'";
+					ImGui::TextColored({ 255 / 255.f, 64 / 255.f, 54 / 255.f, 1 }, gui_text.c_str());
+				}
+
+				// Pause the playback if button is clicked
+				ImGui::SetCursorPos({ app.width() / 2 - 150, app.height() - 60 });
+				if (ImGui::Button("pause\nrecord", { 50, 50 }))
+				{
+					for (auto& pipe_entry : pipes_map) {
+						// Initialize a shared pointer to a device with the current device on the pipeline
+						rs2::device device = pipe_entry.second->get_active_profile().get_device();
+
+						device.as<rs2::recorder>().pause();
+					}
+					
+					captureState = CaptureState::RECORDING_PAUSED;
+				}
+
+				ImGui::SetCursorPos({ app.width() / 2 - 50, app.height() - 60 });
+				if (ImGui::Button(" stop\nrecord", { 50, 50 }))
+				{
+					for (auto& pipe_entry : pipes_map) {
+						// Initialize a shared pointer to a device with the current device on the pipeline
+						rs2::device device = pipe_entry.second->get_active_profile().get_device();
+
+						pipe_entry.second->stop(); // Stop the pipeline that holds the file and the recorder
+						pipe_entry.second = std::make_shared<rs2::pipeline>(); //Reset the shared pointer with a new pipeline
+
+						rs2::config cfg;
+						cfg.enable_device(pipe_entry.first);
+						pipe_entry.second->start(cfg);
+
+						device = pipe_entry.second->get_active_profile().get_device();
+					}
+					recorded = true; // Now we can run the file
+					
+					captureState = CaptureState::STREAMING;
+				}
+			}
+		}
+
+		// PLAYING RELATED
+
+		// After a recording is done, we can play it
+		if (recorded) {
+			ImGui::SetCursorPos({ app.width() / 2 + 100,  app.height() - 80 });
+			ImGui::Text("Click 'play' to start playing");
+			ImGui::SetCursorPos({ app.width() / 2 + 100, app.height() - 60 });
+			if (ImGui::Button("play", { 50, 50 }))
+			{
+				for (auto& pipe_entry : pipes_map) {
+					std::string device_name = pipe_entry.first;
+					std::string filename = pipeToFilenameMap[device_name];
+
+					if (device_name.find(std::string("__")) == std::string::npos) {
+						// Initialize a shared pointer to a device with the current device on the pipeline
+						rs2::device device = pipe_entry.second->get_active_profile().get_device();
+						if (!device.as<rs2::playback>())
+						{
+							pipe_entry.second->stop(); // Stop streaming with default configuration
+							pipe_entry.second = std::make_shared<rs2::pipeline>();
+							rs2::config cfg;
+							cfg.enable_device_from_file(filename);
+							pipe_entry.second->start(cfg); //File will be opened in read mode at this point
+						}
+						else
+						{
+							device.as<rs2::playback>().resume();
+						}
+					}
+					else {
 						pipe_entry.second = std::make_shared<rs2::pipeline>();
 						rs2::config cfg;
 						cfg.enable_device_from_file(filename);
 						pipe_entry.second->start(cfg); //File will be opened in read mode at this point
-						device = pipe_entry.second->get_active_profile().get_device();
-					}
-					else
-					{
-						device.as<rs2::playback>().resume();
 					}
 				}
+				captureState = CaptureState::PLAYING;
+			}
+		}
+		
+		// If device is playing a recording, we allow pause and stop
+		if (captureState == CaptureState::PLAYING)
+		{
+			// Render a seek bar for the player
+			//float2 location = { app.width() / 4, app.height() - 50 };
+			//draw_seek_bar(playback, &seek_pos, location, app.width() / 4);
+
+			ImGui::SetCursorPos({ app.width() / 2 + 200, app.height() - 60 });
+			if (ImGui::Button(" pause\nplaying", { 50, 50 }))
+			{
+				for (auto& pipe_entry : pipes_map) {
+					// Initialize a shared pointer to a device with the current device on the pipeline
+					rs2::device device = pipe_entry.second->get_active_profile().get_device();
+					rs2::playback playback = device.as<rs2::playback>();
+
+					playback.pause();
+				}
+				captureState = CaptureState::PLAYING_PAUSED;
 			}
 
-			// If device is playing a recording, we allow pause and stop
+			if (isPhysicalDeviceConnected) {
+				ImGui::SetCursorPos({ app.width() / 2 + 300, app.height() - 60 });
+				if (ImGui::Button("  stop\nplaying", { 50, 50 }))
+				{
+					for (auto& pipe_entry : pipes_map) {
+						// Initialize a shared pointer to a device with the current device on the pipeline
+						rs2::device device = pipe_entry.second->get_active_profile().get_device();
+						pipe_entry.second->stop();
+						pipe_entry.second = std::make_shared<rs2::pipeline>();
+						rs2::config cfg;
+						cfg.enable_device(pipe_entry.first);
+						pipe_entry.second->start(cfg);
+						device = pipe_entry.second->get_active_profile().get_device();
+					}
+					captureState = CaptureState::STREAMING;
+				}
+			}
+		}
+
+
+		// SWITCH VIEW
+		ImGui::SetCursorPos({ app.width() - 60, app.height() - 60 });
+		if (ImGui::Button("switch\n view", { 50, 50 }))
+		{
+			int s = (int)renderState;
+			s++;
+			s %= (int)RenderState::COUNT;
+			renderState = (RenderState)s;
+		}
+
+
+		ImGui::PopStyleColor(4);
+		ImGui::PopStyleVar();
+
+		ImGui::End();
+		ImGui::Render();
+
+		/* ################################## IMGUI RENDERING ######################################## */
+
+		std::vector<std::string>* renderDeviceNames = &allDeviceNames;
+		if (captureState == CaptureState::STREAMING || captureState == CaptureState::RECORDING || captureState == CaptureState::RECORDING_PAUSED) {
+			renderDeviceNames = &physicalDeviceNames;
+		}
+
+		int numRenderDevices = renderDeviceNames->size();
+
+		float width = app.width() * 0.2f;
+		float height = (app.height() * 0.75f) / (float)ceil(numRenderDevices / 2);
+
+		// The device number of the currently used device
+		int currentDeviceNumber = 0;
+		for (std::string device_name : *renderDeviceNames) {
+			auto pipe = pipes_map[device_name];
+			rs2::device device = pipe->get_active_profile().get_device();
+
+			//// If the device is streaming live and not from a file
+			if (!device.as<rs2::playback>())
+			{
+				framesets[device_name] = pipe->wait_for_frames(); // wait for next set of frames from the camera
+				depths[device_name] = framesets[device_name].get_depth_frame(); // Find and colorize the depth data
+				colors[device_name] = framesets[device_name].get_color_frame(); // Get the color data
+			}
+
+			//// If device is playing a recording, we allow pause and stop
 			if (device.as<rs2::playback>())
 			{
-				rs2::playback playback = device.as<rs2::playback>();
-				if (pipe_entry.second->poll_for_frames(&framesets[device_name])) // Check if new frames are ready
+				if (pipe->poll_for_frames(&framesets[device_name])) // Check if new frames are ready
 				{
 					depths[device_name] = framesets[device_name].get_depth_frame(); // Find and colorize the depth data for rendering
 					colors[device_name] = framesets[device_name].get_color_frame(); // Get the color data for rendering
 				}
-
-				// Render a seek bar for the player
-				float2 location = { app.width() / 4, app.height() - 50 };
-				draw_seek_bar(playback, &seek_pos, location, app.width() / 4);
-
-				ImGui::SetCursorPos({ app.width() / 2 + 200, app.height() - 60 });
-				if (ImGui::Button(" pause\nplaying", { 50, 50 }))
-				{
-					playback.pause();
-				}
-
-				if (isPhysicalDeviceConnected) {
-					ImGui::SetCursorPos({ app.width() / 2 + 300, app.height() - 60 });
-					if (ImGui::Button("  stop\nplaying", { 50, 50 }))
-					{
-						pipe_entry.second->stop();
-						pipe_entry.second = std::make_shared<rs2::pipeline>();
-						pipe_entry.second->start();
-						device = pipe_entry.second->get_active_profile().get_device();
-					}
-				}
 			}
 
-			ImGui::SetCursorPos({ app.width() - 60, app.height() - 60 });
-			if (ImGui::Button("switch\n view", { 50, 50 }))
-			{
-				int s = (int)renderState;
-				s++;
-				s %= (int)RenderState::COUNT;
-				renderState = (RenderState)s;
-			}
-
-			ImGui::PopStyleColor(4);
-			ImGui::PopStyleVar();
-
-			ImGui::End();
-			ImGui::Render();
-
+			float xPos;
+			float yPos;
 			/* ################################## RENDERING ######################################## */
-
-			int numToDisplayDevices = numPhysicalDevices;
-			//if(repl)
 			try {
 				switch (renderState)
 				{
@@ -372,10 +460,18 @@ int main(int argc, char* argv[]) try
 					draw_pointcloud(app.width(), app.height(), app_state, points[device_name]);
 					break;
 				case RenderState::DEPTH_AND_COLOR:
-					// Render depth frames from the default configuration, the recorder or the playback
-					depth_images[device_name].render(colorizers[device_name].process(depths[device_name]), { app.width() * 0.1f, app.height() * 0.1f, app.width() * 0.4f, app.height() * 0.75f });
-					color_images[device_name].render(colors[device_name], { app.width() * 0.5f, app.height() * 0.1f, app.width() * 0.4f, app.height() * 0.75f });
+					render_frames[depths[device_name].get_profile().unique_id()] = colorizers[device_name].process(depths[device_name]);
+					render_frames[colors[device_name].get_profile().unique_id()] = colors[device_name];
+ 					//xPos = app.width() * 0.5f;
+					//if (currentDeviceNumber % 2 == 0) {
+					//	xPos -= 2.0f * width;
+					//}
 
+					//yPos = app.height() * 0.4f + (float)(floor((numRenderDevices - 1) * 0.5f)) * height;
+
+					//// Render depth frames from the default configuration, the recorder or the playback
+					//depth_images[device_name].render(colorizers[device_name].process(depths[device_name]), { xPos, yPos, width, height });
+					//color_images[device_name].render(colors[device_name], { xPos + width, yPos, width, height });
 					break;
 				default:
 					break;
@@ -386,10 +482,16 @@ int main(int argc, char* argv[]) try
 				std::cout << "RealSense error while RENDERING! " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
 			}
 
+			if (renderState == RenderState::DEPTH_AND_COLOR) {
+				app.show(render_frames);
+			}
+
 			/* ################################## RENDERING ######################################## */
 
 			// Leave here !!
 			currentDeviceNumber++;
+
+
 		}
 	}
 	return EXIT_SUCCESS;

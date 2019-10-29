@@ -31,4 +31,8 @@ namespace file_access {
 			lambda(entry);
 		}
 	}
+
+	void resetFolder(std::string path) {
+		iterateFilesInFolder(path, [&](const auto& entry) {fs::remove(entry.path()); }, true);
+	}
 }
