@@ -424,6 +424,7 @@ VolumetricFusion/**/CMakeFiles
 
 # Volumetric Fusion
 *.bag
+recordings/
 
 ## Core latex/pdflatex auxiliary files:
 *.aux
