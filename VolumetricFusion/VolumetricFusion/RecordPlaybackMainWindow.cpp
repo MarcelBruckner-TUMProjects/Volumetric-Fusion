@@ -337,6 +337,7 @@ int main(int argc, char* argv[]) try
 						}
 					}
 					else {
+						//pipe_entry.second->stop(); // Stop streaming with default configuration
 						pipe_entry.second = std::make_shared<rs2::pipeline>();
 						rs2::config cfg;
 						cfg.enable_device_from_file(filename);
@@ -403,7 +404,6 @@ int main(int argc, char* argv[]) try
 
 		ImGui::End();
 		ImGui::Render();
-
 		/* ################################## IMGUI RENDERING ######################################## */
 
 		std::vector<std::string>* renderDeviceNames = &allDeviceNames;
@@ -415,6 +415,8 @@ int main(int argc, char* argv[]) try
 
 		float width = app.width() * 0.2f;
 		float height = (app.height() * 0.75f) / (float)ceil(numRenderDevices / 2);
+		
+		render_frames = std::map<int, rs2::frame>();
 
 		// The device number of the currently used device
 		int currentDeviceNumber = 0;
@@ -440,8 +442,6 @@ int main(int argc, char* argv[]) try
 				}
 			}
 
-			float xPos;
-			float yPos;
 			/* ################################## RENDERING ######################################## */
 			try {
 				switch (renderState)
@@ -462,16 +462,7 @@ int main(int argc, char* argv[]) try
 				case RenderState::DEPTH_AND_COLOR:
 					render_frames[depths[device_name].get_profile().unique_id()] = colorizers[device_name].process(depths[device_name]);
 					render_frames[colors[device_name].get_profile().unique_id()] = colors[device_name];
- 					//xPos = app.width() * 0.5f;
-					//if (currentDeviceNumber % 2 == 0) {
-					//	xPos -= 2.0f * width;
-					//}
 
-					//yPos = app.height() * 0.4f + (float)(floor((numRenderDevices - 1) * 0.5f)) * height;
-
-					//// Render depth frames from the default configuration, the recorder or the playback
-					//depth_images[device_name].render(colorizers[device_name].process(depths[device_name]), { xPos, yPos, width, height });
-					//color_images[device_name].render(colors[device_name], { xPos + width, yPos, width, height });
 					break;
 				default:
 					break;
@@ -482,16 +473,16 @@ int main(int argc, char* argv[]) try
 				std::cout << "RealSense error while RENDERING! " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
 			}
 
-			if (renderState == RenderState::DEPTH_AND_COLOR) {
-				app.show(render_frames);
-			}
 
 			/* ################################## RENDERING ######################################## */
 
 			// Leave here !!
 			currentDeviceNumber++;
 
+		}
 
+		if (renderState == RenderState::DEPTH_AND_COLOR) {
+			app.show(render_frames);
 		}
 	}
 	return EXIT_SUCCESS;
