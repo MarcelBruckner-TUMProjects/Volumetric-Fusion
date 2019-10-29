@@ -18,6 +18,7 @@ if (APPLE)
     /usr/local/Cellar/librealsense/2.29.0/include 
     /usr/local/Cellar/glfw/3.3/include
     ../../third-party/glfw-imgui/include
+    ../../third-party
     FileAccess.hpp
   )
   add_definitions(-DAPPLE)
@@ -70,11 +71,42 @@ add_executable(VolumetricFusion
   ##../../third-party/glfw-imgui/src/winmm_joystick.h
 
 )
-message(STATUS ${imgui_SRC})
 
-target_link_libraries(${PROJECT_NAME} ${realsense2_LIBRARY})
-target_link_libraries(${PROJECT_NAME} glfw ${GLFW_LIBRARIES})
-target_include_directories(${PROJECT_NAME} PUBLIC ${OPENGL_INCLUDE_DIR})
-target_link_libraries(${PROJECT_NAME} ${OPENGL_gl_LIBRARY})
+add_executable(PostProcessing
+        Recorder.cpp
+        CaptureDevice.cpp
+        PostProcessing.cpp
+        ../../third-party/glfw-imgui/src/imgui-fonts-fontawesome.hpp
+        ../../third-party/glfw-imgui/src/imgui-fonts-karla.hpp
+        ../../third-party/glfw-imgui/src/imgui.cpp
+        ../../third-party/glfw-imgui/src/imgui_impl_glfw.cpp
+        ../../third-party/glfw-imgui/src/imgui_draw.cpp
+        )
+
+add_executable(MultiFileStream
+        Recorder.cpp
+        CaptureDevice.cpp
+        MultiFileStream.cpp
+        ../../third-party/glfw-imgui/src/imgui-fonts-fontawesome.hpp
+        ../../third-party/glfw-imgui/src/imgui-fonts-karla.hpp
+        ../../third-party/glfw-imgui/src/imgui.cpp
+        ../../third-party/glfw-imgui/src/imgui_impl_glfw.cpp
+        ../../third-party/glfw-imgui/src/imgui_draw.cpp
+        )
+
+target_link_libraries(MultiFileStream ${realsense2_LIBRARY})
+target_link_libraries(MultiFileStream glfw ${GLFW_LIBRARIES})
+target_include_directories(MultiFileStream PUBLIC ${OPENGL_INCLUDE_DIR})
+target_link_libraries(MultiFileStream ${OPENGL_gl_LIBRARY})
+
+target_link_libraries(PostProcessing ${realsense2_LIBRARY})
+target_link_libraries(PostProcessing glfw ${GLFW_LIBRARIES})
+target_include_directories(PostProcessing PUBLIC ${OPENGL_INCLUDE_DIR})
+target_link_libraries(PostProcessing ${OPENGL_gl_LIBRARY})
+
+target_link_libraries(VolumetricFusion ${realsense2_LIBRARY})
+target_link_libraries(VolumetricFusion glfw ${GLFW_LIBRARIES})
+target_include_directories(VolumetricFusion PUBLIC ${OPENGL_INCLUDE_DIR})
+target_link_libraries(VolumetricFusion ${OPENGL_gl_LIBRARY})
 
 
