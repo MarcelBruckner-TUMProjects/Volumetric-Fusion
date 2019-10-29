@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 
 #include <filesystem>
+#include <direct.h>
 namespace fs = std::filesystem;
 
 namespace file_access {
