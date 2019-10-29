@@ -23,6 +23,8 @@
 #include "imgui_impl_glfw.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+#include <Windows.h>
+#include <synchapi.h>
 
 
 // Helper functions for rendering the UI
@@ -75,7 +77,7 @@ int main(int argc, char * argv[]) try {
         pipe.start(cfg);
         auto profile = pipe.get_active_profile();
         //pipelines.emplace_back(std::make_tuple(i, pipe));
-        pipelines[i] = std::make_tuple(i, pipe);
+        pipelines[i] = std::make_pair(i, pipe);
     }
 
     // Declare filters
@@ -262,8 +264,13 @@ int main(int argc, char * argv[]) try {
             std::cout << "Aligned the current lframes" << std::endl;
         }
 
+
         // 15 frames per second are what I recorded the video at (avoids stuttering and reduces cpu load)
-        nanosleep((const struct timespec[]){{0, 1000000000L / 15L}}, NULL);
+#if APPLE
+		nanosleep((const struct timespec[]){{0, 1000000000L / 15L}}, NULL);
+#else
+		Sleep(1000000000L / 15L);
+#endif
         //nanosleep((const struct timespec[]){{2, 0}}, NULL);
     }
 

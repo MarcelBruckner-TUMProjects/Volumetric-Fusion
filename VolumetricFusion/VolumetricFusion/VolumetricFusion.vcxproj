@@ -20,8 +20,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CaptureDevice.cpp" />
+    <ClCompile Include="MultiFileStream.cpp" />
     <ClCompile Include="Recorder.cpp" />
-    <ClCompile Include="RecordPlaybackMainWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.md" />
@@ -111,6 +111,7 @@
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(ProjectDir)..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
