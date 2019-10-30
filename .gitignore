@@ -412,6 +412,7 @@ _deps
 *.make
 *.cmake
 *.cbp
+cmake-build-debug
 
 # Mac OS gitignore
 VolumetricFusion/VolumetricFusion/VolumetricFusion
@@ -424,6 +425,7 @@ VolumetricFusion/**/CMakeFiles
 
 # Volumetric Fusion
 *.bag
+recordings/
 
 ## Core latex/pdflatex auxiliary files:
 *.aux
