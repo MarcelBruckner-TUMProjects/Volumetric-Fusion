@@ -41,11 +41,12 @@ namespace file_access {
 	}
 
 	std::vector<std::string> listFilesInFolder(std::string folder, std::string filterExtension = std::string(".bag"), bool createIfNot = false, bool sorted=true) {
-		std::vector<std::string> filenames;		
-		iterateFilesInFolder(folder, [&folder, &filenames](const auto& entry) {
-			auto path = entry.path();
-			filenames.push_back(folder + path.filename().string());
-		}, createIfNot);
+		std::vector<std::string> filenames;
+		auto callback = [&folder, &filenames](const auto& entry) {
+            auto path = entry.path();
+            filenames.push_back(folder + path.filename().string());
+        };
+		iterateFilesInFolder(folder, callback, createIfNot);
 
 		std::vector<std::string> filtered;
 		std::copy_if(filenames.begin(), filenames.end(), std::back_inserter(filtered), [&filterExtension](std::string filename) {return hasEnding(filename, filterExtension); });
@@ -57,7 +58,10 @@ namespace file_access {
 	}
 	   
 	void resetFolder(std::string path) {
-		iterateFilesInFolder(path, [&](const auto& entry) {fs::remove(entry.path()); }, true);
+	    auto callback = [&](const auto& entry) {
+	        fs::remove(entry.path());
+	    };
+		iterateFilesInFolder(path, callback, true);
 	}
 
 }
