@@ -33,7 +33,33 @@ namespace file_access {
 		}
 	}
 
+	bool hasEnding(std::string const& fullString, std::string const& ending) {
+		if (fullString.length() >= ending.length()) {
+			return (0 == fullString.compare(fullString.length() - ending.length(), ending.length(), ending));
+		}
+		else {
+			return false;
+		}
+	}
+
+	std::vector<std::string> listFilesInFolder(std::string folder, std::string filterExtension = std::string(".bag"), bool createIfNot = false, bool sorted=true) {
+		std::vector<std::string> filenames;		
+		iterateFilesInFolder(folder, [&folder, &filenames](const auto& entry) {
+			auto path = entry.path();
+			filenames.push_back(folder + path.filename().string());
+		}, createIfNot);
+
+		std::vector<std::string> filtered;
+		std::copy_if(filenames.begin(), filenames.end(), std::back_inserter(filtered), [&filterExtension](std::string filename) {return hasEnding(filename, filterExtension); });
+
+		if (sorted) {
+			std::sort(filtered.begin(), filtered.end());
+		}
+		return filtered;
+	}
+	   
 	void resetFolder(std::string path) {
 		iterateFilesInFolder(path, [&](const auto& entry) {fs::remove(entry.path()); }, true);
 	}
+
 }
