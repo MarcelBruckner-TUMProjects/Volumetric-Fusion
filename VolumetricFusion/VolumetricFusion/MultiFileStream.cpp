@@ -24,10 +24,18 @@
 #include <atomic>
 #include <filesystem>
 
+#include <gl/GL.h>
+
 #include <imgui.h>
 #include "imgui_impl_glfw.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+
+enum class RenderState {
+	MULTI_POINTCLOUD,
+	SINGLE_COLOR,
+	COUNT
+};
 
 enum class CaptureState {
 	STREAMING,
@@ -39,6 +47,7 @@ enum class CaptureState {
 class Settings {
 public:
 	CaptureState captureState = CaptureState::STREAMING;
+	RenderState renderState = RenderState::SINGLE_COLOR;
 	std::string captures_folder = "captures/";
 	std::string recordings_folder = "recordings/";
 }settings;
@@ -68,12 +77,11 @@ int main(int argc, char * argv[]) try {
 
     rs2::context ctx; // Create librealsense context for managing devices
 	std::map<int, std::shared_ptr<rs2::pipeline>> pipelines;
-
+	
 	std::vector<std::string> stream_names(4);
 	int i = 0;
 	switch (settings.captureState) {
 	case CaptureState::STREAMING:
-
 		for (auto&& device : ctx.query_devices())
 		{
 			if (i >= 4) {
@@ -92,7 +100,6 @@ int main(int argc, char * argv[]) try {
 		}
 		break;
 	case CaptureState::RECORDING:
-		file_access::resetFolder(settings.recordings_folder);
 		for (auto&& device : ctx.query_devices())
 		{
 			auto pipe = std::make_shared<rs2::pipeline>(ctx);
@@ -130,10 +137,22 @@ int main(int argc, char * argv[]) try {
 	default:
 		break;
 	}
+
+	if (pipelines.size() <= 0) {
+		_THROW(rs2::error("No device or file found!"));
+	}
+	if (settings.captureState == CaptureState::RECORDING) {
+		file_access::resetFolder(settings.recordings_folder);
+	}
 	while (stream_names.size() < 4) {
 		stream_names.push_back("");
 	}
     
+
+	// We'll keep track of the last frame of each stream available to make the presentation persistent
+	std::map<int, rs2::frame> render_frames;
+
+	texture single_color_frame;
 
     // Declare filters
     rs2::decimation_filter decimation_filter(1);         // Decimation - reduces depth frame density
@@ -169,7 +188,6 @@ int main(int argc, char * argv[]) try {
 				}
 
 				try {
-
 					rs2::frameset data = pipe->wait_for_frames(); // Wait for next set of frames from the camera
 
 					data = align_to_color.process(data);
@@ -192,7 +210,8 @@ int main(int argc, char * argv[]) try {
 					filtered_datas[i].enqueue(filtered);
 				}
 				catch (const std::exception & e) {
-					std::cout << e.what() << std::endl;
+					std::stringstream stream;
+					stream << "******************** THREAD ERROR *******************" << std::endl << e.what() << "****************************************************" <<std::endl;
 				}
 			}
 			pipe->stop();
@@ -219,7 +238,7 @@ int main(int argc, char * argv[]) try {
 		int w2, h2;
 		glfwGetFramebufferSize(window_main, &w2, &h2);
 		const bool is_retina_display = w2 == w * 2 && h2 == h * 2;
-		
+
 		draw_text(10, 20, stream_names[0].c_str());
 		draw_text(w_half, 20, stream_names[1].c_str());
 		draw_text(10, h_half + 10, stream_names[2].c_str());
@@ -291,13 +310,27 @@ int main(int argc, char * argv[]) try {
 			paused = false;
 			std::cout << "Aligned the current lframes" << std::endl;
 		}
-		
+
+		ImGui::SameLine(ImGui::GetWindowWidth() - 360);
+		if (ImGui::Button("Switch view")) {
+			int s = (int) settings.renderState;
+			s = (s + 1) % (int)RenderState::COUNT;
+			settings.renderState = (RenderState) s;
+
+			std::cout << "Switching render state to " << std::to_string((int)settings.renderState) << std::endl;
+		}
+
 		ImGui::End();
 		ImGui::Render();
 
-		// Draw the pointclouds
-		for (int i = 0; i < pipelines.size() && i < 4; ++i)
+		render_frames = std::map<int, rs2::frame>();
+
+		switch (settings.renderState) {
+		case RenderState::MULTI_POINTCLOUD:
 		{
+			// Draw the pointclouds
+			for (int i = 0; i < pipelines.size() && i < 4; ++i)
+			{
 				rs2::frame f;
 				if (!paused && filtered_datas[i].poll_for_frame(&f)) { // Try to take the depth and points from the queue
 					filtered_points[i] = filtered_pc[i].calculate(f);  // Generate pointcloud from the depth data
@@ -325,8 +358,36 @@ int main(int argc, char * argv[]) try {
 						draw_pointcloud(w_half, h_half, view_orientation, filtered_points[i]);
 					}
 				}
-		}	
-    }
+			}
+		}
+		break;
+
+		case RenderState::SINGLE_COLOR:
+		{
+			auto color = filtered_aligned_colors[0];
+			auto data = color.get_data();
+			if (color != NULL) {
+				single_color_frame.render(color, { 0,0, window_main.width() , window_main.height() * 0.95f });
+			}
+
+			glBegin(GL_LINES);
+
+			glColor3f(1, 0, 0);
+
+			glVertex2d(50, 50);
+			glVertex2d(150, 50);
+			glVertex2d(150, 50);
+			glVertex2d(150, 150);
+			glVertex2d(150, 150);
+			glVertex2d(50, 150);
+			glVertex2d(50, 150);
+			glVertex2d(50, 50);
+
+			glEnd();
+			break;
+		}
+		}
+	}
 
     stopped = true;
     for (auto &thread : processing_threads) {
