@@ -38,7 +38,7 @@ enum class CaptureState {
 
 class Settings {
 public:
-	CaptureState captureState = CaptureState::STREAMING;
+	CaptureState captureState = CaptureState::PLAYING;
 	std::string captures_folder = "captures/";
 	std::string recordings_folder = "recordings/";
 }settings;
