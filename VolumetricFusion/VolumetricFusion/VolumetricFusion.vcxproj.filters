@@ -40,5 +40,11 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MultiFileStream.h" />
+    <ClInclude Include="ImGuiHelpers.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Enums.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

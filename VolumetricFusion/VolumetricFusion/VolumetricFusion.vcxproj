@@ -34,7 +34,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CaptureDevice.h" />
+    <ClInclude Include="Enums.hpp" />
     <ClInclude Include="FileAccess.hpp" />
+    <ClInclude Include="ImGuiHelpers.hpp" />
     <ClInclude Include="MultiFileStream.h" />
     <ClInclude Include="ProcessingBlocks.hpp" />
     <ClInclude Include="Recorder.h" />
