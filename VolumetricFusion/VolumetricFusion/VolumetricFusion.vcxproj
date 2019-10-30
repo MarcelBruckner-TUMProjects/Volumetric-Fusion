@@ -36,6 +36,7 @@
     <ClInclude Include="CaptureDevice.h" />
     <ClInclude Include="FileAccess.hpp" />
     <ClInclude Include="MultiFileStream.h" />
+    <ClInclude Include="ProcessingBlocks.hpp" />
     <ClInclude Include="Recorder.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
