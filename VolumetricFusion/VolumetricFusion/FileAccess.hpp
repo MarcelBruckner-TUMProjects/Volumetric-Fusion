@@ -57,7 +57,10 @@ namespace file_access {
 		return filtered;
 	}
 	   
-	void resetFolder(std::string path) {
+	void resetDirectory(std::string path, bool createIfNot = false) {
+		if (!isDirectory(path, createIfNot)) {
+			return;
+		}
 	    auto callback = [&](const auto& entry) {
 	        fs::remove(entry.path());
 	    };

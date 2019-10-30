@@ -46,10 +46,13 @@ enum class CaptureState {
 
 class Settings {
 public:
-	CaptureState captureState = CaptureState::STREAMING;
+	CaptureState captureState = CaptureState::PLAYING;
 	RenderState renderState = RenderState::SINGLE_COLOR;
+	
 	std::string captures_folder = "captures/";
-	std::string recordings_folder = "recordings/";
+
+	//std::string recordings_folder = "recordings/";
+	std::string recordings_folder = "single_stream_recording/";
 }settings;
 
 // Helper functions for rendering the UI
@@ -100,6 +103,11 @@ int main(int argc, char * argv[]) try {
 		}
 		break;
 	case CaptureState::RECORDING:
+	{
+		auto devices = ctx.query_devices();
+		if (devices.size() > 0) {
+			file_access::resetDirectory(settings.recordings_folder, true);
+		}
 		for (auto&& device : ctx.query_devices())
 		{
 			auto pipe = std::make_shared<rs2::pipeline>(ctx);
@@ -115,6 +123,7 @@ int main(int argc, char * argv[]) try {
 			i++;
 		}
 		break;
+	}
 	case CaptureState::PLAYING:
 	{
 		std::vector<std::string> figure_filenames = file_access::listFilesInFolder(settings.recordings_folder);
@@ -140,9 +149,6 @@ int main(int argc, char * argv[]) try {
 
 	if (pipelines.size() <= 0) {
 		_THROW(rs2::error("No device or file found!"));
-	}
-	if (settings.captureState == CaptureState::RECORDING) {
-		file_access::resetFolder(settings.recordings_folder);
 	}
 	while (stream_names.size() < 4) {
 		stream_names.push_back("");
@@ -365,7 +371,6 @@ int main(int argc, char * argv[]) try {
 		case RenderState::SINGLE_COLOR:
 		{
 			auto color = filtered_aligned_colors[0];
-			auto data = color.get_data();
 			if (color != NULL) {
 				single_color_frame.render(color, { 0,0, window_main.width() , window_main.height() * 0.95f });
 			}

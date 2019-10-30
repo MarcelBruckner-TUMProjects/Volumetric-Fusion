@@ -36,5 +36,6 @@
     <ClInclude Include="FileAccess.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MultiFileStream.h" />
   </ItemGroup>
 </Project>
