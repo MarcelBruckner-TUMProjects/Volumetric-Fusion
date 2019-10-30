@@ -13,6 +13,10 @@
 //#include "VolumetricFusion/CaptureDevice.h"
 #endif
 
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+
 #include <map>
 #include <iostream>
 #include <string>
@@ -34,7 +38,7 @@ enum class CaptureState {
 
 class Settings {
 public:
-	CaptureState captureState = CaptureState::PLAYING;
+	CaptureState captureState = CaptureState::STREAMING;
 	std::string captures_folder = "captures/";
 	std::string recordings_folder = "recordings/";
 }settings;
