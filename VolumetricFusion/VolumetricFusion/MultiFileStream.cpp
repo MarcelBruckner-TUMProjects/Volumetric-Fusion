@@ -24,8 +24,6 @@
 #include "imgui_impl_glfw.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-#include <Windows.h>
-#include <synchapi.h>
 
 
 enum class CaptureState {

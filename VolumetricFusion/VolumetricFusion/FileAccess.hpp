@@ -3,7 +3,6 @@
 #include <sys/stat.h>
 
 #include <filesystem>
-#include <direct.h>
 namespace fs = std::filesystem;
 
 namespace file_access {
@@ -16,8 +15,7 @@ namespace file_access {
 		bool isDir = exists(path) && std::filesystem::is_directory(path);
 
 		if (!isDir && createIfNot) {
-			_mkdir(path.c_str());
-			isDir = true;
+			isDir = fs::create_directories(path);
 		}
 
 		return isDir;
