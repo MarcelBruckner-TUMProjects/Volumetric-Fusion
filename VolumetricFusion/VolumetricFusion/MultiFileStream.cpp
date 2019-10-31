@@ -17,6 +17,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/aruco.hpp>
+#include <opencv2/aruco/charuco.hpp>
+#include <opencv2/calib3d.hpp>
 
 #include <map>
 #include <iostream>
@@ -46,7 +48,8 @@ using namespace imgui_helpers;
 
 int main(int argc, char* argv[]) try {
 
-	CaptureState captureState = CaptureState::PLAYING;
+	//CaptureState captureState = CaptureState::PLAYING;
+    CaptureState captureState = CaptureState::STREAMING;
 	RenderState renderState = RenderState::ONLY_COLOR;
 
 	std::string captures_folder = "captures/";
@@ -89,6 +92,7 @@ int main(int argc, char* argv[]) try {
 			std::string device_name = device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
 			cfg.enable_device(device_name);
 			cfg.enable_all_streams();
+			cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 760, 6);
 			pipe->start(cfg);
 			pipelines[i] = pipe;
 			stream_names[i] = device_name;
@@ -147,7 +151,6 @@ int main(int argc, char* argv[]) try {
 		stream_names.push_back("");
 	}
 
-
 	// We'll keep track of the last frame of each stream available to make the presentation persistent
 	std::map<int, rs2::frame> render_frames;
 
@@ -190,19 +193,62 @@ int main(int argc, char* argv[]) try {
 	std::map<int, rs2::frame_queue> depth_processing_queues;
 	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;
 
+	cv::Mat dist_coeffs = cv::Mat::zeros(8, 1, CV_64F);
+
 	for (int i = 0; i < pipelines.size(); i++) {
-	    const auto cpb_callback = [](cv::Mat& image) {
+        auto const profile = pipelines[i]->get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>();
+        auto intrinsics = profile.get_intrinsics();
+
+	    const auto cpb_callback = [&intrinsics, &dist_coeffs, &view_orientation](cv::Mat& image) {
 			std::vector<int> markerIds;
 			std::vector<std::vector<cv::Point2f>> markerCorners;
 			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
+			cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.08, 0.04, dictionary);
 			cv::aruco::detectMarkers(image, dictionary, markerCorners, markerIds);
-			cv::aruco::drawDetectedMarkers(image, markerCorners, markerIds);
+
+            if (markerIds.size() > 0) {
+                std::vector<cv::Point2f> charucoCorners;
+                std::vector<int> charucoIds;
+                cv::aruco::drawDetectedMarkers(image, markerCorners, markerIds);
+                cv::aruco::interpolateCornersCharuco(markerCorners, markerIds, image, board, charucoCorners, charucoIds);
+                // if at least one charuco corner detected
+                if(charucoIds.size() > 0) {
+                    cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
+                    cv::Vec3d rvec, tvec;
+                    cv::Matx33d camera_matrix(
+                            intrinsics.fx, 0,             intrinsics.ppx,
+                            0,             intrinsics.fy, intrinsics.ppy,
+                            0,             0,             1
+                    );
+                    bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera_matrix, dist_coeffs, rvec, tvec);
+                    // if charuco pose is valid
+                    if(valid) {
+                        cv::aruco::drawAxis(image, camera_matrix, dist_coeffs, rvec, tvec, 0.1);
+
+                        // After capturing in several viewpoints, start calibration
+                        cv::Mat cameraMatrix;
+                        cv::Mat distCoeffs(0, 0, 0, 0, 0);
+
+                        std::vector<cv::Mat> rvecs, tvecs;
+                        cv::Size imgSize(intrinsics.width, intrinsics.height);
+                        int calibrationFlags = cv::CALIB_USE_INTRINSIC_GUESS | cv::CALIB_RATIONAL_MODEL | cv::CALIB_FIX_ASPECT_RATIO; // Set calibration flags (same than in calibrateCamera() function)
+                        std::cout << "Start calibration" << std::endl;
+                        try {
+                            double repError = cv::aruco::calibrateCameraCharuco(markerCorners, markerIds, board, imgSize, camera_matrix, distCoeffs, rvecs, tvecs, calibrationFlags);
+                            //double repError = cv::aruco::calibrateCameraCharuco(markerCorners, markerIds, board, imgSize, cameraMatrix, distCoeffs, rvecs, tvecs, calibrationFlags);
+                            std::cout << "Calibration done, error=" << repError << std::endl;
+                        }
+                        catch (const std::exception& e) {
+                            std::cerr << "Calibration FAILED! Reason: " << e.what() << std::endl;
+                        }
+                    }
+                }
+            }
         };
 		color_processing_blocks[i] = std::make_shared<rs2::processing_block>(processing_blocks::createColorProcessingBlock(cpb_callback));
 		color_processing_blocks[i]->start(color_processing_queues[i]); // Bind output of the processing block to be enqueued into the queue
 
 		const auto dpb_callback = [](cv::Mat& image) {
-          cv::medianBlur(image, image, 11);
         };
 		depth_processing_blocks[i] = std::make_shared<rs2::processing_block>(processing_blocks::createDepthProcessingBlock(dpb_callback));
 		depth_processing_blocks[i]->start(depth_processing_queues[i]); // Bind output of the processing block to be enqueued into the queue
@@ -231,10 +277,11 @@ int main(int argc, char* argv[]) try {
 					}
 
 					if (depthProcessing) {
+					    // Does not seem to work
 						// Send depth frame for processing
-						depth_processing_blocks[i]->invoke(depth_frame);
+						//depth_processing_blocks[i]->invoke(depth_frame);
 						// Wait for results
-						depth_frame = depth_processing_queues[i].wait_for_frame();
+						//depth_frame = depth_processing_queues[i].wait_for_frame();
 					}
 					rs2::frame filtered_depth_frame = depth_frame; // Does not copy the frame, only adds a reference
 
@@ -295,7 +342,6 @@ int main(int argc, char* argv[]) try {
 
 		if (renderState != RenderState::ONLY_DEPTH) {
 			addToggleColorProcessingButton(colorProcessing);
-			std::cout << colorProcessing << std::endl;
 		}
 		if (renderState != RenderState::ONLY_COLOR) {
 			addToggleDepthProcessingButton(depthProcessing);
@@ -326,6 +372,10 @@ int main(int argc, char* argv[]) try {
 					else {
 						draw_pointcloud(width_half, height_half, view_orientation, filtered_points[i]);
 					}
+
+					if (dist_coeffs.size) {
+					    draw_rectangle(width_half, height_half, 0, 0, 0, view_orientation);
+					}
 				}
 			}
 		}
@@ -348,6 +398,13 @@ int main(int argc, char* argv[]) try {
 					textures[i].render(filtered_color_frames[i], r);
 				}
 			}
+            std::vector<int> markerIds;
+            std::vector<std::vector<cv::Point2f>> markerCorners;
+            cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
+            cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.08, 0.04, dictionary);
+            cv::Mat boardImage;
+            board->draw(cv::Size(720, 720), boardImage, 10, 1);
+            imshow("board", boardImage);
 
 			break;
 		}
