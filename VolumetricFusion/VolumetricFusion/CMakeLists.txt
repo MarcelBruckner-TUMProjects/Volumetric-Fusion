@@ -15,6 +15,7 @@ if (APPLE)
   find_package(glfw3 REQUIRED)
   find_package(OpenGL REQUIRED)
   find_package(OpenCV REQUIRED)
+  find_package(GLUT REQUIRED)
   include_directories(
     /usr/local/Cellar/librealsense/2.29.0/include 
     /usr/local/Cellar/glfw/3.3/include
@@ -22,6 +23,8 @@ if (APPLE)
     ../../third-party
     FileAccess.hpp
     /usr/local/include/opencv4
+    ${OPENGL_INCLUDE_DIR}
+    ${GLUT_INCLUDE_DIR}
   )
   add_definitions(-DAPPLE)
 endif (APPLE)

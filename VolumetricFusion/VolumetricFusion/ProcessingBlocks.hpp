@@ -1,5 +1,5 @@
 #pragma once
-#include <librealsense2\hpp\rs_processing.hpp>
+#include <librealsense2/hpp/rs_processing.hpp>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>

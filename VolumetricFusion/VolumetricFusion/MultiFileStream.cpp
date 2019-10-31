@@ -24,7 +24,11 @@
 #include <atomic>
 #include <filesystem>
 
-#include <gl/GL.h>
+#if APPLE
+#include <glut.h>
+#else
+#include <GL/gl.h>
+#endif
 
 #include <imgui.h>
 #include "imgui_impl_glfw.h"
@@ -37,7 +41,7 @@ using namespace enums;
 #include "ImGuiHelpers.hpp"
 using namespace imgui_helpers;
 #include "ProcessingBlocks.hpp"
-#include "MULTIFILESTREAM.H"
+#include "MultiFileStream.h"
 
 int main(int argc, char* argv[]) try {
 
@@ -136,7 +140,7 @@ int main(int argc, char* argv[]) try {
 	}
 
 	if (pipelines.size() <= 0) {
-		_THROW(rs2::error("No device or file found!"));
+		throw(rs2::error("No device or file found!"));
 	}
 	while (stream_names.size() < 4) {
 		stream_names.push_back("");
@@ -186,14 +190,16 @@ int main(int argc, char* argv[]) try {
 	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;
 
 	for (int i = 0; i < pipelines.size(); i++) {
-		color_processing_blocks[i] = std::make_shared<rs2::processing_block>(processing_blocks::createColorProcessingBlock([](cv::Mat& image) {
-			cv::medianBlur(image, image, 11);
-		}));
+	    const auto cpb_callback = [](cv::Mat& image) {
+          cv::medianBlur(image, image, 11);
+        };
+		color_processing_blocks[i] = std::make_shared<rs2::processing_block>(processing_blocks::createColorProcessingBlock(cpb_callback));
 		color_processing_blocks[i]->start(color_processing_queues[i]); // Bind output of the processing block to be enqueued into the queue
 
-		depth_processing_blocks[i] = std::make_shared<rs2::processing_block>(processing_blocks::createDepthProcessingBlock([](cv::Mat& image) {
-			cv::medianBlur(image, image, 11);
-		}));
+		const auto dpb_callback = [](cv::Mat& image) {
+          cv::medianBlur(image, image, 11);
+        };
+		depth_processing_blocks[i] = std::make_shared<rs2::processing_block>(processing_blocks::createDepthProcessingBlock(dpb_callback));
 		depth_processing_blocks[i]->start(depth_processing_queues[i]); // Bind output of the processing block to be enqueued into the queue
 	}
 
@@ -294,6 +300,7 @@ int main(int argc, char* argv[]) try {
 		render_frames = std::map<int, rs2::frame>();
 
 		switch (renderState) {
+		case RenderState::COUNT:
 		case RenderState::MULTI_POINTCLOUD:
 		{
 			// Draw the pointclouds
@@ -323,8 +330,13 @@ int main(int argc, char* argv[]) try {
 		{
 			for (int i = 0; i < pipelines.size() && i < 4; ++i)
 			{
-				if (filtered_color_frames[i] != NULL) {
-					rect r{ width_half * (i % 2), height_half - (height_half * (i / 2)), width_half, height_half };
+				if (filtered_color_frames[i] != false) {
+					rect r{
+                            static_cast<float>(width_half * (i % 2)),
+                            static_cast<float>(height_half - (height_half * (i / 2))),
+                            static_cast<float>(width_half),
+                            static_cast<float>(height_half)
+                    };
 					if (is_retina_display) {
 						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
 					}
@@ -339,8 +351,13 @@ int main(int argc, char* argv[]) try {
 		{
 			for (int i = 0; i < pipelines.size() && i < 4; ++i)
 			{
-				if (filtered_depth_frames[i] != NULL) {
-					rect r{ width_half * (i % 2), height_half - (height_half * (i / 2)), width_half, height_half };
+				if (filtered_depth_frames[i] != false) {
+					rect r{
+					    static_cast<float>(width_half * (i % 2)),
+                        static_cast<float>(height_half - (height_half * (i / 2))),
+                        static_cast<float>(width_half),
+                        static_cast<float>(height_half)
+					};
 					if (is_retina_display) {
 						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
 					}
