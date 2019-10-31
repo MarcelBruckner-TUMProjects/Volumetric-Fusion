@@ -16,6 +16,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/aruco.hpp>
 
 #include <map>
 #include <iostream>
@@ -191,7 +192,11 @@ int main(int argc, char* argv[]) try {
 
 	for (int i = 0; i < pipelines.size(); i++) {
 	    const auto cpb_callback = [](cv::Mat& image) {
-          cv::medianBlur(image, image, 11);
+			std::vector<int> markerIds;
+			std::vector<std::vector<cv::Point2f>> markerCorners;
+			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
+			cv::aruco::detectMarkers(image, dictionary, markerCorners, markerIds);
+			cv::aruco::drawDetectedMarkers(image, markerCorners, markerIds);
         };
 		color_processing_blocks[i] = std::make_shared<rs2::processing_block>(processing_blocks::createColorProcessingBlock(cpb_callback));
 		color_processing_blocks[i]->start(color_processing_queues[i]); // Bind output of the processing block to be enqueued into the queue
