@@ -278,8 +278,9 @@ int main(int argc, char* argv[]) try {
 			cv::aruco::drawDetectedMarkers(image, markerCorners, markerIds);
 		};*/
 
+
 		const auto charucoPoseEstimation = [&](cv::Mat& image) {
-			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_1000);
 			cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.04, 0.02, dictionary);
 
 			cv::Mat imageCopy;
@@ -287,6 +288,7 @@ int main(int argc, char* argv[]) try {
 			std::vector<int> ids;
 			std::vector<std::vector<cv::Point2f>> corners;
 			cv::aruco::detectMarkers(image, dictionary, corners, ids);
+			std::cout << ids.size() << std::endl;
 			// if at least one marker detected
 			if (ids.size() > 0) {
 				std::vector<cv::Point2f> charucoCorners;
