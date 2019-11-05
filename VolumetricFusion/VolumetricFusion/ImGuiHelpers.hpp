@@ -7,6 +7,9 @@
 #else
 #include "example.hpp"
 #endif
+#include <opencv2/highgui/highgui.hpp>
+//#include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgcodecs/imgcodecs.hpp>
 
 namespace imgui_helpers {
 
@@ -134,4 +137,27 @@ namespace imgui_helpers {
 	    addTopBarButton("Save Frames", callback);
 	}
 
+	void addGenerateCharucoDiamond(std::string& charuco_folder) {
+		const auto callback = [&]() {
+			file_access::isDirectory(charuco_folder, true);
+			for (int i = 0; i < 6; i++) {
+				cv::Mat diamondImage;
+				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+				cv::aruco::drawCharucoDiamond(dictionary, cv::Vec4i((i * 4) + 0, (i * 4) + 1, (i * 4) + 2, (i * 4) + 3), 200, 120, diamondImage);
+
+				imshow("board", diamondImage);
+				auto filename = charuco_folder + "diamond_" + std::to_string(i) + ".png";
+
+				try {
+					cv::imwrite(filename, diamondImage);
+				}
+				catch (std::runtime_error & ex) {
+					fprintf(stderr, "Exception converting image to PNG format: %s\n", ex.what());
+					return 1;
+				}
+			}
+		};
+
+		addTopBarButton("Generate ChAruCo Diamonds", callback);
+	}
 }

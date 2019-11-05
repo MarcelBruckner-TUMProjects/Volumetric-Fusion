@@ -51,10 +51,15 @@ int main(int argc, char* argv[]) try {
 	CaptureState captureState = CaptureState::STREAMING;
 	RenderState renderState = RenderState::ONLY_COLOR;
 
+	float squareLength = 120.f;
+	float markerLength = 40.f;
+
 	std::string captures_folder = "captures/";
 
 	//std::string recordings_folder = "recordings/";
 	std::string recordings_folder = "single_stream_recording/";
+
+	std::string charuco_folder = "charuco/";
 
 	// Create a simple OpenGL window for rendering:
 	window window_main(1280, 960, "VolumetricFusion - MultiStreamViewer");
@@ -283,30 +288,46 @@ int main(int argc, char* argv[]) try {
 		cv::Matx33f cameraMatrix = cameraMatrices[i];
 		auto distCoeff = distCoeffs[i];
 
-		const auto charucoPoseEstimation = [cameraMatrix, distCoeff](cv::Mat& image) {
+		const auto charucoPoseEstimation = [cameraMatrix, distCoeff, squareLength, markerLength](cv::Mat& image) {
 			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
 			cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.08, 0.04, dictionary);
 
 			std::vector<int> ids;
 			std::vector<std::vector<cv::Point2f>> corners;
 			cv::aruco::detectMarkers(image, dictionary, corners, ids);
-			// if at least one marker detected
-			if (ids.size() > 0) {
-				std::vector<cv::Point2f> charucoCorners;
-				std::vector<int> charucoIds;
 
-				cv::aruco::interpolateCornersCharuco(corners, ids, image, board, charucoCorners, charucoIds);
-				// if at least one charuco corner detected
-				if (charucoIds.size() > 0) {
-					cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
-					cv::Vec3d rvec, tvec;
-					
-					bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeff, rvec, tvec);
-					// if charuco pose is valid
-					if (valid) {
-						cv::aruco::drawAxis(image, cameraMatrix, distCoeff, rvec, tvec, 0.1);
-					}
-				}
+			/* ChAruCo Marker board */
+
+			// if at least one marker detected
+			//if (ids.size() > 0) {
+			//	std::vector<cv::Point2f> charucoCorners;
+			//	std::vector<int> charucoIds;
+
+			//	cv::aruco::interpolateCornersCharuco(corners, ids, image, board, charucoCorners, charucoIds);
+			//	// if at least one charuco corner detected
+			//	if (charucoIds.size() > 0) {
+			//		cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
+			//		cv::Vec3d rvec, tvec;
+			//		
+			//		bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeff, rvec, tvec);
+			//		// if charuco pose is valid
+			//		if (valid) {
+			//			cv::aruco::drawAxis(image, cameraMatrix, distCoeff, rvec, tvec, 0.1);
+			//		}
+			//	}
+			//}
+
+			/* ChAruCo diamond */
+			std::vector<cv::Vec4i> diamondIds;
+			std::vector<std::vector<cv::Point2f>> diamondCorners;
+			// detect diamon diamonds
+			cv::aruco::detectCharucoDiamond(image, corners, ids, squareLength / markerLength, diamondCorners, diamondIds);
+			// estimate poses
+			std::vector<cv::Vec3d> rvecs, tvecs;
+			cv::aruco::estimatePoseSingleMarkers(diamondCorners, squareLength, cameraMatrix, distCoeff, rvecs, tvecs);
+			// draw axis
+			for (unsigned int i = 0; i < rvecs.size(); i++) {
+				cv::aruco::drawAxis(image, cameraMatrix, distCoeff, rvecs[i], tvecs[i], 1);
 			}
 		};
 
@@ -350,6 +371,7 @@ int main(int argc, char* argv[]) try {
 		if (renderState != RenderState::ONLY_COLOR) {
 			addToggleDepthProcessingButton(depthProcessing);
 		}
+		imgui_helpers::addGenerateCharucoDiamond(charuco_folder);
 		imgui_helpers::finalize();
 
 		render_frames = std::map<int, rs2::frame>();
@@ -391,26 +413,18 @@ int main(int argc, char* argv[]) try {
 			{
 				if (filtered_color_frames[i] != false) {
 					rect r{
-                            static_cast<float>(width_half * (i % 2)),
-                            static_cast<float>(height_half - (height_half * (i / 2))),
-                            static_cast<float>(width_half),
-                            static_cast<float>(height_half)
-                    };
+							static_cast<float>(width_half * (i % 2)),
+							static_cast<float>(height_half - (height_half * (i / 2))),
+							static_cast<float>(width_half),
+							static_cast<float>(height_half)
+					};
 					if (is_retina_display) {
 						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
 					}
 					textures[i].render(filtered_color_frames[i], r);
 				}
 			}
-            std::vector<int> markerIds;
-            std::vector<std::vector<cv::Point2f>> markerCorners;
-            cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
-			for (int i = 0; i < 4; i++) {
-				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.08, 0.04, dictionary);
-				cv::Mat boardImage;
-				board->draw(cv::Size(720, 720), boardImage, 10, 1);
-				imshow("board", boardImage);
-			}
+
 			break;
 		}
 
