@@ -191,14 +191,14 @@ int main(int argc, char* argv[]) try {
 	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;
 
 	std::map<int, rs2_intrinsics> intrinsics;
-	std::map<int, cv::Matx33f> cameraMatrix;
+	std::map<int, cv::Matx33f> cameraMatrices;
 	std::map<int, std::vector<float>> distCoeffs;
 
-	for (int i = 0; i < pipelines.size(); ++i) {
+	for (int i = 0; i < pipelines.size(); i++) {
 		intrinsics[i] = pipelines[i]->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics();
-		cameraMatrix[i] = cv::Matx33f(
-			intrinsics[i].fx, 0, 0, 
-			0, intrinsics[i].fy, 0, 
+		cameraMatrices[i] = cv::Matx33f(
+			intrinsics[i].fx, 0, intrinsics[i].ppx, 
+			0, intrinsics[i].fy, intrinsics[i].ppy, 
 			0,0,1
 		);
 
@@ -277,34 +277,34 @@ int main(int argc, char* argv[]) try {
 			cv::aruco::detectMarkers(image, dictionary, markerCorners, markerIds);
 			cv::aruco::drawDetectedMarkers(image, markerCorners, markerIds);
 		};*/
+		cv::Matx33f cameraMatrix = cameraMatrices[i];
+		auto distCoeff = distCoeffs[i];
 
+		const auto charucoPoseEstimation = [cameraMatrix, distCoeff](cv::Mat& image) {
+			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
+			cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.08, 0.04, dictionary);
 
-		const auto charucoPoseEstimation = [&](cv::Mat& image) {
-			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_1000);
-			cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 7, 0.04, 0.02, dictionary);
-
-			cv::Mat imageCopy;
-			image.copyTo(imageCopy);
 			std::vector<int> ids;
 			std::vector<std::vector<cv::Point2f>> corners;
 			cv::aruco::detectMarkers(image, dictionary, corners, ids);
-			std::cout << ids.size() << std::endl;
 			// if at least one marker detected
 			if (ids.size() > 0) {
 				std::vector<cv::Point2f> charucoCorners;
 				std::vector<int> charucoIds;
-				cv::aruco::interpolateCornersCharuco(corners, ids, image, board, charucoCorners, charucoIds, cameraMatrix[i], distCoeffs[i]);
+
+				cv::aruco::interpolateCornersCharuco(corners, ids, image, board, charucoCorners, charucoIds);
 				// if at least one charuco corner detected
 				if (charucoIds.size() > 0) {
-					cv::aruco::drawDetectedCornersCharuco(imageCopy, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
+					cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
 					cv::Vec3d rvec, tvec;
-					bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix[i], distCoeffs[i], rvec, tvec);
+					
+					bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeff, rvec, tvec);
 					// if charuco pose is valid
-					if (valid)
-						cv::aruco::drawAxis(imageCopy, cameraMatrix[i], distCoeffs[i], rvec, tvec, 0.1);
+					if (valid) {
+						cv::aruco::drawAxis(image, cameraMatrix, distCoeff, rvec, tvec, 0.1);
+					}
 				}
 			}
-			image = imageCopy;
 		};
 
 
