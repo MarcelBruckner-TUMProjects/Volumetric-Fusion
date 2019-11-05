@@ -283,7 +283,7 @@ int main(int argc, char* argv[]) try {
 		// Retina display (Mac OS) have double the pixel density
 		int w2, h2;
 		glfwGetFramebufferSize(window_main, &w2, &h2);
-		const bool is_retina_display = w2 == width * 2 && h2 == height * 2;
+		const bool is_retina_display = w2 == width * 2 && h2 == window_main.height() * 2;
 
 		imgui_helpers::initialize(window_main, w2, h2, stream_names, width_half, height_half, width, height);
 		addSwitchViewButton(renderState, depthProcessing, colorProcessing);
