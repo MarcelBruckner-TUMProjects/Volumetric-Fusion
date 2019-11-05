@@ -1,3 +1,4 @@
+#pragma region Includes
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
@@ -45,22 +46,26 @@ using namespace enums;
 using namespace imgui_helpers;
 #include "ProcessingBlocks.hpp"
 #include "MultiFileStream.h"
+#pragma endregion
+
+template<typename T, typename V>
+std::vector<T> extract_keys(std::map<T, V> const& input_map);
 
 int main(int argc, char* argv[]) try {
 
+#pragma region Non window setting
 	CaptureState captureState = CaptureState::STREAMING;
 	RenderState renderState = RenderState::ONLY_COLOR;
-
-	float squareLength = 120.f;
-	float markerLength = 40.f;
-
+	
 	std::string captures_folder = "captures/";
 
 	//std::string recordings_folder = "recordings/";
 	std::string recordings_folder = "single_stream_recording/";
 
 	std::string charuco_folder = "charuco/";
-
+#pragma endregion
+	
+#pragma region Window initialization
 	// Create a simple OpenGL window for rendering:
 	window window_main(1280, 960, "VolumetricFusion - MultiStreamViewer");
 
@@ -77,7 +82,9 @@ int main(int argc, char* argv[]) try {
 	view_orientation.last_y = 1015.8;
 	view_orientation.offset_x = 2.0;
 	view_orientation.offset_y = -2.0;
+#pragma endregion
 
+#pragma region Pipeline initialization
 	rs2::context ctx; // Create librealsense context for managing devices
 	std::map<int, std::shared_ptr<rs2::pipeline>> pipelines;
 
@@ -154,7 +161,10 @@ int main(int argc, char* argv[]) try {
 	while (stream_names.size() < 4) {
 		stream_names.push_back("");
 	}
+#pragma endregion
 
+#pragma region Variables
+	   
 	// We'll keep track of the last frame of each stream available to make the presentation persistent
 	std::map<int, rs2::frame> render_frames;
 
@@ -179,7 +189,7 @@ int main(int argc, char* argv[]) try {
 	std::atomic_bool stopped(false);
 	std::atomic_bool paused(false);
 	std::atomic_bool depthProcessing(false);
-	std::atomic_bool colorProcessing(false);
+	std::atomic_bool colorProcessing(true);
 	//std::vector<rs2::frame_queue> filtered_datas(pipelines.size());
 	std::map<int, rs2::frame> filtered_color_frames;
 	std::map<int, rs2::frame> filtered_depth_frames;
@@ -194,12 +204,27 @@ int main(int argc, char* argv[]) try {
 	std::map<int, std::shared_ptr<rs2::processing_block>> color_processing_blocks;
 
 	// Create custom depth processing block and their output queues:
-	std::map<int, rs2::frame_queue> depth_processing_queues;
-	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;
+	/*std::map<int, rs2::frame_queue> depth_processing_queues;
+	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
 
+	// Pose estimation camera stuff
 	std::map<int, rs2_intrinsics> intrinsics;
 	std::map<int, cv::Matx33f> cameraMatrices;
 	std::map<int, std::vector<float>> distCoeffs;
+
+	// Pose estimation buffers
+	// buffer <pipelineId, <frame_id, value>>
+	std::map<int, std::map<unsigned long long, std::vector<int>>> charucoIdBuffers;
+	//std::map<int, std::map<int, std::vector<std::vector<cv::Point2f>>>> diamondCornerBuffers;
+	std::map<int, std::map<unsigned long long, cv::Vec3d>> rotationBuffers;
+	std::map<int, std::map<unsigned long long, cv::Vec3d>> translationBuffers;
+
+	// Camera calibration thread
+	std::thread calibrationThread;
+	std::atomic_bool calibrateCameras = true;
+#pragma endregion
+
+#pragma region Camera intrinsics
 
 	for (int i = 0; i < pipelines.size(); i++) {
 		intrinsics[i] = pipelines[i]->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics();
@@ -213,6 +238,31 @@ int main(int argc, char* argv[]) try {
 			distCoeffs[i].push_back(c);
 		}
 	}
+#pragma endregion
+
+#pragma region Camera Calibration Thread
+
+		calibrationThread = std::thread([&, i]() {
+			while(!stopped.load() && pipelines.size() > 1){
+				if (!calibrateCameras.load()) {
+					continue;
+				}
+
+				for (int i = 0; i < pipelines.size(); ++i) {
+					auto charucoIdBuffer = charucoIdBuffers[i];
+					auto translationBuffer = translationBuffers[i];
+					auto rotationBuffer = rotationBuffers[i];
+					std::vector<unsigned long long> frame_ids = extract_keys(charucoIdBuffer);
+
+					for (int i = 0; i < pipelines.size(); ++i) {
+
+					}
+				}
+			}
+		});
+#pragma endregion
+
+#pragma region Processing Threads
 
 	for (int i = 0; i < pipelines.size(); ++i) {
 		processing_threads[i] = std::thread([&, i]() {
@@ -220,7 +270,7 @@ int main(int argc, char* argv[]) try {
 
 			rs2::align align_to_color(RS2_STREAM_COLOR);
 
-			while (!stopped) //While application is running
+			while (!stopped.load()) //While application is running
 			{
 				while (paused.load()) {
 					continue;
@@ -276,73 +326,53 @@ int main(int argc, char* argv[]) try {
 			pipe->stop();
 		});
 	}
+#pragma endregion
+
+#pragma region Processing blocks
 
 	for (int i = 0; i < pipelines.size(); i++) {
-		/*const auto cpb_callback = [](cv::Mat& image) {
-			std::vector<int> markerIds;
-			std::vector<std::vector<cv::Point2f>> markerCorners;
-			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
-			cv::aruco::detectMarkers(image, dictionary, markerCorners, markerIds);
-			cv::aruco::drawDetectedMarkers(image, markerCorners, markerIds);
-		};*/
 		cv::Matx33f cameraMatrix = cameraMatrices[i];
 		auto distCoeff = distCoeffs[i];
 
-		const auto charucoPoseEstimation = [cameraMatrix, distCoeff, squareLength, markerLength](cv::Mat& image) {
-			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
-			cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.08, 0.04, dictionary);
+		const auto charucoPoseEstimation = [&, cameraMatrix, distCoeff, i](cv::Mat& image, unsigned long long frame_id) {
+			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+			cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
+			/*cv::Ptr<cv::aruco::DetectorParameters> params;
+			params->cornerRefinementMethod = cv::aruco::CORNER_REFINE_NONE;*/
 
-			std::vector<int> ids;
-			std::vector<std::vector<cv::Point2f>> corners;
-			cv::aruco::detectMarkers(image, dictionary, corners, ids);
+				std::vector<int> ids;
+				std::vector<std::vector<cv::Point2f>> corners;
+				cv::aruco::detectMarkers(image, dictionary, corners, ids);
+				// if at least one marker detected
+				if (ids.size() > 0) {
+					cv::aruco::drawDetectedMarkers(image, corners, ids);
+					std::vector<cv::Point2f> charucoCorners;
+					std::vector<int> charucoIds;
+					cv::aruco::interpolateCornersCharuco(corners, ids, image, board, charucoCorners, charucoIds);
+					// if at least one charuco corner detected
+					if (charucoIds.size() > 0) {
+						cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
+						cv::Vec3d rotation, translation;
+						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeff, rotation, translation);
+						// if charuco pose is valid
+						if (valid) {
+							cv::aruco::drawAxis(image, cameraMatrix, distCoeff, rotation, translation, 0.1);
 
-			/* ChAruCo Marker board */
-
-			// if at least one marker detected
-			//if (ids.size() > 0) {
-			//	std::vector<cv::Point2f> charucoCorners;
-			//	std::vector<int> charucoIds;
-
-			//	cv::aruco::interpolateCornersCharuco(corners, ids, image, board, charucoCorners, charucoIds);
-			//	// if at least one charuco corner detected
-			//	if (charucoIds.size() > 0) {
-			//		cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
-			//		cv::Vec3d rvec, tvec;
-			//		
-			//		bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeff, rvec, tvec);
-			//		// if charuco pose is valid
-			//		if (valid) {
-			//			cv::aruco::drawAxis(image, cameraMatrix, distCoeff, rvec, tvec, 0.1);
-			//		}
-			//	}
-			//}
-
-			/* ChAruCo diamond */
-			std::vector<cv::Vec4i> diamondIds;
-			std::vector<std::vector<cv::Point2f>> diamondCorners;
-			// detect diamon diamonds
-			cv::aruco::detectCharucoDiamond(image, corners, ids, squareLength / markerLength, diamondCorners, diamondIds);
-			// estimate poses
-			std::vector<cv::Vec3d> rvecs, tvecs;
-			cv::aruco::estimatePoseSingleMarkers(diamondCorners, squareLength, cameraMatrix, distCoeff, rvecs, tvecs);
-			// draw axis
-			for (unsigned int i = 0; i < rvecs.size(); i++) {
-				cv::aruco::drawAxis(image, cameraMatrix, distCoeff, rvecs[i], tvecs[i], 1);
-			}
+							charucoIdBuffers[i][frame_id] = charucoIds;
+							translationBuffers[i][frame_id] = translation;
+							rotationBuffers[i][frame_id] = rotation;
+						}
+					}
+				}
 		};
 
 
 		color_processing_blocks[i] = std::make_shared<rs2::processing_block>(processing_blocks::createColorProcessingBlock(charucoPoseEstimation));
 		color_processing_blocks[i]->start(color_processing_queues[i]); // Bind output of the processing block to be enqueued into the queue
-
-		const auto dpb_callback = [](cv::Mat& image) {
-			cv::medianBlur(image, image, 11);
-		};
-		depth_processing_blocks[i] = std::make_shared<rs2::processing_block>(processing_blocks::createDepthProcessingBlock(dpb_callback));
-		depth_processing_blocks[i]->start(depth_processing_queues[i]); // Bind output of the processing block to be enqueued into the queue
 	}
-
-	bool align_frames = false;
+#pragma endregion
+	
+#pragma region Main loop
 
 	while (window_main)
 	{
@@ -369,9 +399,10 @@ int main(int argc, char* argv[]) try {
 			addToggleColorProcessingButton(colorProcessing);
 		}
 		if (renderState != RenderState::ONLY_COLOR) {
-			addToggleDepthProcessingButton(depthProcessing);
+			//addToggleDepthProcessingButton(depthProcessing);
 		}
 		imgui_helpers::addGenerateCharucoDiamond(charuco_folder);
+		imgui_helpers::addGenerateCharucoBoard(charuco_folder);
 		imgui_helpers::finalize();
 
 		render_frames = std::map<int, rs2::frame>();
@@ -450,14 +481,19 @@ int main(int argc, char* argv[]) try {
 		}
 		}
 	}
+#pragma endregion
 
-	stopped = true;
+#pragma region Final cleanup
+
+	stopped.store(true);
 	for (auto& thread : processing_threads) {
 		thread.second.join();
 	}
+#pragma endregion
 
 	return EXIT_SUCCESS;
 }
+#pragma region Error handling
 catch (const rs2::error & e)
 {
     std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
@@ -468,3 +504,17 @@ catch (const std::exception& e)
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
 }
+#pragma endregion
+
+#pragma region Helper functions
+
+template<typename T, typename V>
+std::vector<T> extract_keys(std::map<T,V> const& input_map) {
+	std::vector<T> retval;
+	for (auto const& element : input_map) {
+		retval.push_back(element.first);
+	}
+	return retval;
+}
+
+#pragma endregion

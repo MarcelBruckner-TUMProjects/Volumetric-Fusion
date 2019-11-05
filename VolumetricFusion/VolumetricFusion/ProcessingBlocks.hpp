@@ -15,7 +15,7 @@ namespace processing_blocks {
 				basic lambda syntax: processing_blocks::createProcessingBlock([](cv::Mat &image){...})
 		*/
 		template<typename F>
-		rs2::processing_block createProcessingBlock(F& lambda, int imageDescriptor, int factor) {
+		rs2::processing_block createProcessingBlock(F& lambda, int imageDescriptor, int factor, int frame_id = -1) {
 			return rs2::processing_block(
 				[=](rs2::frame f, rs2::frame_source& src)
 			{
@@ -29,7 +29,7 @@ namespace processing_blocks {
 				// do some (silly) processing
 
 				// Here the magic happens
-				lambda(image);
+				lambda(image, f.get_frame_number());
 
 				// Allocate new frame. Copy all missing data from f.
 				// This assumes the output is same resolution and format
@@ -51,11 +51,11 @@ namespace processing_blocks {
 		return createProcessingBlock(lambda, CV_8UC3, 3);
 	}
 
-	template<typename F>
-	rs2::processing_block createDepthProcessingBlock(F& lambda) {
-		// Don't bother the magic numbers, they describe the image channels
-		return createProcessingBlock(lambda, CV_8UC1, 2);
-	}
+	//template<typename F>
+	//rs2::processing_block createDepthProcessingBlock(F& lambda, int frame_id=-1) {
+	//	// Don't bother the magic numbers, they describe the image channels
+	//	return createProcessingBlock(lambda, CV_8UC1, 2);
+	//}
 
 	rs2::processing_block createEmpty()
 	{

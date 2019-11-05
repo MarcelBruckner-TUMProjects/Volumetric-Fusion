@@ -160,4 +160,30 @@ namespace imgui_helpers {
 
 		addTopBarButton("Generate ChAruCo Diamonds", callback);
 	}
+
+	void addGenerateCharucoBoard(std::string& charuco_folder) {
+		const auto callback = [&]() {
+			file_access::isDirectory(charuco_folder, true);
+			for (int i = 0; i < 6; i++) {
+				
+				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
+				cv::Mat boardImage;
+				board->draw(cv::Size(5000, 5000), boardImage, 10, 1);
+
+				imshow("board", boardImage);
+				auto filename = charuco_folder + "board_" + std::to_string(i) + ".png";
+
+				try {
+					cv::imwrite(filename, boardImage);
+				}
+				catch (std::runtime_error & ex) {
+					fprintf(stderr, "Exception converting image to PNG format: %s\n", ex.what());
+					return 1;
+				}
+			}
+		};
+
+		addTopBarButton("Generate ChAruCo Boards", callback);
+	}
 }
