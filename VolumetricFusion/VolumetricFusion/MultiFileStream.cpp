@@ -18,6 +18,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/aruco.hpp>
 #include <opencv2/aruco/charuco.hpp>
+#include <opencv2/calib3d.hpp>
 
 #include <map>
 #include <iostream>
@@ -90,6 +91,7 @@ int main(int argc, char* argv[]) try {
 			std::string device_name = device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
 			cfg.enable_device(device_name);
 			cfg.enable_all_streams();
+			cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 760, 6);
 			pipe->start(cfg);
 			pipelines[i] = pipe;
 			stream_names[i] = device_name;
@@ -230,10 +232,11 @@ int main(int argc, char* argv[]) try {
 					}
 
 					if (depthProcessing) {
+					    // Does not seem to work
 						// Send depth frame for processing
-						depth_processing_blocks[i]->invoke(depth_frame);
+						//depth_processing_blocks[i]->invoke(depth_frame);
 						// Wait for results
-						depth_frame = depth_processing_queues[i].wait_for_frame();
+						//depth_frame = depth_processing_queues[i].wait_for_frame();
 					}
 					rs2::frame filtered_depth_frame = depth_frame; // Does not copy the frame, only adds a reference
 
@@ -373,6 +376,10 @@ int main(int argc, char* argv[]) try {
 					else {
 						draw_pointcloud(width_half, height_half, view_orientation, filtered_points[i]);
 					}
+
+					if (distCoeffs.size()) {
+					    draw_rectangle(width_half, height_half, 0, 0, 0, view_orientation);
+					}
 				}
 			}
 		}
@@ -395,7 +402,15 @@ int main(int argc, char* argv[]) try {
 					textures[i].render(filtered_color_frames[i], r);
 				}
 			}
-
+            std::vector<int> markerIds;
+            std::vector<std::vector<cv::Point2f>> markerCorners;
+            cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_4X4_250);
+			for (int i = 0; i < 4; i++) {
+				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.08, 0.04, dictionary);
+				cv::Mat boardImage;
+				board->draw(cv::Size(720, 720), boardImage, 10, 1);
+				imshow("board", boardImage);
+			}
 			break;
 		}
 
