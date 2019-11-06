@@ -1,0 +1,3 @@
+[submodule "include/Eigen"]
+	path = include/Eigen
+	url = git@github.com:eigenteam/eigen-git-mirror.git
