@@ -2,15 +2,19 @@
 // Copyright(c) 2015 Intel Corporation. All Rights Reserved.
 
 #pragma once
-
+#define NOMINMAX
 #if KEVIN_MACOS
 #pragma message("Included on Mac OS")
 #endif
 
 #include <librealsense2/rs.hpp>
 
-#define GL_SILENCE_DEPRECATION
-#define GLFW_INCLUDE_GLU
+#if APPLE
+#include <glut.h>
+#else
+#include <windows.h>
+#include <GL/gl.h>
+#endif
 #include <GLFW/glfw3.h>
 
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
@@ -24,22 +28,68 @@
 #include <map>
 #include <functional>
 
-#ifndef PI
-const double PI = 3.14159265358979323846;
-#endif
-const size_t IMU_FRAME_WIDTH = 1280;
-const size_t IMU_FRAME_HEIGHT = 720;
 
 namespace vc::data {
-	class Data {
+
+#ifndef PI
+	const double PI = 3.14159265358979323846;
+#endif
+	const size_t IMU_FRAME_WIDTH = 1280;
+	const size_t IMU_FRAME_HEIGHT = 720;
+	
+	class Processing {
 	public:
-		Rendering rendering;
+		rs2::frame_queue charucoProcessingQueues;
+		std::shared_ptr<rs2::processing_block > charucoProcessingBlocks;
+
+
+		// Pose estimation buffers
+		// buffer <pipelineId, <frame_id, value>>
+		std::map<unsigned long long, std::vector<int>> charucoIdBuffers;
+		std::map<unsigned long long, Eigen::Matrix4d> rotationBuffers;
+		std::map<unsigned long long, Eigen::Matrix4d> translationBuffers;
 	};
 
-	class Rendering {
+	class Camera {
 	public:
+		// Pose estimation camera stuff
+		rs2_intrinsics intrinsics;
+		cv::Matx33f cameraMatrices;
+		std::vector<float> distCoeffs;
+	};
+
+	class Data {
+	public:
+		std::string deviceName;
+
 		texture tex;
 		rs2::colorizer colorizer;
+		rs2::frame  filteredColorFrames;
+		rs2::frame  filteredDepthFrames;
+
+		rs2::pointcloud pointclouds;
+		rs2::frame colorizedDepthFrames;
+		rs2::points points;
+
+		Processing processing;
+		Camera camera;
+
+		Data(std::string deviceName) {
+			this->deviceName = deviceName;
+		}
+
+		void setIntrinsics(rs2_intrinsics intrinsics) {
+			camera.intrinsics = intrinsics;
+			camera.cameraMatrices = cv::Matx33f(
+				intrinsics.fx, 0, intrinsics.ppx,
+				0, intrinsics.fy, intrinsics.ppy,
+				0, 0, 1
+			);
+
+			for (float c : intrinsics.coeffs) {
+				camera.distCoeffs.push_back(c);
+			}
+		}
 	};
 
 
@@ -971,7 +1021,7 @@ namespace vc::data {
 
 		// T265 pose
 		GLfloat H_world_t265[16];
-		quat2mat(pose.rotation, H_world_t265);
+		vc::data::quat2mat(pose.rotation, H_world_t265);
 		H_world_t265[12] = pose.translation.x;
 		H_world_t265[13] = pose.translation.y;
 		H_world_t265[14] = pose.translation.z;

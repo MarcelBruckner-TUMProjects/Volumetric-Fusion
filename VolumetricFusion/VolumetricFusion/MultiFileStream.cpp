@@ -5,11 +5,9 @@
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 // Include short list of convenience functions for rendering
 #if APPLE
-#include "../example.hpp"
 #include "FileAccess.hpp"
 //#include "CaptureDevice.h"
 #else
-#include "example.hpp"
 #include "VolumetricFusion/FileAccess.hpp"
 //#include "VolumetricFusion/CaptureDevice.h"
 #endif
@@ -28,11 +26,6 @@
 #include <atomic>
 #include <filesystem>
 
-#if APPLE
-#include <glut.h>
-#else
-#include <GL/gl.h>
-#endif
 
 #include <imgui.h>
 #include "imgui_impl_glfw.h"
@@ -47,8 +40,8 @@ using namespace imgui_helpers;
 #include "ProcessingBlocks.hpp"
 #include "MultiFileStream.h"
 #include "Eigen/Dense"
-#include <VolumetricFusion\Settings.hpp>
-
+#include "VolumetricFusion\Settings.hpp"
+#include "Data.hpp"
 #pragma endregion
 
 template<typename T, typename V>
@@ -84,10 +77,11 @@ int main(int argc, char* argv[]) try {
 #pragma endregion
 
 #pragma region Pipeline initialization
+	std::vector<vc::data::Data> datas;
 	rs2::context ctx; // Create librealsense context for managing devices
-	std::map<int, std::shared_ptr<rs2::pipeline>> pipelines;
+	std::vector< std::shared_ptr<rs2::pipeline>> pipelines;
 
-	std::vector<std::string> streamNames(4);
+	std::vector<std::string> streamNames;
 	int i = 0;
 	switch (state.captureState) {
 	case CaptureState::STREAMING:
@@ -104,8 +98,11 @@ int main(int argc, char* argv[]) try {
 			cfg.enable_all_streams();
 			cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 760, 6);
 			pipe->start(cfg);
-			pipelines[i] = pipe;
-			streamNames[i] = deviceName;
+
+			pipelines.push_back(pipe);
+			streamNames.push_back(deviceName);
+
+			datas.push_back(vc::data::Data(deviceName));
 			i++;
 		}
 		break;
@@ -125,8 +122,8 @@ int main(int argc, char* argv[]) try {
 			cfg.enable_all_streams();
 			cfg.enable_record_to_file(folderSettings.recordingsFolder + deviceName + ".bag");
 			pipe->start(cfg);
-			pipelines[i] = pipe;
-			streamNames[i] = deviceName;
+			pipelines.push_back(pipe);
+			datas.push_back(vc::data::Data(deviceName));
 			i++;
 		}
 		break;
@@ -144,8 +141,8 @@ int main(int argc, char* argv[]) try {
 			cfg.enable_device_from_file(deviceName);
 			cfg.enable_all_streams();
 			pipe->start(cfg);
-			pipelines[i] = pipe;
-			streamNames[i] = deviceName;
+			pipelines.push_back(pipe);
+			datas.push_back(vc::data::Data(deviceName));
 		}
 	}
 	break;
@@ -164,55 +161,17 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Variables
 	   
-	std::map<int, texture> textures;
-	std::map<int, rs2::colorizer> colorizers;
-
-	// Declare filters
-	rs2::decimation_filter decimationFilter(1);         // Decimation - reduces depth frame density
-	rs2::threshold_filter thresholdFilter(0.0f, 1.1f); // Threshold  - removes values outside recommended range
-	// 0 - fill_from_left - Use the value from the left neighbor pixel to fill the hole
-	// 1 - farest_from_around - Use the value from the neighboring pixel which is furthest away from the sensor
-	// 2 - nearest_from_around - - Use the value from the neighboring pixel closest to the sensor
-	//rs2::hole_filling_filter hole_filter(1); // terrible results ...
-
-	std::vector<rs2::filter*> filters;
-	filters.emplace_back(&decimationFilter);
-	filters.emplace_back(&thresholdFilter);
-	//filters.emplace_back(&hole_filter);
-
 	// Create a thread for getting frames from the device and process them
 	// to prevent UI thread from blocking due to long computations.
 	std::atomic_bool stopped(false);
 	std::atomic_bool paused(false);
-
-	std::map<int, rs2::frame> filteredColorFrames;
-	std::map<int, rs2::frame> filteredDepthFrames;
-
+	
 	std::map<int, std::thread> captureThreads;
-
-	std::map<int, rs2::pointcloud> pointclouds;
-	std::map<int, rs2::frame> colorizedDepthFrames;
-	std::map<int, rs2::points> points;
-
-	// Create custom color processing block and their output queues:
-	std::map<int, rs2::frame_queue> charucoProcessingQueues;
-	std::map<int, std::shared_ptr<rs2::processing_block>> charucoProcessingBlocks;
-
+	
 	// Create custom depth processing block and their output queues:
 	/*std::map<int, rs2::frame_queue> depth_processing_queues;
 	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
-
-	// Pose estimation camera stuff
-	std::map<int, rs2_intrinsics> intrinsics;
-	std::map<int, cv::Matx33f> cameraMatrices;
-	std::map<int, std::vector<float>> distCoeffs;
-
-	// Pose estimation buffers
-	// buffer <pipelineId, <frame_id, value>>
-	std::map<int, std::map<unsigned long long, std::vector<int>>> charucoIdBuffers;
-	std::map<int, std::map<unsigned long long, Eigen::Matrix4d>> rotationBuffers;
-	std::map<int, std::map<unsigned long long, Eigen::Matrix4d>> translationBuffers;
-
+		
 	// Calculated relative transformations between cameras per frame
 	std::map<std::tuple<int, int>, std::map<int, Eigen::Matrix4d>> relativeTransformations;
 
@@ -224,48 +183,39 @@ int main(int argc, char* argv[]) try {
 #pragma region Camera intrinsics
 
 	for (int i = 0; i < pipelines.size(); i++) {
-		intrinsics[i] = pipelines[i]->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics();
-		cameraMatrices[i] = cv::Matx33f(
-			intrinsics[i].fx, 0, intrinsics[i].ppx, 
-			0, intrinsics[i].fy, intrinsics[i].ppy, 
-			0,0,1
-		);
-
-		for (float c : intrinsics[i].coeffs) {
-			distCoeffs[i].push_back(c);
-		}
+		datas[i].setIntrinsics(pipelines[i]->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
 	}
 #pragma endregion
 
 #pragma region Camera Calibration Thread
 
-		calibrationThread = std::thread([&stopped, &calibrateCameras, &rotationBuffers, &translationBuffers, &charucoIdBuffers, &relativeTransformations]() {
+		calibrationThread = std::thread([&datas, &stopped, &calibrateCameras, &relativeTransformations]() {
 			while(!stopped){
 				if (!calibrateCameras) {
 					continue;
 				}
 
-				for (int i = 0; i < charucoIdBuffers.size(); i++) {
-					std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = charucoIdBuffers[i];
+				for (int i = 0; i < datas.size(); i++) {
+					std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = datas[i].processing.charucoIdBuffers;
 					std::vector<unsigned long long> outerFrameIds = extractKeys(baseCharucoIdBuffer);
 
-					for (int j = 0; j < charucoIdBuffers.size(); j++) {
+					for (int j = 0; j < datas.size(); j++) {
 						if (i == j) {
 							continue;
 						}
 
-						std::map<unsigned long long, std::vector<int>> relativeCharucoIdBuffer = charucoIdBuffers[j];
+						std::map<unsigned long long, std::vector<int>> relativeCharucoIdBuffer = datas[i].processing.charucoIdBuffers;
 						std::vector<unsigned long long> innerFrameIds = extractKeys(relativeCharucoIdBuffer);
 
 						std::vector<unsigned long long> overlapingFrames = findOverlap(outerFrameIds, innerFrameIds);
 
 						for (auto frame : overlapingFrames) 
 						{
-							Eigen::Matrix4d baseToMarkerTranslation = translationBuffers[i][frame];
-							Eigen::Matrix4d baseToMarkerRotation = rotationBuffers[i][frame];
+							Eigen::Matrix4d baseToMarkerTranslation = datas[i].processing.translationBuffers[frame];
+							Eigen::Matrix4d baseToMarkerRotation = datas[i].processing.rotationBuffers[frame];
 
-							Eigen::Matrix4d markerToRelativeTranslation = translationBuffers[j][frame].inverse();
-							Eigen::Matrix4d markerToRelativeRotation = rotationBuffers[j][frame].inverse();
+							Eigen::Matrix4d markerToRelativeTranslation = datas[j].processing.translationBuffers[frame].inverse();
+							Eigen::Matrix4d markerToRelativeRotation = datas[j].processing.rotationBuffers[frame].inverse();
 
 							Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
 
@@ -300,39 +250,39 @@ int main(int argc, char* argv[]) try {
 				}
 
 				try {
-					rs2::frameset data = pipe->wait_for_frames(); // Wait for next set of frames from the camera
+					rs2::frameset frameset = pipe->wait_for_frames(); // Wait for next set of frames from the camera
 
-					data = alignToColor.process(data);
+					frameset = alignToColor.process(frameset);
 
-					rs2::frame depthFrame = data.get_depth_frame(); //Take the depth frame from the frameset
+					rs2::frame depthFrame = frameset.get_depth_frame(); //Take the depth frame from the frameset
 					if (!depthFrame) { // Should not happen but if the pipeline is configured differently
 						return;       //  it might not provide depth and we don't want to crash
 					}
 
 					rs2::frame filteredDepthFrame = depthFrame; // Does not copy the frame, only adds a reference
 
-					rs2::frame colorFrame = data.get_color_frame();
+					rs2::frame colorFrame = frameset.get_color_frame();
 
 					if (calibrateCameras) {
 						// Send color frame for processing
-						charucoProcessingBlocks[i]->invoke(colorFrame);
+						datas[i].processing.charucoProcessingBlocks->invoke(colorFrame);
 						// Wait for results
-						colorFrame = charucoProcessingQueues[i].wait_for_frame();
+						colorFrame = datas[i].processing.charucoProcessingQueues.wait_for_frame();
 					}
 
-					filteredColorFrames[i] = colorFrame;
+					datas[i].filteredColorFrames = colorFrame;
 
 					// Apply filters.
-					for (auto&& filter : filters) {
+					/*for (auto&& filter : data.filters) {
 						filteredDepthFrame = filter->process(filteredDepthFrame);
-					}
+					}*/
 
 					// Push filtered & original data to their respective queues
-					filteredDepthFrames[i] = filteredDepthFrame;
+					datas[i].filteredDepthFrames = filteredDepthFrame;
 
-					points[i] = pointclouds[i].calculate(depthFrame);  // Generate pointcloud from the depth data
-					colorizedDepthFrames[i] = colorizers[i].process(depthFrame);		// Colorize the depth frame with a color map
-					pointclouds[i].map_to(colorizedDepthFrames[i]);      // Map the colored depth to the point cloud
+					datas[i].points = datas[i].pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
+					datas[i].colorizedDepthFrames = datas[i].colorizer.process(depthFrame);		// Colorize the depth frame with a color map
+					datas[i].pointclouds.map_to(datas[i].colorizedDepthFrames);      // Map the colored depth to the point cloud
 				}
 				catch (const std::exception & e) {
 					std::stringstream stream;
@@ -347,10 +297,10 @@ int main(int argc, char* argv[]) try {
 #pragma region Processing blocks
 
 	for (int i = 0; i < pipelines.size(); i++) {
-		cv::Matx33f cameraMatrix = cameraMatrices[i];
-		auto distCoeff = distCoeffs[i];
+		cv::Matx33f cameraMatrix = datas[i].camera.cameraMatrices;
+		auto distCoeff = datas[i].camera.distCoeffs;
 
-		const auto charucoPoseEstimation = [&rotationBuffers, &translationBuffers, &charucoIdBuffers, cameraMatrix, distCoeff, i](cv::Mat& image, unsigned long long frameId) {
+		const auto charucoPoseEstimation = [&datas, cameraMatrix, distCoeff, i](cv::Mat& image, unsigned long long frameId) {
 			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 			cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
 			/*cv::Ptr<cv::aruco::DetectorParameters> params;
@@ -374,11 +324,11 @@ int main(int argc, char* argv[]) try {
 						if (valid) {
 							cv::aruco::drawAxis(image, cameraMatrix, distCoeff, rotation, translation, 0.1);
 
-							charucoIdBuffers[i][frameId] = charucoIds;
+							datas[i].processing.charucoIdBuffers[frameId] = charucoIds;
 							Eigen::Matrix4d tmpTranslation;
 							tmpTranslation.setIdentity();
 							tmpTranslation.block<3,1>(0,3) << translation[0], translation[1], translation[2];
-							translationBuffers[i][frameId] = tmpTranslation;
+							datas[i].processing.translationBuffers[frameId] = tmpTranslation;
 							
 							cv::Matx33d tmp;
 							cv::Rodrigues(rotation, tmp);
@@ -388,7 +338,7 @@ int main(int argc, char* argv[]) try {
 								tmp.val[0], tmp.val[1], tmp.val[2],
 								tmp.val[3], tmp.val[4], tmp.val[5],
 								tmp.val[6], tmp.val[7], tmp.val[8];
-							rotationBuffers[i][frameId] = tmpRotation;
+							datas[i].processing.rotationBuffers[frameId] = tmpRotation;
 
 							//std::stringstream ss;
 							//ss << "************************************************************************************" << std::endl;
@@ -400,8 +350,8 @@ int main(int argc, char* argv[]) try {
 		};
 
 
-		charucoProcessingBlocks[i] = std::make_shared<rs2::processing_block>(processing_blocks::createColorProcessingBlock(charucoPoseEstimation));
-		charucoProcessingBlocks[i]->start(charucoProcessingQueues[i]); // Bind output of the processing block to be enqueued into the queue
+		datas[i].processing.charucoProcessingBlocks = std::make_shared<rs2::processing_block>(processing_blocks::createColorProcessingBlock(charucoPoseEstimation));
+		datas[i].processing.charucoProcessingBlocks->start(datas[i].processing.charucoProcessingQueues); // Bind output of the processing block to be enqueued into the queue
 	}
 #pragma endregion
 	
@@ -423,9 +373,10 @@ int main(int argc, char* argv[]) try {
 		imgui_helpers::initialize(app, w2, h2, streamNames, widthHalf, heightHalf, width, height);
 		addSwitchViewButton(state.renderState, calibrateCameras);
 		addPauseResumeToggle(paused);
-		addSaveFramesButton(folderSettings.capturesFolder, pipelines, colorizedDepthFrames, points);
+		//TODO
+//		addSaveFramesButton(folderSettings.capturesFolder, pipelines, colorizedDepthFrames, points);
 		if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-			addAlignPointCloudsButton(paused, points);
+			//addAlignPointCloudsButton(paused, points);
 		}
 
 		if (state.renderState != RenderState::ONLY_DEPTH) {
@@ -445,8 +396,8 @@ int main(int argc, char* argv[]) try {
 			// Draw the pointclouds
 			for (int i = 0; i < pipelines.size() && i < 4; ++i)
 			{
-				if (colorizedDepthFrames[i] && points[i]) {
-					viewOrientation.tex.upload(colorizedDepthFrames[i]);   //  and upload the texture to the view (without this the view will be B&W)
+				if (datas[i].colorizedDepthFrames && datas[i].points) {
+					viewOrientation.tex.upload(datas[i].colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
 					if (isRetinaDisplay) {
 						glViewport(width * (i % 2), height - (height * (i / 2)), width, height);
 					}
@@ -454,14 +405,14 @@ int main(int argc, char* argv[]) try {
 						glViewport(widthHalf * (i % 2), heightHalf - (heightHalf * (i / 2)), widthHalf, heightHalf);
 					}
 
-					if (filteredColorFrames[i]) {
-						draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, points[i], filteredColorFrames[i], 0.2f);
+					if (datas[i].filteredColorFrames) {
+						draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, datas[i].points, datas[i].filteredColorFrames, 0.2f);
 					}
 					else {
-						draw_pointcloud(widthHalf, heightHalf, viewOrientation, points[i]);
+						draw_pointcloud(widthHalf, heightHalf, viewOrientation, datas[i].points);
 					}
 
-					if (distCoeffs.size()) {
+					if (datas.size()) {
 					    draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
 					}
 				}
@@ -473,9 +424,9 @@ int main(int argc, char* argv[]) try {
 		{
 			for (int i = 0; i < pipelines.size() && i < 4; ++i)
 			{
-				if (filteredColorFrames[i] != false) {
+				if (datas[i].filteredColorFrames != false) {
 					rect r{
-							static_cast<float>(widthHalf * (i % 2)),
+						static_cast<float>(widthHalf * (i % 2)),
 							static_cast<float>(heightHalf - (heightHalf * (i / 2))),
 							static_cast<float>(widthHalf),
 							static_cast<float>(heightHalf)
@@ -483,7 +434,7 @@ int main(int argc, char* argv[]) try {
 					if (isRetinaDisplay) {
 						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
 					}
-					textures[i].render(filteredColorFrames[i], r);
+					datas[i].tex.render(datas[i].filteredColorFrames, r);
 				}
 			}
 
@@ -494,7 +445,7 @@ int main(int argc, char* argv[]) try {
 		{
 			for (int i = 0; i < pipelines.size() && i < 4; ++i)
 			{
-				if (filteredDepthFrames[i] != false) {
+				if (datas[i].filteredDepthFrames != false) {
 					rect r{
 					    static_cast<float>(widthHalf * (i % 2)),
                         static_cast<float>(heightHalf - (heightHalf * (i / 2))),
@@ -504,7 +455,7 @@ int main(int argc, char* argv[]) try {
 					if (isRetinaDisplay) {
 						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
 					}
-					textures[i].render(colorizers[i].process(filteredDepthFrames[i]), r);
+					datas[i].tex.render(datas[i].colorizer.process(datas[i].filteredDepthFrames), r);
 				}
 			}
 
