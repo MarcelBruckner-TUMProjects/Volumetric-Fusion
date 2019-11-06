@@ -40,13 +40,14 @@
 #include "stb_image_write.h"
 
 #include "Enums.hpp"
-using namespace enums;
+using namespace vc::enums;
 
 #include "ImGuiHelpers.hpp"
 using namespace imgui_helpers;
 #include "ProcessingBlocks.hpp"
 #include "MultiFileStream.h"
 #include "Eigen/Dense"
+#include <VolumetricFusion\Settings.hpp>
 
 #pragma endregion
 
@@ -59,15 +60,8 @@ std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b);
 int main(int argc, char* argv[]) try {
 
 #pragma region Non window setting
-	CaptureState captureState = CaptureState::STREAMING;
-	RenderState renderState = RenderState::ONLY_COLOR;
-	
-	std::string capturesFolder = "captures/";
-
-	//std::string recordings_folder = "recordings/";
-	std::string recordingsFolder = "single_stream_recording/";
-
-	std::string charucoFolder = "charuco/";
+	vc::settings::FolderSettings folderSettings;
+	vc::settings::State state = vc::settings::State(CaptureState::PLAYING);
 #pragma endregion
 	
 #pragma region Window initialization
@@ -95,7 +89,7 @@ int main(int argc, char* argv[]) try {
 
 	std::vector<std::string> streamNames(4);
 	int i = 0;
-	switch (captureState) {
+	switch (state.captureState) {
 	case CaptureState::STREAMING:
 		for (auto&& device : ctx.query_devices())
 		{
@@ -119,7 +113,7 @@ int main(int argc, char* argv[]) try {
 	{
 		auto devices = ctx.query_devices();
 		if (devices.size() > 0) {
-			file_access::resetDirectory(recordingsFolder, true);
+			file_access::resetDirectory(folderSettings.recordingsFolder, true);
 		}
 		for (auto&& device : ctx.query_devices())
 		{
@@ -129,7 +123,7 @@ int main(int argc, char* argv[]) try {
 			std::string deviceName = device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
 			cfg.enable_device(deviceName);
 			cfg.enable_all_streams();
-			cfg.enable_record_to_file(recordingsFolder + deviceName + ".bag");
+			cfg.enable_record_to_file(folderSettings.recordingsFolder + deviceName + ".bag");
 			pipe->start(cfg);
 			pipelines[i] = pipe;
 			streamNames[i] = deviceName;
@@ -139,7 +133,7 @@ int main(int argc, char* argv[]) try {
 	}
 	case CaptureState::PLAYING:
 	{
-		std::vector<std::string> filenames = file_access::listFilesInFolder(recordingsFolder);
+		std::vector<std::string> filenames = file_access::listFilesInFolder(folderSettings.recordingsFolder);
 
 		for (int i = 0; i < filenames.size() && i < 4; i++)
 		{
@@ -427,24 +421,24 @@ int main(int argc, char* argv[]) try {
 		const bool isRetinaDisplay = w2 == width * 2 && h2 == height * 2;
 
 		imgui_helpers::initialize(app, w2, h2, streamNames, widthHalf, heightHalf, width, height);
-		addSwitchViewButton(renderState, calibrateCameras);
+		addSwitchViewButton(state.renderState, calibrateCameras);
 		addPauseResumeToggle(paused);
-		addSaveFramesButton(capturesFolder, pipelines, colorizedDepthFrames, points);
-		if (renderState == RenderState::MULTI_POINTCLOUD) {
+		addSaveFramesButton(folderSettings.capturesFolder, pipelines, colorizedDepthFrames, points);
+		if (state.renderState == RenderState::MULTI_POINTCLOUD) {
 			addAlignPointCloudsButton(paused, points);
 		}
 
-		if (renderState != RenderState::ONLY_DEPTH) {
+		if (state.renderState != RenderState::ONLY_DEPTH) {
 			addCalibrateToggle(calibrateCameras);
 		}
-		if (renderState != RenderState::ONLY_COLOR) {
+		if (state.renderState != RenderState::ONLY_COLOR) {
 			//addToggleDepthProcessingButton(depthProcessing);
 		}
-		imgui_helpers::addGenerateCharucoDiamond(charucoFolder);
-		imgui_helpers::addGenerateCharucoBoard(charucoFolder);
+		imgui_helpers::addGenerateCharucoDiamond(folderSettings.charucoFolder);
+		imgui_helpers::addGenerateCharucoBoard(folderSettings.charucoFolder);
 		imgui_helpers::finalize();
 		
-		switch (renderState) {
+		switch (state.renderState) {
 		case RenderState::COUNT:
 		case RenderState::MULTI_POINTCLOUD:
 		{

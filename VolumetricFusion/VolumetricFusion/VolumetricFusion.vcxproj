@@ -34,12 +34,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CaptureDevice.h" />
+    <ClInclude Include="Data.hpp" />
     <ClInclude Include="Enums.hpp" />
     <ClInclude Include="FileAccess.hpp" />
     <ClInclude Include="ImGuiHelpers.hpp" />
     <ClInclude Include="MultiFileStream.h" />
     <ClInclude Include="ProcessingBlocks.hpp" />
     <ClInclude Include="Recorder.h" />
+    <ClInclude Include="Settings.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9D1F0672-47E2-4248-921C-BE9731E71B70}</ProjectGuid>

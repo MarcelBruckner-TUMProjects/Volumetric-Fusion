@@ -46,5 +46,11 @@
     <ClInclude Include="Enums.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Settings.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Data.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
