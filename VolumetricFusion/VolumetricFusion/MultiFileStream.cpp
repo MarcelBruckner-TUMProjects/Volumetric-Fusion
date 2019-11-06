@@ -46,10 +46,15 @@ using namespace enums;
 using namespace imgui_helpers;
 #include "ProcessingBlocks.hpp"
 #include "MultiFileStream.h"
+#include "Eigen/Dense"
+
 #pragma endregion
 
 template<typename T, typename V>
 std::vector<T> extract_keys(std::map<T, V> const& input_map);
+
+template<typename T>
+std::vector<T> find_overlap(std::vector<T> a, std::vector<T> b);
 
 int main(int argc, char* argv[]) try {
 
@@ -215,9 +220,11 @@ int main(int argc, char* argv[]) try {
 	// Pose estimation buffers
 	// buffer <pipelineId, <frame_id, value>>
 	std::map<int, std::map<unsigned long long, std::vector<int>>> charucoIdBuffers;
-	//std::map<int, std::map<int, std::vector<std::vector<cv::Point2f>>>> diamondCornerBuffers;
-	std::map<int, std::map<unsigned long long, cv::Vec3d>> rotationBuffers;
-	std::map<int, std::map<unsigned long long, cv::Vec3d>> translationBuffers;
+	std::map<int, std::map<unsigned long long, Eigen::Matrix4d>> rotationBuffers;
+	std::map<int, std::map<unsigned long long, Eigen::Matrix4d>> translationBuffers;
+
+	// Calculated relative transformations between cameras
+	std::map<std::tuple<int, int>, Eigen::Matrix4d> relativeTransformations;
 
 	// Camera calibration thread
 	std::thread calibrationThread;
@@ -242,20 +249,44 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Camera Calibration Thread
 
-		calibrationThread = std::thread([&, i]() {
-			while(!stopped.load() && pipelines.size() > 1){
-				if (!calibrateCameras.load()) {
+		calibrationThread = std::thread([&stopped, &calibrateCameras, &rotationBuffers, &translationBuffers, &charucoIdBuffers]() {
+			while(!stopped){
+				if (!calibrateCameras) {
 					continue;
 				}
 
-				for (int i = 0; i < pipelines.size(); ++i) {
-					auto charucoIdBuffer = charucoIdBuffers[i];
-					auto translationBuffer = translationBuffers[i];
-					auto rotationBuffer = rotationBuffers[i];
-					std::vector<unsigned long long> frame_ids = extract_keys(charucoIdBuffer);
+				for (int i = 0; i < charucoIdBuffers.size(); i++) {
+					std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = charucoIdBuffers[i];
+					std::vector<unsigned long long> outer_frame_ids = extract_keys(baseCharucoIdBuffer);
 
-					for (int i = 0; i < pipelines.size(); ++i) {
+					for (int j = 0; j < charucoIdBuffers.size(); j++) {
+						if (i == j) {
+							continue;
+						}
 
+						std::map<unsigned long long, std::vector<int>> relativeCharucoIdBuffer = charucoIdBuffers[j];
+						std::vector<unsigned long long> inner_frame_ids = extract_keys(relativeCharucoIdBuffer);
+
+						std::vector<unsigned long long> overlaping_frames = find_overlap(outer_frame_ids, inner_frame_ids);
+
+						for (auto frame : overlaping_frames) 
+						{
+							Eigen::Matrix4d baseToMarkerTranslation = translationBuffers[i][frame];
+							Eigen::Matrix4d baseToMarkerRotation = rotationBuffers[i][frame];
+
+							Eigen::Matrix4d markerToRelativeTranslation = translationBuffers[j][frame].inverse();
+							Eigen::Matrix4d markerToRelativeRotation = rotationBuffers[j][frame].inverse();
+
+							Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
+
+							std::stringstream ss;
+							ss << "************************************************************************************" << std::endl;
+							ss << "Devices " << i << ", " << j << " - Frame " << frame << std::endl << std::endl;
+							ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << markerToRelativeTranslation << std::endl << std::endl;
+							ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << markerToRelativeRotation << std::endl << std::endl;
+							ss << "Combined: " << std::endl << relativeTransformation << std::endl;
+							std::cout << ss.str();
+						}
 					}
 				}
 			}
@@ -334,7 +365,7 @@ int main(int argc, char* argv[]) try {
 		cv::Matx33f cameraMatrix = cameraMatrices[i];
 		auto distCoeff = distCoeffs[i];
 
-		const auto charucoPoseEstimation = [&, cameraMatrix, distCoeff, i](cv::Mat& image, unsigned long long frame_id) {
+		const auto charucoPoseEstimation = [&rotationBuffers, &translationBuffers, &charucoIdBuffers, cameraMatrix, distCoeff, i](cv::Mat& image, unsigned long long frame_id) {
 			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 			cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
 			/*cv::Ptr<cv::aruco::DetectorParameters> params;
@@ -359,8 +390,25 @@ int main(int argc, char* argv[]) try {
 							cv::aruco::drawAxis(image, cameraMatrix, distCoeff, rotation, translation, 0.1);
 
 							charucoIdBuffers[i][frame_id] = charucoIds;
-							translationBuffers[i][frame_id] = translation;
-							rotationBuffers[i][frame_id] = rotation;
+							Eigen::Matrix4d tmpTranslation;
+							tmpTranslation.setIdentity();
+							tmpTranslation.block<3,1>(0,3) << translation[0], translation[1], translation[2];
+							translationBuffers[i][frame_id] = tmpTranslation;
+							
+							cv::Matx33d tmp;
+							cv::Rodrigues(rotation, tmp);
+							Eigen::Matrix4d tmpRotation;
+							tmpRotation.setIdentity();
+							tmpRotation.block<3, 3>(0, 0) <<
+								tmp.val[0], tmp.val[1], tmp.val[2],
+								tmp.val[3], tmp.val[4], tmp.val[5],
+								tmp.val[6], tmp.val[7], tmp.val[8];
+							rotationBuffers[i][frame_id] = tmpRotation;
+
+							std::stringstream ss;
+							ss << "************************************************************************************" << std::endl;
+							ss << "Device " << i << ", Frame " << frame_id << ":" << std::endl << "Translation: " << std::endl << tmpTranslation << std::endl << "Rotation: " << std::endl << tmpRotation << std::endl;
+							std::cout << ss.str();
 						}
 					}
 				}
@@ -515,6 +563,20 @@ std::vector<T> extract_keys(std::map<T,V> const& input_map) {
 		retval.push_back(element.first);
 	}
 	return retval;
+}
+
+
+template<typename T>
+std::vector<T> find_overlap(std::vector<T> a, std::vector<T> b) {
+	std::vector<T> c;
+	
+	for (T x : a) {
+		if (std::find(b.begin(), b.end(), x) != b.end()) {
+			c.push_back(x);
+		}
+	}
+
+	return c;
 }
 
 #pragma endregion
