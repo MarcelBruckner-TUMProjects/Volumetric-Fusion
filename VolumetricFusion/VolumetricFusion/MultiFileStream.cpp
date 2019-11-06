@@ -219,8 +219,8 @@ int main(int argc, char* argv[]) try {
 	std::map<int, std::map<unsigned long long, Eigen::Matrix4d>> rotationBuffers;
 	std::map<int, std::map<unsigned long long, Eigen::Matrix4d>> translationBuffers;
 
-	// Calculated relative transformations between cameras
-	std::map<std::tuple<int, int>, Eigen::Matrix4d> relativeTransformations;
+	// Calculated relative transformations between cameras per frame
+	std::map<std::tuple<int, int>, std::map<int, Eigen::Matrix4d>> relativeTransformations;
 
 	// Camera calibration thread
 	std::thread calibrationThread;
@@ -245,7 +245,7 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Camera Calibration Thread
 
-		calibrationThread = std::thread([&stopped, &calibrateCameras, &rotationBuffers, &translationBuffers, &charucoIdBuffers]() {
+		calibrationThread = std::thread([&stopped, &calibrateCameras, &rotationBuffers, &translationBuffers, &charucoIdBuffers, &relativeTransformations]() {
 			while(!stopped){
 				if (!calibrateCameras) {
 					continue;
@@ -274,6 +274,8 @@ int main(int argc, char* argv[]) try {
 							Eigen::Matrix4d markerToRelativeRotation = rotationBuffers[j][frame].inverse();
 
 							Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
+
+							relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
 
 							std::stringstream ss;
 							ss << "************************************************************************************" << std::endl;
