@@ -7,12 +7,13 @@
     <ClCompile Include="Recorder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RecordPlaybackMainWindow.cpp">
+    <ClCompile Include="MultiFileStream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.md" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">
@@ -33,6 +34,16 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="FileAccess.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ProcessingBlocks.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MultiFileStream.h" />
+    <ClInclude Include="ImGuiHelpers.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Enums.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

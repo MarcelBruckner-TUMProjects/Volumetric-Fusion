@@ -14,12 +14,17 @@ if (APPLE)
   find_package(realsense2 REQUIRED)
   find_package(glfw3 REQUIRED)
   find_package(OpenGL REQUIRED)
+  find_package(OpenCV REQUIRED)
+  find_package(GLUT REQUIRED)
   include_directories(
     /usr/local/Cellar/librealsense/2.29.0/include 
     /usr/local/Cellar/glfw/3.3/include
     ../../third-party/glfw-imgui/include
     ../../third-party
     FileAccess.hpp
+    /usr/local/include/opencv4
+    ${OPENGL_INCLUDE_DIR}
+    ${GLUT_INCLUDE_DIR}
   )
   add_definitions(-DAPPLE)
 endif (APPLE)
@@ -98,6 +103,7 @@ target_link_libraries(MultiFileStream ${realsense2_LIBRARY})
 target_link_libraries(MultiFileStream glfw ${GLFW_LIBRARIES})
 target_include_directories(MultiFileStream PUBLIC ${OPENGL_INCLUDE_DIR})
 target_link_libraries(MultiFileStream ${OPENGL_gl_LIBRARY})
+target_link_libraries(MultiFileStream ${OpenCV_LIBS})
 
 target_link_libraries(PostProcessing ${realsense2_LIBRARY})
 target_link_libraries(PostProcessing glfw ${GLFW_LIBRARIES})

@@ -31,7 +31,7 @@
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(opencvDir)\lib\$(PlatformShortName)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opencv_highgui341.lib;opencv_core341.lib;opencv_imgproc341.lib;opencv_dnn341.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_imgcodecs300d.lib,opencv_highgui341.lib;opencv_core341.lib;opencv_imgproc341.lib;opencv_dnn341.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>
