@@ -21,7 +21,6 @@
   <ItemGroup>
     <ClCompile Include="CaptureDevice.cpp" />
     <ClCompile Include="MultiFileStream.cpp" />
-    <ClCompile Include="Recorder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -33,13 +32,13 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CaptureDevice.h" />
+    <ClInclude Include="CaptureDevice.hpp" />
+    <ClInclude Include="Settings.hpp" />
     <ClInclude Include="Enums.hpp" />
     <ClInclude Include="FileAccess.hpp" />
     <ClInclude Include="ImGuiHelpers.hpp" />
     <ClInclude Include="MultiFileStream.h" />
     <ClInclude Include="ProcessingBlocks.hpp" />
-    <ClInclude Include="Recorder.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9D1F0672-47E2-4248-921C-BE9731E71B70}</ProjectGuid>

@@ -40,7 +40,9 @@ window app(1280, 720, "RealSense Pointcloud Example");
 // Construct an object to manage view state
 state app_state = { 0, 0, 0, 0, false, 0, 0, 0 };
 // register callbacks to allow manipulation of the pointcloud
-register_glfw_callbacks(app, app_state);
+
+
+(app, app_state);
 ```
 
 We are going to use classes within the `rs2` namespace:
