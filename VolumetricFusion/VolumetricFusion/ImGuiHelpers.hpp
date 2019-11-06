@@ -47,15 +47,14 @@ namespace imgui_helpers {
 		}
 	}
 
-	void addSwitchViewButton(RenderState &renderState, std::atomic_bool& depthProcessing, std::atomic_bool& colorProcessing)
+	void addSwitchViewButton(RenderState &renderState, std::atomic_bool& calibrate)
 	{
 	    const auto callback = [&]() {
           int s = (int)renderState;
           s = (s + 1) % (int)RenderState::COUNT;
           renderState = (RenderState)s;
 
-          depthProcessing = false;
-          colorProcessing = false;
+          calibrate = false;
 
           std::cout << "Switching render state to " << std::to_string((int)renderState) << std::endl;
         };
@@ -73,17 +72,14 @@ namespace imgui_helpers {
 		addTopBarButton(text, callback);
 	}
 
-	void addPauseResumeButton(std::atomic_bool& paused)
+	void addPauseResumeToggle(std::atomic_bool& paused)
 	{
 		imgui_helpers::addToggleButton("Pause", "Resume", paused);
 	}
-
-	void addToggleDepthProcessingButton(std::atomic_bool& depthProcessing) {
-		imgui_helpers::addToggleButton("Process Depth", "Stop Depth Processing", depthProcessing);
-	}
-
-	void addToggleColorProcessingButton(std::atomic_bool& colorProcessing) {
-		imgui_helpers::addToggleButton("Process Color", "Stop Color Processing", colorProcessing);
+	
+	void addCalibrateToggle(std::atomic_bool& calibrate)
+	{
+		imgui_helpers::addToggleButton("Calibrate", "Stop Calibration", calibrate);
 	}
 
 	void addAlignPointCloudsButton(std::atomic_bool& paused, std::map<int, rs2::points>& filtered_points)
@@ -165,7 +161,7 @@ namespace imgui_helpers {
 		const auto callback = [&]() {
 			file_access::isDirectory(charuco_folder, true);
 			for (int i = 0; i < 6; i++) {
-				
+
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
 				cv::Mat boardImage;
