@@ -37,7 +37,7 @@
     <ClInclude Include="FileAccess.hpp" />
     <ClInclude Include="ImGuiHelpers.hpp" />
     <ClInclude Include="MultiFileStream.h" />
-    <ClInclude Include="ProcessingBlocks.hpp" />
+    <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Recorder.h" />
     <ClInclude Include="Settings.hpp" />
   </ItemGroup>

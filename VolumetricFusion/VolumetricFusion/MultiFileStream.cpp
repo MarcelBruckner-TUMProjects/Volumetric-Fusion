@@ -29,14 +29,14 @@
 using namespace vc::enums;
 
 #include "ImGuiHelpers.hpp"
-using namespace imgui_helpers;
-#include "ProcessingBlocks.hpp"
+#include "Processing.hpp"
 #include "MultiFileStream.h"
 #include "Eigen/Dense"
 #include "Settings.hpp"
 #include "Data.hpp"
 #include "CaptureDevice.hpp"
 #include "VolumetricFusion/FileAccess.hpp"
+#include <signal.h>
 
 #pragma endregion
 
@@ -46,14 +46,17 @@ std::vector<T> extractKeys(std::map<T, V> const& input_map);
 template<typename T>
 std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b);
 
+void my_function_to_handle_aborts(int signalNumber) {
+	std::cout << "Something aborted" << std::endl;
+}
+
 int main(int argc, char* argv[]) try {
 
-#pragma region Non window setting
+	signal(SIGABRT, &my_function_to_handle_aborts);
+
 	vc::settings::FolderSettings folderSettings;
 	vc::settings::State state = vc::settings::State(CaptureState::PLAYING);
-#pragma endregion
 	
-#pragma region Window initialization
 	// Create a simple OpenGL window for rendering:
 	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
 
@@ -70,9 +73,10 @@ int main(int argc, char* argv[]) try {
 	viewOrientation.last_y = 1015.8;
 	viewOrientation.offset_x = 2.0;
 	viewOrientation.offset_y = -2.0;
-#pragma endregion
 
-#pragma region Pipeline initialization
+
+	/*Do this early in your program's initialization */
+
 	rs2::context ctx; // Create librealsense context for managing devices
 	//std::vector<vc::data::Data> datas;
 	std::vector< vc::capture::CaptureDevice> pipelines;
@@ -113,17 +117,12 @@ int main(int argc, char* argv[]) try {
 	while (streamNames.size() < 4) {
 		streamNames.push_back("");
 	}
-#pragma endregion
-
-#pragma region Variables
 	   
 	// Create a thread for getting frames from the device and process them
 	// to prevent UI thread from blocking due to long computations.
 	std::atomic_bool stopped(false);
 	std::atomic_bool paused(false);
-	
-	std::map<int, std::thread> captureThreads;
-	
+		
 	// Create custom depth processing block and their output queues:
 	/*std::map<int, rs2::frame_queue> depth_processing_queues;
 	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
@@ -134,15 +133,12 @@ int main(int argc, char* argv[]) try {
 	// Camera calibration thread
 	std::thread calibrationThread;
 	std::atomic_bool calibrateCameras = true;
-#pragma endregion
-
-#pragma region Camera intrinsics
-
+	
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i].startPipeline();
-		pipelines[i].data->setIntrinsics(pipelines[i].pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
+		pipelines[i].resumeThread();
+		pipelines[i].calibrate(calibrateCameras);
 	}
-#pragma endregion
 
 #pragma region Camera Calibration Thread
 
@@ -153,7 +149,7 @@ int main(int argc, char* argv[]) try {
 				}
 
 				for (int i = 0; i < pipelines.size(); i++) {
-					std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = pipelines[i].data->processing.charucoIdBuffers;
+					std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = pipelines[i].processing->charucoIdBuffers;
 					std::vector<unsigned long long> outerFrameIds = extractKeys(baseCharucoIdBuffer);
 
 					for (int j = 0; j < pipelines.size(); j++) {
@@ -161,18 +157,18 @@ int main(int argc, char* argv[]) try {
 							continue;
 						}
 
-						std::map<unsigned long long, std::vector<int>> relativeCharucoIdBuffer = pipelines[i].data->processing.charucoIdBuffers;
+						std::map<unsigned long long, std::vector<int>> relativeCharucoIdBuffer = pipelines[i].processing->charucoIdBuffers;
 						std::vector<unsigned long long> innerFrameIds = extractKeys(relativeCharucoIdBuffer);
 
 						std::vector<unsigned long long> overlapingFrames = findOverlap(outerFrameIds, innerFrameIds);
 
 						for (auto frame : overlapingFrames) 
 						{
-							Eigen::Matrix4d baseToMarkerTranslation = pipelines[i].data->processing.translationBuffers[frame];
-							Eigen::Matrix4d baseToMarkerRotation = pipelines[i].data->processing.rotationBuffers[frame];
+							Eigen::Matrix4d baseToMarkerTranslation = pipelines[i].processing->translationBuffers[frame];
+							Eigen::Matrix4d baseToMarkerRotation = pipelines[i].processing->rotationBuffers[frame];
 
-							Eigen::Matrix4d markerToRelativeTranslation = pipelines[j].data->processing.translationBuffers[frame].inverse();
-							Eigen::Matrix4d markerToRelativeRotation = pipelines[j].data->processing.rotationBuffers[frame].inverse();
+							Eigen::Matrix4d markerToRelativeTranslation = pipelines[j].processing->translationBuffers[frame].inverse();
+							Eigen::Matrix4d markerToRelativeRotation = pipelines[j].processing->rotationBuffers[frame].inverse();
 
 							Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
 
@@ -191,76 +187,7 @@ int main(int argc, char* argv[]) try {
 			}
 		});
 #pragma endregion
-
-#pragma region Processing Threads
-
-	for (int i = 0; i < pipelines.size(); ++i) {
-		captureThreads[i] = std::thread(&vc::capture::CaptureDevice::captureThreadFunction, pipelines[i]);
-		pipelines[i].paused->store(false);
-	}
-#pragma endregion
-
-#pragma region Processing blocks
-
-	for (int i = 0; i < pipelines.size(); i++) {
-		cv::Matx33f cameraMatrix = pipelines[i].data->camera.cameraMatrices;
-		auto distCoeff = pipelines[i].data->camera.distCoeffs;
-
-		const auto charucoPoseEstimation = [&pipelines, cameraMatrix, distCoeff, i](cv::Mat& image, unsigned long long frameId) {
-			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-			cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
-			/*cv::Ptr<cv::aruco::DetectorParameters> params;
-			params->cornerRefinementMethod = cv::aruco::CORNER_REFINE_NONE;*/
-
-				std::vector<int> ids;
-				std::vector<std::vector<cv::Point2f>> corners;
-				cv::aruco::detectMarkers(image, dictionary, corners, ids);
-				// if at least one marker detected
-				if (ids.size() > 0) {
-					cv::aruco::drawDetectedMarkers(image, corners, ids);
-					std::vector<cv::Point2f> charucoCorners;
-					std::vector<int> charucoIds;
-					cv::aruco::interpolateCornersCharuco(corners, ids, image, board, charucoCorners, charucoIds);
-					// if at least one charuco corner detected
-					if (charucoIds.size() > 0) {
-						cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
-						cv::Vec3d rotation, translation;
-						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, cameraMatrix, distCoeff, rotation, translation);
-						// if charuco pose is valid
-						if (valid) {
-							cv::aruco::drawAxis(image, cameraMatrix, distCoeff, rotation, translation, 0.1);
-
-							pipelines[i].data->processing.charucoIdBuffers[frameId] = charucoIds;
-							Eigen::Matrix4d tmpTranslation;
-							tmpTranslation.setIdentity();
-							tmpTranslation.block<3,1>(0,3) << translation[0], translation[1], translation[2];
-							pipelines[i].data->processing.translationBuffers[frameId] = tmpTranslation;
-							
-							cv::Matx33d tmp;
-							cv::Rodrigues(rotation, tmp);
-							Eigen::Matrix4d tmpRotation;
-							tmpRotation.setIdentity();
-							tmpRotation.block<3, 3>(0, 0) <<
-								tmp.val[0], tmp.val[1], tmp.val[2],
-								tmp.val[3], tmp.val[4], tmp.val[5],
-								tmp.val[6], tmp.val[7], tmp.val[8];
-							pipelines[i].data->processing.rotationBuffers[frameId] = tmpRotation;
-
-							//std::stringstream ss;
-							//ss << "************************************************************************************" << std::endl;
-							//ss << "Device " << i << ", Frame " << frame_id << ":" << std::endl << "Translation: " << std::endl << tmpTranslation << std::endl << "Rotation: " << std::endl << tmpRotation << std::endl;
-							//std::cout << ss.str();
-						}
-					}
-				}
-		};
-
-
-		pipelines[i].data->processing.charucoProcessingBlocks = std::make_shared<rs2::processing_block>(processing_blocks::createColorProcessingBlock(charucoPoseEstimation));
-		pipelines[i].data->processing.charucoProcessingBlocks->start(pipelines[i].data->processing.charucoProcessingQueues); // Bind output of the processing block to be enqueued into the queue
-	}
-#pragma endregion
-	
+				
 #pragma region Main loop
 
 	while (app)
@@ -276,24 +203,34 @@ int main(int argc, char* argv[]) try {
 		glfwGetFramebufferSize(app, &w2, &h2);
 		const bool isRetinaDisplay = w2 == width * 2 && h2 == height * 2;
 
-		imgui_helpers::initialize(app, w2, h2, streamNames, widthHalf, heightHalf, width, height);
-		addSwitchViewButton(state.renderState, calibrateCameras);
-		addPauseResumeToggle(paused);
-		//TODO
+		vc::imgui_helpers::initialize(app, w2, h2, streamNames, widthHalf, heightHalf, width, height);
+		vc::imgui_helpers::addSwitchViewButton(state.renderState, calibrateCameras);
+		if (vc::imgui_helpers::addPauseResumeToggle(paused)) {
+			for (int i = 0; i < pipelines.size(); i++)
+			{
+				pipelines[i].paused->store(paused);
+			}
+		}
+
 //		addSaveFramesButton(folderSettings.capturesFolder, pipelines, colorizedDepthFrames, points);
 		if (state.renderState == RenderState::MULTI_POINTCLOUD) {
 			//addAlignPointCloudsButton(paused, points);
 		}
 
 		if (state.renderState != RenderState::ONLY_DEPTH) {
-			addCalibrateToggle(calibrateCameras);
+			if (vc::imgui_helpers::addCalibrateToggle(calibrateCameras)) {
+				for (int i = 0; i < pipelines.size(); i++)
+				{
+					pipelines[i].calibrateCameras ->store(calibrateCameras);
+				}
+			}
 		}
 		if (state.renderState != RenderState::ONLY_COLOR) {
 			//addToggleDepthProcessingButton(depthProcessing);
 		}
-		imgui_helpers::addGenerateCharucoDiamond(folderSettings.charucoFolder);
-		imgui_helpers::addGenerateCharucoBoard(folderSettings.charucoFolder);
-		imgui_helpers::finalize();
+		vc::imgui_helpers::addGenerateCharucoDiamond(folderSettings.charucoFolder);
+		vc::imgui_helpers::addGenerateCharucoBoard(folderSettings.charucoFolder);
+		vc::imgui_helpers::finalize();
 		
 		switch (state.renderState) {
 		case RenderState::COUNT:
@@ -374,11 +311,12 @@ int main(int argc, char* argv[]) try {
 #pragma region Final cleanup
 
 	stopped.store(true);
-	for (auto& thread : captureThreads) {
-		thread.second.join();
+	for (int i = 0; i < pipelines.size(); i++) {
+		pipelines[i].stopThread();
 	}
 #pragma endregion
 
+	std::exit(EXIT_SUCCESS);
 	return EXIT_SUCCESS;
 }
 #pragma region Error handling

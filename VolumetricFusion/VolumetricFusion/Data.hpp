@@ -2,19 +2,24 @@
 // Copyright(c) 2015 Intel Corporation. All Rights Reserved.
 
 #pragma once
+
+#ifndef _DATA_HEADER_
+#define _DATA_HEADER_
+
+
 #define NOMINMAX
 #if KEVIN_MACOS
 #pragma message("Included on Mac OS")
 #endif
 
 #include <librealsense2/rs.hpp>
-
-#if APPLE
-#include <glut.h>
-#else
-#include <windows.h>
-#include <GL/gl.h>
-#endif
+//
+//#if APPLE
+//#include <glut.h>
+//#else
+//#include <windows.h>
+//#include <GL/gl.h>
+//#endif
 #include <GLFW/glfw3.h>
 
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
@@ -28,6 +33,11 @@
 #include <map>
 #include <functional>
 
+#include "Processing.hpp"
+
+namespace vc::processing {
+	class Processing;
+}
 
 namespace vc::data {
 
@@ -36,20 +46,7 @@ namespace vc::data {
 #endif
 	const size_t IMU_FRAME_WIDTH = 1280;
 	const size_t IMU_FRAME_HEIGHT = 720;
-
-	class Processing {
-	public:
-		rs2::frame_queue charucoProcessingQueues;
-		std::shared_ptr<rs2::processing_block > charucoProcessingBlocks;
-
-
-		// Pose estimation buffers
-		// buffer <pipelineId, <frame_id, value>>
-		std::map<unsigned long long, std::vector<int>> charucoIdBuffers;
-		std::map<unsigned long long, Eigen::Matrix4d> rotationBuffers;
-		std::map<unsigned long long, Eigen::Matrix4d> translationBuffers;
-	};
-
+	
 	class Camera {
 	public:
 		// Pose estimation camera stuff
@@ -60,6 +57,7 @@ namespace vc::data {
 
 	class Data {
 	public:
+
 		std::string deviceName;
 
 		texture tex;
@@ -71,8 +69,8 @@ namespace vc::data {
 		rs2::frame colorizedDepthFrames;
 		rs2::points points;
 
-		Processing processing;
 		Camera camera;
+		vc::processing::Processing* processing;
 
 		Data() {
 		}
@@ -92,3 +90,5 @@ namespace vc::data {
 		}
 	};
 }
+#endif // !_DATA_HEADER_
+

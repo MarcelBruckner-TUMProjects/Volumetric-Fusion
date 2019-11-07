@@ -1,52 +1,88 @@
 #pragma once
 
+#ifndef _CAPTURE_DEVICE_
+#define _CAPTURE_DEVICE_
+
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 #include <map>
 #include <iostream>
 #include <string>
 #include <thread>
 #include <atomic>
+#include "Data.hpp"
+#include "Processing.hpp"
 
 namespace vc::capture {
+		
+	/// <summary>
+	/// Base class for capturing devices
+	/// </summary>
 	class CaptureDevice {
-	public:		
+	public:
+		rs2::config cfg;
+		std::shared_ptr < vc::processing::Processing> processing;
+
 		std::shared_ptr < vc::data::Data >data;
 		std::shared_ptr<rs2::pipeline > pipeline;
-		rs2::config cfg;
 
 		std::shared_ptr < std::atomic_bool> stopped;
 		std::shared_ptr < std::atomic_bool> paused;
 		std::shared_ptr < std::atomic_bool> calibrateCameras;
-		
+
+		std::shared_ptr < std::thread> thread;
+
 		void startPipeline() {
 			this->pipeline->start(this->cfg);
+			this->data->setIntrinsics(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
+		}
+
+		void pauseThread() {
+			this->paused->store(true);
+		}
+
+		void resumeThread() {
+			this->paused->store(false);
+		}
+
+		void stopThread() {
+			this->stopped->store(true);
+		}
+
+		void calibrate(bool calibrate) {
+			this->calibrateCameras->store(calibrate);
 		}
 
 		CaptureDevice(CaptureDevice& other) {
 			this->data = other.data;
+			this->processing = other.processing;
 			this->pipeline = other.pipeline;
 			this->cfg = other.cfg;
 
 			this->stopped = other.stopped;
 			this->paused = other.paused;
 			this->calibrateCameras = other.calibrateCameras;
+			this->thread = other.thread;
 		}
 				
 		CaptureDevice(rs2::context context) {
 			this->data = std::make_shared<vc::data::Data>();
+			this->processing = std::make_shared<vc::processing::Processing>();
 			this->pipeline = std::make_shared<rs2::pipeline>(context);
 			this->stopped = std::make_shared<std::atomic_bool>(false);
 			this->paused = std::make_shared<std::atomic_bool>(true);
 			this->calibrateCameras = std::make_shared<std::atomic_bool>(false);
-		}
 
+			this->thread = std::make_shared<std::thread>(&vc::capture::CaptureDevice::captureThreadFunction, this);
+		}
+		
 		void captureThreadFunction() {
 			{
 				rs2::align alignToColor(RS2_STREAM_COLOR);
+				processing->startCharucoProcessing(data->camera);
 
 				while (!stopped->load()) //While application is running
 				{
-					if (paused->load()) {
+					while (paused->load()) {
 						continue;
 					}
 
@@ -66,9 +102,9 @@ namespace vc::capture {
 
 						if (calibrateCameras->load()) {
 							// Send color frame for processing
-							data->processing.charucoProcessingBlocks->invoke(colorFrame);
+							processing->charucoProcessingBlocks->invoke(colorFrame);
 							// Wait for results
-							colorFrame = data->processing.charucoProcessingQueues.wait_for_frame();
+							colorFrame = processing->charucoProcessingQueues.wait_for_frame();
 						}
 
 						data->filteredColorFrames = colorFrame;
@@ -94,7 +130,11 @@ namespace vc::capture {
 			}
 		}
 	};
-
+	
+	/// <summary>
+	/// A capture device for streaming the live RGB-D data from the device.
+	/// </summary>
+	/// <seealso cref="CaptureDevice" />
 	class StreamingCaptureDevice : public CaptureDevice {
 	public:
 		StreamingCaptureDevice(rs2::context context, rs2::device device) : 
@@ -106,7 +146,11 @@ namespace vc::capture {
 			this->cfg.enable_all_streams();
 		}
 	};
-
+	
+	/// <summary>
+	///  A capture device for streaming the live RGB-D data from the device and to record it to a file.
+	/// </summary>
+	/// <seealso cref="StreamingCaptureDevice" />
 	class RecordingCaptureDevice : public StreamingCaptureDevice {
 	public:
 		RecordingCaptureDevice(rs2::context context, rs2::device device, std::string foldername) :
@@ -117,7 +161,11 @@ namespace vc::capture {
 			this->cfg.enable_record_to_file(foldername + data->deviceName + ".bag");
 		}
 	};
-
+	
+	/// <summary>
+	///  A capture device for streaming the RGB-D data from a file.
+	/// </summary>
+	/// <seealso cref="CaptureDevice" />
 	class PlayingCaptureDevice : public CaptureDevice {
 	public:
 		PlayingCaptureDevice(rs2::context context, std::string filename) : 
@@ -130,3 +178,5 @@ namespace vc::capture {
 		}
 	};
 }
+
+#endif // !_CAPTURE_DEVICE_

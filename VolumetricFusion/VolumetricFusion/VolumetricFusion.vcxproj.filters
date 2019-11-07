@@ -27,9 +27,6 @@
     <ClInclude Include="FileAccess.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ProcessingBlocks.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="MultiFileStream.h" />
     <ClInclude Include="ImGuiHelpers.hpp">
       <Filter>Header Files</Filter>
@@ -44,6 +41,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CaptureDevice.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Processing.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
