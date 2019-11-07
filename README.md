@@ -26,3 +26,11 @@ A multi-view RGB-D Capture Setup is built using 4 [Intel® RealSense™ Depth Ca
 - [DynamicFusion: Reconstruction and Tracking of Non-rigid Scenes in Real-Time [Newcombe et al.]](https://rse-lab.cs.washington.edu/papers/dynamic-fusion-cvpr-2015.pdf)
 - [RealSense Multiple Camera WhitePaper](https://www.intel.com/content/dam/support/us/en/documents/emerging-technologies/intel-realsense-technology/RealSense_Multiple_Camera_WhitePaper.pdf)
 - [Volumetric Capture](https://github.com/VCL3D/VolumetricCapture)
+
+## Github Repos
+tsdf Fusion (https://github.com/andyzeng/tsdf-fusion)
+tsdf Fusion in Python (https://github.com/andyzeng/tsdf-fusion-python)
+Elastic Fusion (https://github.com/mp3guy/ElasticFusion)
+ReFusion (https://github.com/PRBonn/refusion)
+KinectFusion (https://github.com/chrdiller/KinectFusionApp)
+ReFusionhttps://github.com/PRBonn/refusion
