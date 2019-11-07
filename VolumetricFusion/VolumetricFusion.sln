@@ -53,6 +53,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "glfw-imgui", "..\third-part
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VolumetricFusion", "VolumetricFusion\VolumetricFusion.vcxproj", "{9D1F0672-47E2-4248-921C-BE9731E71B70}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tsdf-fusion", "tsdf-fusion\tsdf-fusion.vcxproj", "{2789D455-383C-4697-B44C-39E5CDB79B04}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -244,6 +246,12 @@ Global
 		{9D1F0672-47E2-4248-921C-BE9731E71B70}.Release|x64.Build.0 = Release|x64
 		{9D1F0672-47E2-4248-921C-BE9731E71B70}.Release|x86.ActiveCfg = Release|Win32
 		{9D1F0672-47E2-4248-921C-BE9731E71B70}.Release|x86.Build.0 = Release|Win32
+		{2789D455-383C-4697-B44C-39E5CDB79B04}.Debug|x64.ActiveCfg = Debug|x64
+		{2789D455-383C-4697-B44C-39E5CDB79B04}.Debug|x64.Build.0 = Debug|x64
+		{2789D455-383C-4697-B44C-39E5CDB79B04}.Debug|x86.ActiveCfg = Debug|x64
+		{2789D455-383C-4697-B44C-39E5CDB79B04}.Release|x64.ActiveCfg = Release|x64
+		{2789D455-383C-4697-B44C-39E5CDB79B04}.Release|x64.Build.0 = Release|x64
+		{2789D455-383C-4697-B44C-39E5CDB79B04}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
