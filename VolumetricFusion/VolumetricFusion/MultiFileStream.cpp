@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) try {
 	signal(SIGABRT, &my_function_to_handle_aborts);
 
 	vc::settings::FolderSettings folderSettings;
-	vc::settings::State state = vc::settings::State(CaptureState::PLAYING);
+	vc::settings::State state = vc::settings::State(CaptureState::STREAMING);
 	
 	// Create a simple OpenGL window for rendering:
 	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
