@@ -76,58 +76,56 @@ namespace vc::capture {
 		}
 		
 		void captureThreadFunction() {
+			rs2::align alignToColor(RS2_STREAM_COLOR);
+			processing->startCharucoProcessing(data->camera);
+
+			while (!stopped->load()) //While application is running
 			{
-				rs2::align alignToColor(RS2_STREAM_COLOR);
-				processing->startCharucoProcessing(data->camera);
-
-				while (!stopped->load()) //While application is running
-				{
-					while (paused->load()) {
-						continue;
-					}
-
-					try {
-						rs2::frameset frameset = pipeline->wait_for_frames(); // Wait for next set of frames from the camera
-
-						frameset = alignToColor.process(frameset);
-
-						rs2::frame depthFrame = frameset.get_depth_frame(); //Take the depth frame from the frameset
-						if (!depthFrame) { // Should not happen but if the pipeline is configured differently
-							return;       //  it might not provide depth and we don't want to crash
-						}
-
-						rs2::frame filteredDepthFrame = depthFrame; // Does not copy the frame, only adds a reference
-
-						rs2::frame colorFrame = frameset.get_color_frame();
-
-						if (calibrateCameras->load()) {
-							// Send color frame for processing
-							processing->charucoProcessingBlocks->invoke(colorFrame);
-							// Wait for results
-							colorFrame = processing->charucoProcessingQueues.wait_for_frame();
-						}
-
-						data->filteredColorFrames = colorFrame;
-
-						// Apply filters.
-						/*for (auto&& filter : data->filters) {
-							filteredDepthFrame = filter->process(filteredDepthFrame);
-						}*/
-
-						// Push filtered & original data to their respective queues
-						data->filteredDepthFrames = filteredDepthFrame;
-
-						data->points = data->pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
-						data->colorizedDepthFrames = data->colorizer.process(depthFrame);		// Colorize the depth frame with a color map
-						data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud
-					}
-					catch (const std::exception & e) {
-						std::stringstream stream;
-						stream << "******************** THREAD ERROR *******************" << std::endl << e.what() << "****************************************************" << std::endl;
-					}
+				while (paused->load()) {
+					continue;
 				}
-				pipeline->stop();
+
+				try {
+					rs2::frameset frameset = pipeline->wait_for_frames(); // Wait for next set of frames from the camera
+
+					frameset = alignToColor.process(frameset);
+
+					rs2::frame depthFrame = frameset.get_depth_frame(); //Take the depth frame from the frameset
+					if (!depthFrame) { // Should not happen but if the pipeline is configured differently
+						return;       //  it might not provide depth and we don't want to crash
+					}
+
+					rs2::frame filteredDepthFrame = depthFrame; // Does not copy the frame, only adds a reference
+
+					rs2::frame colorFrame = frameset.get_color_frame();
+
+					if (calibrateCameras->load()) {
+						// Send color frame for processing
+						processing->charucoProcessingBlocks->invoke(colorFrame);
+						// Wait for results
+						colorFrame = processing->charucoProcessingQueues.wait_for_frame();
+					}
+
+					data->filteredColorFrames = colorFrame;
+
+					// Apply filters.
+					/*for (auto&& filter : data->filters) {
+						filteredDepthFrame = filter->process(filteredDepthFrame);
+					}*/
+
+					// Push filtered & original data to their respective queues
+					data->filteredDepthFrames = filteredDepthFrame;
+
+					data->points = data->pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
+					data->colorizedDepthFrames = data->colorizer.process(depthFrame);		// Colorize the depth frame with a color map
+					data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud
+				}
+				catch (const std::exception & e) {
+					std::stringstream stream;
+					stream << "******************** THREAD ERROR *******************" << std::endl << e.what() << "****************************************************" << std::endl;
+				}
 			}
+			this->pipeline->stop();
 		}
 	};
 	

@@ -87,7 +87,7 @@ namespace vc::processing {
 		std::shared_ptr<rs2::processing_block > charucoProcessingBlocks;
 
 		// Pose estimation buffers
-		// buffer <pipelineId, <frame_id, value>>
+		// buffer <frame_id, value>
 		std::map<unsigned long long, std::vector<int>> charucoIdBuffers;
 		std::map<unsigned long long, Eigen::Matrix4d> rotationBuffers;
 		std::map<unsigned long long, Eigen::Matrix4d> translationBuffers;

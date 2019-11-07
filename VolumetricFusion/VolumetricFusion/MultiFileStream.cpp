@@ -55,7 +55,8 @@ int main(int argc, char* argv[]) try {
 	signal(SIGABRT, &my_function_to_handle_aborts);
 
 	vc::settings::FolderSettings folderSettings;
-	vc::settings::State state = vc::settings::State(CaptureState::STREAMING);
+	folderSettings.recordingsFolder = "allCameras/";
+	vc::settings::State state = vc::settings::State(CaptureState::PLAYING);
 	
 	// Create a simple OpenGL window for rendering:
 	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
@@ -201,7 +202,7 @@ int main(int argc, char* argv[]) try {
 		// Retina display (Mac OS) have double the pixel density
 		int w2, h2;
 		glfwGetFramebufferSize(app, &w2, &h2);
-		const bool isRetinaDisplay = w2 == width * 2 && h2 == height * 2;
+		const bool isRetinaDisplay = w2 == app.width() * 2 && h2 == app.height() * 2;
 
 		vc::imgui_helpers::initialize(app, w2, h2, streamNames, widthHalf, heightHalf, width, height);
 		vc::imgui_helpers::addSwitchViewButton(state.renderState, calibrateCameras);
@@ -313,10 +314,12 @@ int main(int argc, char* argv[]) try {
 	stopped.store(true);
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i]->stopThread();
+		pipelines[i]->thread->join();
 	}
+	calibrationThread.join();
 #pragma endregion
 
-	std::exit(EXIT_SUCCESS);
+	//std::exit(EXIT_SUCCESS);
 	return EXIT_SUCCESS;
 }
 #pragma region Error handling
