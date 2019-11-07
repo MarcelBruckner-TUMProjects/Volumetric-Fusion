@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) try {
 	signal(SIGABRT, &my_function_to_handle_aborts);
 
 	vc::settings::FolderSettings folderSettings;
-	vc::settings::State state = vc::settings::State(CaptureState::PLAYING);
+	vc::settings::State state = vc::settings::State(CaptureState::STREAMING);
 	
 	// Create a simple OpenGL window for rendering:
 	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) try {
 
 	rs2::context ctx; // Create librealsense context for managing devices
 	//std::vector<vc::data::Data> datas;
-	std::vector< vc::capture::CaptureDevice> pipelines;
+	std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 	std::vector<std::string> streamNames;
 
 	if (state.captureState == CaptureState::RECORDING || state.captureState == CaptureState::STREAMING) {
@@ -93,10 +93,10 @@ int main(int argc, char* argv[]) try {
 		for (auto&& device : ctx.query_devices())
 		{
 			if (state.captureState == CaptureState::RECORDING) {
-				pipelines.push_back(vc::capture::RecordingCaptureDevice(ctx, device, folderSettings.recordingsFolder));
+				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, folderSettings.recordingsFolder));
 			}
 			else if (state.captureState == CaptureState::STREAMING) {
-				pipelines.push_back(vc::capture::StreamingCaptureDevice(ctx, device));
+				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device));
 			}
 			i++;
 		}
@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) try {
 
 		for (int i = 0; i < filenames.size() && i < 4; i++)
 		{
-			pipelines.push_back(vc::capture::PlayingCaptureDevice(ctx, filenames[i]));
+			pipelines.emplace_back(std::make_shared < vc::capture::PlayingCaptureDevice>(ctx, filenames[i]));
 		}
 	}
 
@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) try {
 		throw(rs2::error("No device or file found!"));
 	}
 	while (streamNames.size() < 4) {
-		streamNames.push_back("");
+		streamNames.emplace_back("");
 	}
 	   
 	// Create a thread for getting frames from the device and process them
@@ -135,9 +135,9 @@ int main(int argc, char* argv[]) try {
 	std::atomic_bool calibrateCameras = true;
 	
 	for (int i = 0; i < pipelines.size(); i++) {
-		pipelines[i].startPipeline();
-		pipelines[i].resumeThread();
-		pipelines[i].calibrate(calibrateCameras);
+		pipelines[i]->startPipeline();
+		pipelines[i]->resumeThread();
+		pipelines[i]->calibrate(calibrateCameras);
 	}
 
 #pragma region Camera Calibration Thread
@@ -149,7 +149,7 @@ int main(int argc, char* argv[]) try {
 				}
 
 				for (int i = 0; i < pipelines.size(); i++) {
-					std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = pipelines[i].processing->charucoIdBuffers;
+					std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
 					std::vector<unsigned long long> outerFrameIds = extractKeys(baseCharucoIdBuffer);
 
 					for (int j = 0; j < pipelines.size(); j++) {
@@ -157,18 +157,18 @@ int main(int argc, char* argv[]) try {
 							continue;
 						}
 
-						std::map<unsigned long long, std::vector<int>> relativeCharucoIdBuffer = pipelines[i].processing->charucoIdBuffers;
+						std::map<unsigned long long, std::vector<int>> relativeCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
 						std::vector<unsigned long long> innerFrameIds = extractKeys(relativeCharucoIdBuffer);
 
 						std::vector<unsigned long long> overlapingFrames = findOverlap(outerFrameIds, innerFrameIds);
 
 						for (auto frame : overlapingFrames) 
 						{
-							Eigen::Matrix4d baseToMarkerTranslation = pipelines[i].processing->translationBuffers[frame];
-							Eigen::Matrix4d baseToMarkerRotation = pipelines[i].processing->rotationBuffers[frame];
+							Eigen::Matrix4d baseToMarkerTranslation = pipelines[i]->processing->translationBuffers[frame];
+							Eigen::Matrix4d baseToMarkerRotation = pipelines[i]->processing->rotationBuffers[frame];
 
-							Eigen::Matrix4d markerToRelativeTranslation = pipelines[j].processing->translationBuffers[frame].inverse();
-							Eigen::Matrix4d markerToRelativeRotation = pipelines[j].processing->rotationBuffers[frame].inverse();
+							Eigen::Matrix4d markerToRelativeTranslation = pipelines[j]->processing->translationBuffers[frame].inverse();
+							Eigen::Matrix4d markerToRelativeRotation = pipelines[j]->processing->rotationBuffers[frame].inverse();
 
 							Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
 
@@ -208,7 +208,7 @@ int main(int argc, char* argv[]) try {
 		if (vc::imgui_helpers::addPauseResumeToggle(paused)) {
 			for (int i = 0; i < pipelines.size(); i++)
 			{
-				pipelines[i].paused->store(paused);
+				pipelines[i]->paused->store(paused);
 			}
 		}
 
@@ -221,7 +221,7 @@ int main(int argc, char* argv[]) try {
 			if (vc::imgui_helpers::addCalibrateToggle(calibrateCameras)) {
 				for (int i = 0; i < pipelines.size(); i++)
 				{
-					pipelines[i].calibrateCameras ->store(calibrateCameras);
+					pipelines[i]->calibrateCameras ->store(calibrateCameras);
 				}
 			}
 		}
@@ -239,8 +239,8 @@ int main(int argc, char* argv[]) try {
 			// Draw the pointclouds
 			for (int i = 0; i < pipelines.size() && i < 4; ++i)
 			{
-				if (pipelines[i].data->colorizedDepthFrames && pipelines[i].data->points) {
-					viewOrientation.tex.upload(pipelines[i].data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
+				if (pipelines[i]->data->colorizedDepthFrames && pipelines[i]->data->points) {
+					viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
 					if (isRetinaDisplay) {
 						glViewport(width * (i % 2), height - (height * (i / 2)), width, height);
 					}
@@ -248,11 +248,11 @@ int main(int argc, char* argv[]) try {
 						glViewport(widthHalf * (i % 2), heightHalf - (heightHalf * (i / 2)), widthHalf, heightHalf);
 					}
 
-					if (pipelines[i].data->filteredColorFrames) {
-						draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i].data->points, pipelines[i].data->filteredColorFrames, 0.2f);
+					if (pipelines[i]->data->filteredColorFrames) {
+						draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);
 					}
 					else {
-						draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i].data->points);
+						draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
 					}
 
 					if (pipelines.size()) {
@@ -267,7 +267,7 @@ int main(int argc, char* argv[]) try {
 		{
 			for (int i = 0; i < pipelines.size() && i < 4; ++i)
 			{
-				if (pipelines[i].data->filteredColorFrames != false) {
+				if (pipelines[i]->data->filteredColorFrames != false) {
 					rect r{
 						static_cast<float>(widthHalf * (i % 2)),
 							static_cast<float>(heightHalf - (heightHalf * (i / 2))),
@@ -277,7 +277,7 @@ int main(int argc, char* argv[]) try {
 					if (isRetinaDisplay) {
 						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
 					}
-					pipelines[i].data->tex.render(pipelines[i].data->filteredColorFrames, r);
+					pipelines[i]->data->tex.render(pipelines[i]->data->filteredColorFrames, r);
 				}
 			}
 
@@ -288,7 +288,7 @@ int main(int argc, char* argv[]) try {
 		{
 			for (int i = 0; i < pipelines.size() && i < 4; ++i)
 			{
-				if (pipelines[i].data->filteredDepthFrames != false) {
+				if (pipelines[i]->data->filteredDepthFrames != false) {
 					rect r{
 					    static_cast<float>(widthHalf * (i % 2)),
                         static_cast<float>(heightHalf - (heightHalf * (i / 2))),
@@ -298,7 +298,7 @@ int main(int argc, char* argv[]) try {
 					if (isRetinaDisplay) {
 						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
 					}
-					pipelines[i].data->tex.render(pipelines[i].data->colorizer.process(pipelines[i].data->filteredDepthFrames), r);
+					pipelines[i]->data->tex.render(pipelines[i]->data->colorizer.process(pipelines[i]->data->filteredDepthFrames), r);
 				}
 			}
 
@@ -312,7 +312,7 @@ int main(int argc, char* argv[]) try {
 
 	stopped.store(true);
 	for (int i = 0; i < pipelines.size(); i++) {
-		pipelines[i].stopThread();
+		pipelines[i]->stopThread();
 	}
 #pragma endregion
 
@@ -338,7 +338,7 @@ template<typename T, typename V>
 std::vector<T> extractKeys(std::map<T,V> const& input_map) {
 	std::vector<T> retval;
 	for (auto const& element : input_map) {
-		retval.push_back(element.first);
+		retval.emplace_back(element.first);
 	}
 	return retval;
 }
@@ -350,7 +350,7 @@ std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
 	
 	for (T x : a) {
 		if (std::find(b.begin(), b.end(), x) != b.end()) {
-			c.push_back(x);
+			c.emplace_back(x);
 		}
 	}
 
