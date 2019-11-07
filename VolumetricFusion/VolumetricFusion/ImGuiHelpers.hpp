@@ -4,13 +4,14 @@
 
 #if APPLE
 #include "../example.hpp"
+#include "FileAccess.hpp"
 #else
 #include "example.hpp"
+#include "VolumetricFusion/FileAccess.hpp"
 #endif
 #include <opencv2/highgui/highgui.hpp>
 //#include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgcodecs/imgcodecs.hpp>
-#include "VolumetricFusion/FileAccess.hpp"
 
 namespace vc::imgui_helpers {
 
