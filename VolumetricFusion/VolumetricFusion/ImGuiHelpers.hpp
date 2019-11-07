@@ -10,6 +10,7 @@
 #include <opencv2/highgui/highgui.hpp>
 //#include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgcodecs/imgcodecs.hpp>
+#include "VolumetricFusion/FileAccess.hpp"
 
 namespace imgui_helpers {
 
@@ -108,7 +109,7 @@ namespace imgui_helpers {
 
 	void addSaveFramesButton(std::string& captures_folder, std::map<int, std::shared_ptr<rs2::pipeline>>& pipelines, std::map<int, rs2::frame>& colorized_depth_frames, std::map<int, rs2::points>& filtered_points) {
 		const auto callback = [&]() {
-          file_access::isDirectory(captures_folder, true);
+          vc::file_access::isDirectory(captures_folder, true);
           // Write images to disk
           for (int i = 0; i < pipelines.size(); ++i) {
               auto vf = colorized_depth_frames[i].as<rs2::video_frame>();
@@ -135,7 +136,7 @@ namespace imgui_helpers {
 
 	void addGenerateCharucoDiamond(std::string& charuco_folder) {
 		const auto callback = [&]() {
-			file_access::isDirectory(charuco_folder, true);
+			vc::file_access::isDirectory(charuco_folder, true);
 			for (int i = 0; i < 6; i++) {
 				cv::Mat diamondImage;
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
@@ -159,7 +160,7 @@ namespace imgui_helpers {
 
 	void addGenerateCharucoBoard(std::string& charuco_folder) {
 		const auto callback = [&]() {
-			file_access::isDirectory(charuco_folder, true);
+			vc::file_access::isDirectory(charuco_folder, true);
 			for (int i = 0; i < 6; i++) {
 
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);

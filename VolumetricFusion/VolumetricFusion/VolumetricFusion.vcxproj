@@ -19,9 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CaptureDevice.cpp" />
     <ClCompile Include="MultiFileStream.cpp" />
-    <ClCompile Include="Recorder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -33,7 +31,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CaptureDevice.h" />
+    <ClInclude Include="CaptureDevice.hpp" />
     <ClInclude Include="Data.hpp" />
     <ClInclude Include="Enums.hpp" />
     <ClInclude Include="FileAccess.hpp" />
