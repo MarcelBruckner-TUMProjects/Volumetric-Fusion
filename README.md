@@ -28,9 +28,9 @@ A multi-view RGB-D Capture Setup is built using 4 [Intel® RealSense™ Depth Ca
 - [Volumetric Capture](https://github.com/VCL3D/VolumetricCapture)
 
 ## Github Repos
-tsdf Fusion (https://github.com/andyzeng/tsdf-fusion)
-tsdf Fusion in Python (https://github.com/andyzeng/tsdf-fusion-python)
-Elastic Fusion (https://github.com/mp3guy/ElasticFusion)
-ReFusion (https://github.com/PRBonn/refusion)
-KinectFusion (https://github.com/chrdiller/KinectFusionApp)
-ReFusionhttps://github.com/PRBonn/refusion
+- tsdf Fusion (https://github.com/andyzeng/tsdf-fusion)
+- tsdf Fusion in Python (https://github.com/andyzeng/tsdf-fusion-python)
+- Elastic Fusion (https://github.com/mp3guy/ElasticFusion)
+- ReFusion (https://github.com/PRBonn/refusion)
+- KinectFusion (https://github.com/chrdiller/KinectFusionApp)
+- ReFusionhttps://github.com/PRBonn/refusion
