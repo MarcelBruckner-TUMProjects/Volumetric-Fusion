@@ -5,7 +5,7 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
-namespace file_access {
+namespace vc::file_access {
 	bool exists(const std::string& name) {
 		struct stat buffer;
 		return (stat(name.c_str(), &buffer) == 0);

@@ -3,11 +3,7 @@
 
 #include <string>
 #include <vector>
-#if APPLE
-#include "CaptureDevice.h"
-#else
-#include "VolumetricFusion/CaptureDevice.h"
-#endif
+#include "CaptureDevice.hpp"
 #include <filesystem>
 #include <cstdio>
 #include <experimental/filesystem>

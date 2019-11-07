@@ -10,8 +10,9 @@
 #include <opencv2/highgui/highgui.hpp>
 //#include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgcodecs/imgcodecs.hpp>
+#include "VolumetricFusion/FileAccess.hpp"
 
-namespace imgui_helpers {
+namespace vc::imgui_helpers {
 
 	void initialize(window& window_main, int& w2, int& h2, std::vector<std::string>& stream_names, const int& width_half, const int& height_half, const float& width, const float& height)
 	{
@@ -40,14 +41,16 @@ namespace imgui_helpers {
 	}
 
 	template<typename F>
-	void addTopBarButton(const char* text, F& onButtonPressedAction, float pos_x = 0.0F, float spacing_w = -1.0F) {
+	bool addTopBarButton(const char* text, F& onButtonPressedAction, float pos_x = 0.0F, float spacing_w = -1.0F) {
 		ImGui::SameLine(pos_x, spacing_w);
 		if (ImGui::Button(text)) {
 			onButtonPressedAction();
+			return true;
 		}
+		return false;
 	}
 
-	void addSwitchViewButton(RenderState &renderState, std::atomic_bool& calibrate)
+	bool addSwitchViewButton(RenderState &renderState, std::atomic_bool& calibrate)
 	{
 	    const auto callback = [&]() {
           int s = (int)renderState;
@@ -58,10 +61,10 @@ namespace imgui_helpers {
 
           std::cout << "Switching render state to " << std::to_string((int)renderState) << std::endl;
         };
-		addTopBarButton("Switch view", callback);
+		return addTopBarButton("Switch view", callback);
 	}
 
-	void addToggleButton(const char* offText, const char* onText, std::atomic_bool &variable) {
+	bool addToggleButton(const char* offText, const char* onText, std::atomic_bool &variable) {
 		const char* text = offText;
 		if (variable) {
 			text = onText;
@@ -69,20 +72,20 @@ namespace imgui_helpers {
 		const auto callback = [&]() {
           variable = !variable;
         };
-		addTopBarButton(text, callback);
+		return addTopBarButton(text, callback);
 	}
 
-	void addPauseResumeToggle(std::atomic_bool& paused)
+	bool addPauseResumeToggle(std::atomic_bool& paused)
 	{
-		imgui_helpers::addToggleButton("Pause", "Resume", paused);
+		return addToggleButton("Pause", "Resume", paused);
 	}
 	
-	void addCalibrateToggle(std::atomic_bool& calibrate)
+	bool addCalibrateToggle(std::atomic_bool& calibrate)
 	{
-		imgui_helpers::addToggleButton("Calibrate", "Stop Calibration", calibrate);
+		return addToggleButton("Calibrate", "Stop Calibration", calibrate);
 	}
 
-	void addAlignPointCloudsButton(std::atomic_bool& paused, std::map<int, rs2::points>& filtered_points)
+	bool addAlignPointCloudsButton(std::atomic_bool& paused, std::map<int, rs2::points>& filtered_points)
 	{
         const auto callback = [&]() {
           paused = true;
@@ -103,12 +106,12 @@ namespace imgui_helpers {
           paused = false;
           std::cout << "Aligned the current lframes" << std::endl;
         };
-		addTopBarButton("Align Pointclouds", callback);
+		return addTopBarButton("Align Pointclouds", callback);
 	}
 
-	void addSaveFramesButton(std::string& captures_folder, std::map<int, std::shared_ptr<rs2::pipeline>>& pipelines, std::map<int, rs2::frame>& colorized_depth_frames, std::map<int, rs2::points>& filtered_points) {
+	bool addSaveFramesButton(std::string& captures_folder, std::map<int, std::shared_ptr<rs2::pipeline>>& pipelines, std::map<int, rs2::frame>& colorized_depth_frames, std::map<int, rs2::points>& filtered_points) {
 		const auto callback = [&]() {
-          file_access::isDirectory(captures_folder, true);
+          vc::file_access::isDirectory(captures_folder, true);
           // Write images to disk
           for (int i = 0; i < pipelines.size(); ++i) {
               auto vf = colorized_depth_frames[i].as<rs2::video_frame>();
@@ -130,12 +133,12 @@ namespace imgui_helpers {
                         << std::endl;
           }
         };
-	    addTopBarButton("Save Frames", callback);
+		return addTopBarButton("Save Frames", callback);
 	}
 
-	void addGenerateCharucoDiamond(std::string& charuco_folder) {
+	bool addGenerateCharucoDiamond(std::string& charuco_folder) {
 		const auto callback = [&]() {
-			file_access::isDirectory(charuco_folder, true);
+			vc::file_access::isDirectory(charuco_folder, true);
 			for (int i = 0; i < 6; i++) {
 				cv::Mat diamondImage;
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
@@ -154,12 +157,12 @@ namespace imgui_helpers {
 			}
 		};
 
-		addTopBarButton("Generate ChAruCo Diamonds", callback);
+		return addTopBarButton("Generate ChAruCo Diamonds", callback);
 	}
 
-	void addGenerateCharucoBoard(std::string& charuco_folder) {
+	bool addGenerateCharucoBoard(std::string& charuco_folder) {
 		const auto callback = [&]() {
-			file_access::isDirectory(charuco_folder, true);
+			vc::file_access::isDirectory(charuco_folder, true);
 			for (int i = 0; i < 6; i++) {
 
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
@@ -180,6 +183,6 @@ namespace imgui_helpers {
 			}
 		};
 
-		addTopBarButton("Generate ChAruCo Boards", callback);
+		return addTopBarButton("Generate ChAruCo Boards", callback);
 	}
 }
