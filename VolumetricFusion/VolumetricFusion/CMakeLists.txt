@@ -39,8 +39,6 @@ endif (APPLE)
 add_executable(VolumetricFusion
   #MainWindow.cpp
   RecordPlaybackMainWindow.cpp
-  Recorder.cpp
-  CaptureDevice.cpp
 
   #${imgui_SRC}
 
@@ -78,8 +76,6 @@ add_executable(VolumetricFusion
 )
 
 add_executable(PostProcessing
-        Recorder.cpp
-        CaptureDevice.cpp
         PostProcessing.cpp
         ../../third-party/glfw-imgui/src/imgui-fonts-fontawesome.hpp
         ../../third-party/glfw-imgui/src/imgui-fonts-karla.hpp
@@ -89,8 +85,6 @@ add_executable(PostProcessing
         )
 
 add_executable(MultiFileStream
-        Recorder.cpp
-        CaptureDevice.cpp
         MultiFileStream.cpp
         ../../third-party/glfw-imgui/src/imgui-fonts-fontawesome.hpp
         ../../third-party/glfw-imgui/src/imgui-fonts-karla.hpp

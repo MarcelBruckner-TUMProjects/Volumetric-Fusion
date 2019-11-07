@@ -1,216 +1,180 @@
 #pragma once
-#include <example.hpp>
+
+#ifndef _CAPTURE_DEVICE_
+#define _CAPTURE_DEVICE_
+
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 #include <map>
 #include <iostream>
 #include <string>
 #include <thread>
 #include <atomic>
-#include "ProcessingBlocks.hpp"
+#include "Data.hpp"
+#include "Processing.hpp"
 
-#include <opencv2\core\matx.hpp>
-
-namespace vc {
+namespace vc::capture {
+		
 	/// <summary>
-	/// A capture device holding references to all neccessary pipelines and data.
+	/// Base class for capturing devices
 	/// </summary>
 	class CaptureDevice {
 	public:
-		/// <summary>
-		/// The RealSense pipeline
-		/// </summary>
-		std::shared_ptr<rs2::pipeline> pipeline;
+		rs2::config cfg;
+		std::shared_ptr < vc::processing::Processing> processing;
 
-		/// <summary>
-		/// The device name displayed in the views
-		/// </summary>
-		std::string deviceName;
+		std::shared_ptr < vc::data::Data >data;
+		std::shared_ptr<rs2::pipeline > pipeline;
 
-		/// <summary>
-		/// The configuration
-		/// </summary>
-		rs2::config config;
+		std::shared_ptr < std::atomic_bool> stopped;
+		std::shared_ptr < std::atomic_bool> paused;
+		std::shared_ptr < std::atomic_bool> calibrateCameras;
 
-		/// <summary>
-		/// The render frames. We'll keep track of the last frame of each stream available to make the presentation persistent	
-		/// </summary>
-		rs2::frame renderFrames;
+		std::shared_ptr < std::thread> thread;
 
-		/// <summary>
-		/// The texture
-		/// </summary>
-		texture texture;
+		void startPipeline() {
+			this->pipeline->start(this->cfg);
+			this->data->setIntrinsics(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
+		}
 
-		/// <summary>
-		/// The colorizer
-		/// </summary>
-		rs2::colorizer colorizer;
+		void pauseThread() {
+			this->paused->store(true);
+		}
 
-		/// <summary>
-		/// The filtered color frame
-		/// </summary>
-		rs2::frame filteredColorFrame;
+		void resumeThread() {
+			this->paused->store(false);
+		}
 
-		/// <summary>
-		/// The filtered depth frames
-		/// </summary>
-		rs2::frame filteredDepthFrame;
+		void stopThread() {
+			this->stopped->store(true);
+		}
 
-		rs2::pointcloud pointcloud;
-		rs2::points points;
-		rs2::frame colorizedDepthFrame;
+		void calibrate(bool calibrate) {
+			this->calibrateCameras->store(calibrate);
+		}
 
-		/// <summary>
-		/// The camera matrix
-		/// </summary>
-		cv::Matx33f cameraMatrix;
+		CaptureDevice(CaptureDevice& other) {
+			this->data = other.data;
+			this->processing = other.processing;
+			this->pipeline = other.pipeline;
+			this->cfg = other.cfg;
 
-		/// <summary>
-		/// The distortion coefficients
-		/// </summary>
-		std::vector<float> distortionCoefficients;
+			this->stopped = other.stopped;
+			this->paused = other.paused;
+			this->calibrateCameras = other.calibrateCameras;
+			this->thread = other.thread;
+		}
+				
+		CaptureDevice(rs2::context context) {
+			this->data = std::make_shared<vc::data::Data>();
+			this->processing = std::make_shared<vc::processing::Processing>();
+			this->pipeline = std::make_shared<rs2::pipeline>(context);
+			this->stopped = std::make_shared<std::atomic_bool>(false);
+			this->paused = std::make_shared<std::atomic_bool>(true);
+			this->calibrateCameras = std::make_shared<std::atomic_bool>(false);
 
-		/// <summary>
-		/// The charuco identifier buffer
-		/// </summary>
-		std::map<unsigned long long, std::vector<int>> charucoIdBuffer;
-
-		/// <summary>
-		/// The rotation buffer
-		/// </summary>
-		std::map<unsigned long long, cv::Vec3d> rotationBuffer;
-
-		/// <summary>
-		/// The translation buffer
-		/// </summary>
-		std::map<unsigned long long, cv::Vec3d> translationBuffer;
+			this->thread = std::make_shared<std::thread>(&vc::capture::CaptureDevice::captureThreadFunction, this);
+		}
 		
-		std::shared_ptr<std::atomic_bool> isStopped;
-		std::shared_ptr<std::atomic_bool> isPaused;
-		std::shared_ptr<std::atomic_bool> isCharucoProcessing;
+		void captureThreadFunction() {
+			rs2::align alignToColor(RS2_STREAM_COLOR);
+			processing->startCharucoProcessing(data->camera);
 
-		rs2::pipeline_profile start();
-		void stop();
-
-		void setIntrinsics();
-
-		void renderOnlyColor(rect r);
-		void renderOnlyDepth(rect r);
-		void renderPointcloud(int i, glfw_state view_orientation, bool is_retina_display, int width, int height, int width_half, int height_half);
-
-	protected:
-		/// <summary>
-		/// The intrinsics
-		/// </summary>
-		rs2_intrinsics intrinsics;
-
-		/// <summary>
-		/// The processing threads
-		/// </summary>
-		std::thread processingThread = std::thread([&]() {
-			auto pipe = pipeline;
-
-			rs2::align align_to_color(RS2_STREAM_COLOR);
-
-			while (!*isStopped) //While application is running
+			while (!stopped->load()) //While application is running
 			{
-				while (*isPaused) {
+				while (paused->load()) {
 					continue;
 				}
 
 				try {
-					rs2::frameset data = pipe->wait_for_frames(); // Wait for next set of frames from the camera
+					rs2::frameset frameset = pipeline->wait_for_frames(); // Wait for next set of frames from the camera
 
-					data = align_to_color.process(data);
+					frameset = alignToColor.process(frameset);
 
-					rs2::frame depth_frame = data.get_depth_frame(); //Take the depth frame from the frameset
-					if (!depth_frame) { // Should not happen but if the pipeline is configured differently
+					rs2::frame depthFrame = frameset.get_depth_frame(); //Take the depth frame from the frameset
+					if (!depthFrame) { // Should not happen but if the pipeline is configured differently
 						return;       //  it might not provide depth and we don't want to crash
 					}
 
-					rs2::frame filtered_depth_frame = depth_frame; // Does not copy the frame, only adds a reference
+					rs2::frame filteredDepthFrame = depthFrame; // Does not copy the frame, only adds a reference
 
-					rs2::frame color_frame = data.get_color_frame();
+					rs2::frame colorFrame = frameset.get_color_frame();
 
-					//if (*isCharucoProcessing) {
-					//	// Send color frame for processing
-					//	charucoProcessingBlock.invoke(color_frame);
-					//	// Wait for results
-					//	color_frame = charucoProcessingQueue.wait_for_frame();
-					//}
+					if (calibrateCameras->load()) {
+						// Send color frame for processing
+						processing->charucoProcessingBlocks->invoke(colorFrame);
+						// Wait for results
+						colorFrame = processing->charucoProcessingQueues.wait_for_frame();
+					}
 
-					filteredColorFrame = color_frame;
+					data->filteredColorFrames = colorFrame;
 
-					//// Apply filters.
-					//for (auto&& filter : filters) {
-					//	filtered_depth_frame = filter->process(filtered_depth_frame);
-					//}
+					// Apply filters.
+					/*for (auto&& filter : data->filters) {
+						filteredDepthFrame = filter->process(filteredDepthFrame);
+					}*/
 
 					// Push filtered & original data to their respective queues
-					filteredDepthFrame = filtered_depth_frame;
+					data->filteredDepthFrames = filteredDepthFrame;
 
-					points = pointcloud.calculate(depth_frame);  // Generate pointcloud from the depth data
-					colorizedDepthFrame = colorizer.process(depth_frame);		// Colorize the depth frame with a color map
-					pointcloud.map_to(colorizedDepthFrame);      // Map the colored depth to the point cloud
+					data->points = data->pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
+					data->colorizedDepthFrames = data->colorizer.process(depthFrame);		// Colorize the depth frame with a color map
+					data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud
 				}
 				catch (const std::exception & e) {
 					std::stringstream stream;
 					stream << "******************** THREAD ERROR *******************" << std::endl << e.what() << "****************************************************" << std::endl;
 				}
 			}
-			pipe->stop();
-		});;
-
-		/// <summary>
-		/// The color processing queue
-		/// </summary>
-		rs2::frame_queue charucoProcessingQueue;
-		
-		/// <summary>
-		/// The color processing block
-		/// </summary>
-		//rs2::processing_block charucoProcessingBlock = vc::processing_blocks::createColorProcessingBlock(vc::processing_blocks::charucoPoseEstimation);
-
-
-		void setBools(std::shared_ptr<std::atomic_bool> isStopped,
-			std::shared_ptr<std::atomic_bool> isPaused,
-			std::shared_ptr<std::atomic_bool> isColorProcessing);
-
+			this->pipeline->stop();
+		}
 	};
-
+	
 	/// <summary>
-	/// A capture device to stream the live RGB-D data from the cameras.
+	/// A capture device for streaming the live RGB-D data from the device.
 	/// </summary>
 	/// <seealso cref="CaptureDevice" />
 	class StreamingCaptureDevice : public CaptureDevice {
 	public:
-		StreamingCaptureDevice(rs2::context ctx, rs2::device device, 
-			std::shared_ptr<std::atomic_bool> isStopped, 
-			std::shared_ptr<std::atomic_bool> isPaused,
-			std::shared_ptr<std::atomic_bool> isColorProcessing);
+		StreamingCaptureDevice(rs2::context context, rs2::device device) : 
+		CaptureDevice(context)
+		{
+			data->deviceName = device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
+
+			this->cfg.enable_device(data->deviceName);
+			this->cfg.enable_all_streams();
+		}
 	};
 	
 	/// <summary>
-	/// A capture device that additionally records the stream to a file.
+	///  A capture device for streaming the live RGB-D data from the device and to record it to a file.
 	/// </summary>
 	/// <seealso cref="StreamingCaptureDevice" />
 	class RecordingCaptureDevice : public StreamingCaptureDevice {
 	public:
-		RecordingCaptureDevice(rs2::context ctx, rs2::device device, std::string recordingsFolder,
-			std::shared_ptr<std::atomic_bool> isStopped,
-			std::shared_ptr<std::atomic_bool> isPaused,
-			std::shared_ptr<std::atomic_bool> isColorProcessing);
+		RecordingCaptureDevice(rs2::context context, rs2::device device, std::string foldername) :
+			StreamingCaptureDevice(context, device)
+		{
+			this->cfg.enable_device(data->deviceName);
+			this->cfg.enable_all_streams();
+			this->cfg.enable_record_to_file(foldername + data->deviceName + ".bag");
+		}
 	};
 	
 	/// <summary>
-	/// A capture device to stream the RGB-D data from a file.
+	///  A capture device for streaming the RGB-D data from a file.
 	/// </summary>
 	/// <seealso cref="CaptureDevice" />
 	class PlayingCaptureDevice : public CaptureDevice {
 	public:
-		PlayingCaptureDevice(rs2::context ctx, std::string filename,
-			std::shared_ptr<std::atomic_bool> isStopped,
-			std::shared_ptr<std::atomic_bool> isPaused,
-			std::shared_ptr<std::atomic_bool> isColorProcessing);
+		PlayingCaptureDevice(rs2::context context, std::string filename) : 
+			CaptureDevice(context)
+		{
+			data->deviceName = filename;
+
+			this->cfg.enable_device_from_file(data->deviceName);
+			this->cfg.enable_all_streams();
+		}
 	};
 }
+
+#endif // !_CAPTURE_DEVICE_

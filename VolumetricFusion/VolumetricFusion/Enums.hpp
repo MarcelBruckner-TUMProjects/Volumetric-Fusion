@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-namespace enums{
+namespace vc::enums{
 	enum class RenderState {
 		MULTI_POINTCLOUD,
 		ONLY_COLOR,

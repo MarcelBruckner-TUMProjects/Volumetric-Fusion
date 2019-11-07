@@ -1,42 +1,28 @@
 #pragma once
 #include <VolumetricFusion\Enums.hpp>
-using namespace enums;
+using namespace vc::enums;
+namespace vc::settings {
+	class State {
+	public:
+		CaptureState captureState;
+		RenderState renderState;
 
-namespace vc {
-	namespace settings {
-		class States {
-		public:
-			CaptureState captureState;
-			RenderState renderState;
+		State(CaptureState captureState = CaptureState::STREAMING, RenderState renderState = RenderState::ONLY_COLOR) {
+			this->captureState = captureState;
+			this->renderState = renderState;
+		}
+	};
 
-			States(CaptureState captureState = CaptureState::STREAMING, RenderState renderState = RenderState::ONLY_COLOR) {
-				this->captureState = captureState;
-				this->renderState = renderState;
-			}
-		};
+	class FolderSettings {
+	public:
+		std::string capturesFolder;
+		std::string recordingsFolder;
+		std::string charucoFolder;
 
-		class OutputFolders {
-		public:
-			std::string capturesFolder;
-			std::string recordingsFolder;
-			std::string charucoFolder;
-
-			OutputFolders(std::string capturesFolder = "captures/", std::string recordingsFolder = "single_stream_recording/", std::string charucoFolder = "charuco/") {
-				this->capturesFolder = capturesFolder;
-				this->recordingsFolder = recordingsFolder;
-				this->charucoFolder = charucoFolder;
-			}
-		};
-
-		class MarkerSettings {
-		public:
-			float squareLength;
-			float markerLength;
-
-			MarkerSettings(float squareLength = 0.04f, float markerLength = 0.02f) {
-				this->squareLength = squareLength;
-				this->markerLength = markerLength;
-			}
-		};
-	}
+		FolderSettings(std::string capturesFolder = "captures/", std::string recordingsFolder = "single_stream_recording/", std::string charucoFolder = "charuco/") {
+			this->capturesFolder = capturesFolder;
+			this->recordingsFolder = recordingsFolder;
+			this->charucoFolder = charucoFolder;
+		}
+	};
 }

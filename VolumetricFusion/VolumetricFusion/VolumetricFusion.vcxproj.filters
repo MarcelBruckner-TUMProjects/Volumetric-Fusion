@@ -4,9 +4,6 @@
     <ClCompile Include="MultiFileStream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CaptureDevice.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.md" />
@@ -19,12 +16,15 @@
     <Filter Include="Header Files">
       <UniqueIdentifier>{cc4c29ba-d7d5-4c9d-b871-329befd02faa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Helpers">
+      <UniqueIdentifier>{aa4aeaf4-cc77-441c-950f-28f87aa939f6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="FileAccess.hpp">
+    <ClInclude Include="Recorder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ProcessingBlocks.hpp">
+    <ClInclude Include="FileAccess.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MultiFileStream.h" />
@@ -37,7 +37,13 @@
     <ClInclude Include="Settings.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Data.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="CaptureDevice.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Processing.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

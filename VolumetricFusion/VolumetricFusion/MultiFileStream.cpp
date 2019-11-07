@@ -1,18 +1,9 @@
-#pragma once
 #pragma region Includes
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 // Include short list of convenience functions for rendering
-#if APPLE
-#include "FileAccess.hpp"
-//#include "CaptureDevice.h"
-#else
-//#include "example.hpp"
-#include "VolumetricFusion/FileAccess.hpp"
-//#include "VolumetricFusion/CaptureDevice.h"
-#endif
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -28,14 +19,6 @@
 #include <atomic>
 #include <filesystem>
 
-#if APPLE
-#include <glut.h>
-#else
-#define NOMINMAX
-#include <windows.h>
-#include <GL/gl.h>
-#endif
-
 
 #include <imgui.h>
 #include "imgui_impl_glfw.h"
@@ -43,214 +26,260 @@
 #include "stb_image_write.h"
 
 #include "Enums.hpp"
-using namespace enums;
+using namespace vc::enums;
 
-#include "Settings.hpp"
 #include "ImGuiHelpers.hpp"
-#include "VolumetricFusion/CaptureDevice.hpp"
-using namespace imgui_helpers;
+#include "Processing.hpp"
+#include "MultiFileStream.h"
+#include "Eigen/Dense"
+#include "Settings.hpp"
+#include "Data.hpp"
+#include "CaptureDevice.hpp"
+#include "VolumetricFusion/FileAccess.hpp"
+#include <signal.h>
+
 #pragma endregion
 
 template<typename T, typename V>
-std::vector<T> extract_keys(std::map<T, V> const& input_map);
+std::vector<T> extractKeys(std::map<T, V> const& input_map);
+
+template<typename T>
+std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b);
+
+void my_function_to_handle_aborts(int signalNumber) {
+	std::cout << "Something aborted" << std::endl;
+}
 
 int main(int argc, char* argv[]) try {
 
-	vc::settings::MarkerSettings markerSettings = vc::settings::MarkerSettings();
-	vc::settings::OutputFolders outputFolders = vc::settings::OutputFolders();
-	vc::settings::States state = vc::settings::States();
+	signal(SIGABRT, &my_function_to_handle_aborts);
+
+	vc::settings::FolderSettings folderSettings;
+	folderSettings.recordingsFolder = "allCameras/";
+	vc::settings::State state = vc::settings::State(CaptureState::PLAYING);
 	
-#pragma region Window initialization
 	// Create a simple OpenGL window for rendering:
-	window window_main(1280, 960, "VolumetricFusion - MultiStreamViewer");
+	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
 
-	ImGui_ImplGlfw_Init(window_main, false);
-
+	ImGui_ImplGlfw_Init(app, false);
 
 	// Construct an object to manage view state
-	glfw_state view_orientation{};
+	glfw_state viewOrientation;
 	// Let the user control and manipulate the scenery orientation
-	register_glfw_callbacks(window_main, view_orientation);
+	register_glfw_callbacks(app, viewOrientation);
 
-	view_orientation.yaw = -2.6;
-	view_orientation.pitch = 0.8;
-	view_orientation.last_x = 738.7;
-	view_orientation.last_y = 1015.8;
-	view_orientation.offset_x = 2.0;
-	view_orientation.offset_y = -2.0;
-#pragma endregion
-
-
-#pragma region Variables
-
-	// Declare filters
-	rs2::decimation_filter decimation_filter(1);         // Decimation - reduces depth frame density
-	rs2::threshold_filter threshold_filter(0.0f, 1.1f); // Threshold  - removes values outside recommended range
-	// 0 - fill_from_left - Use the value from the left neighbor pixel to fill the hole
-	// 1 - farest_from_around - Use the value from the neighboring pixel which is furthest away from the sensor
-	// 2 - nearest_from_around - - Use the value from the neighboring pixel closest to the sensor
-	//rs2::hole_filling_filter hole_filter(1); // terrible results ...
-
-	std::vector<rs2::filter*> filters;
-	filters.emplace_back(&decimation_filter);
-	filters.emplace_back(&threshold_filter);
-	//filters.emplace_back(&hole_filter);
-
-	// Create a thread for getting frames from the device and process them
-	// to prevent UI thread from blocking due to long computations.
-
-	std::shared_ptr<std::atomic_bool> isStopped = std::make_shared<std::atomic_bool>(false);
-	std::shared_ptr<std::atomic_bool> isPaused = std::make_shared<std::atomic_bool>(false);
-	std::shared_ptr<std::atomic_bool> isColorProcessing = std::make_shared<std::atomic_bool>(true);
+	viewOrientation.yaw = -2.6;
+	viewOrientation.pitch = 0.8;
+	viewOrientation.last_x = 738.7;
+	viewOrientation.last_y = 1015.8;
+	viewOrientation.offset_x = 2.0;
+	viewOrientation.offset_y = -2.0;
 
 
-	// Camera calibration thread
-	std::thread calibrationThread;
-	std::atomic_bool calibrateCameras = true;
-#pragma endregion
+	/*Do this early in your program's initialization */
 
-#pragma region Capture device initialization
 	rs2::context ctx; // Create librealsense context for managing devices
-	//std::map<int, std::shared_ptr<rs2::pipeline>> pipelines;
+	//std::vector<vc::data::Data> datas;
+	std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
+	std::vector<std::string> streamNames;
 
-	//std::vector<std::string> streamNames(4);
-	std::vector<vc::CaptureDevice> captureDevices;
-
-	int i = 0;
-	if (state.captureState != CaptureState::PLAYING) {
+	if (state.captureState == CaptureState::RECORDING || state.captureState == CaptureState::STREAMING) {
 		auto devices = ctx.query_devices();
 		if (state.captureState == CaptureState::RECORDING) {
 			if (devices.size() > 0) {
-				file_access::resetDirectory(outputFolders.recordingsFolder, true);
+				vc::file_access::resetDirectory(folderSettings.recordingsFolder, true);
 			}
 		}
-
-		for (auto&& device : devices)
+		int i = 0;
+		for (auto&& device : ctx.query_devices())
 		{
-			if (i >= 4) {
-				break;
-			}
-
-			if (state.captureState == CaptureState::STREAMING) {
-				captureDevices.push_back(vc::StreamingCaptureDevice(ctx, device, isStopped, isPaused, isColorProcessing));
-			}
 			if (state.captureState == CaptureState::RECORDING) {
-				captureDevices.push_back(vc::RecordingCaptureDevice(ctx, device, outputFolders.recordingsFolder, isStopped, isPaused, isColorProcessing));
+				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, folderSettings.recordingsFolder));
+			}
+			else if (state.captureState == CaptureState::STREAMING) {
+				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device));
 			}
 			i++;
 		}
 	}
-	else {
-		std::vector<std::string> figure_filenames = file_access::listFilesInFolder(outputFolders.recordingsFolder);
+	else if (state.captureState == CaptureState::PLAYING){
+		std::vector<std::string> filenames = vc::file_access::listFilesInFolder(folderSettings.recordingsFolder);
 
-		for (int i = 0; i < figure_filenames.size() && i < 4; i++)
+		for (int i = 0; i < filenames.size() && i < 4; i++)
 		{
-			captureDevices.push_back(vc::PlayingCaptureDevice(ctx, figure_filenames[i], isStopped, isPaused, isColorProcessing));
+			pipelines.emplace_back(std::make_shared < vc::capture::PlayingCaptureDevice>(ctx, filenames[i]));
 		}
 	}
 
 
-	if (captureDevices.size() <= 0) {
+	if (pipelines.size() <= 0) {
 		throw(rs2::error("No device or file found!"));
 	}
-
-	for each (auto captureDevice in captureDevices)
-	{
-		captureDevice->start();
-		captureDevice->setIntrinsics();
+	while (streamNames.size() < 4) {
+		streamNames.emplace_back("");
 	}
-#pragma endregion
+	   
+	// Create a thread for getting frames from the device and process them
+	// to prevent UI thread from blocking due to long computations.
+	std::atomic_bool stopped(false);
+	std::atomic_bool paused(false);
+		
+	// Create custom depth processing block and their output queues:
+	/*std::map<int, rs2::frame_queue> depth_processing_queues;
+	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
+		
+	// Calculated relative transformations between cameras per frame
+	std::map<std::tuple<int, int>, std::map<int, Eigen::Matrix4d>> relativeTransformations;
 
+	// Camera calibration thread
+	std::thread calibrationThread;
+	std::atomic_bool calibrateCameras = true;
 	
+	for (int i = 0; i < pipelines.size(); i++) {
+		pipelines[i]->startPipeline();
+		pipelines[i]->resumeThread();
+		pipelines[i]->calibrate(calibrateCameras);
+	}
+
 #pragma region Camera Calibration Thread
 
-		calibrationThread = std::thread([&, i]() {
-			while(!isStopped && captureDevices.size() > 1){
+		calibrationThread = std::thread([&pipelines, &stopped, &calibrateCameras, &relativeTransformations]() {
+			while(!stopped){
 				if (!calibrateCameras) {
 					continue;
 				}
 
-				for (int i = 0; i < captureDevices.size(); ++i) {
+				for (int i = 0; i < pipelines.size(); i++) {
+					std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
+					std::vector<unsigned long long> outerFrameIds = extractKeys(baseCharucoIdBuffer);
+
+					for (int j = 0; j < pipelines.size(); j++) {
+						if (i == j) {
+							continue;
+						}
+
+						std::map<unsigned long long, std::vector<int>> relativeCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
+						std::vector<unsigned long long> innerFrameIds = extractKeys(relativeCharucoIdBuffer);
+
+						std::vector<unsigned long long> overlapingFrames = findOverlap(outerFrameIds, innerFrameIds);
+
+						for (auto frame : overlapingFrames) 
+						{
+							Eigen::Matrix4d baseToMarkerTranslation = pipelines[i]->processing->translationBuffers[frame];
+							Eigen::Matrix4d baseToMarkerRotation = pipelines[i]->processing->rotationBuffers[frame];
+
+							Eigen::Matrix4d markerToRelativeTranslation = pipelines[j]->processing->translationBuffers[frame].inverse();
+							Eigen::Matrix4d markerToRelativeRotation = pipelines[j]->processing->rotationBuffers[frame].inverse();
+
+							Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
+
+							relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
+
+							std::stringstream ss;
+							ss << "************************************************************************************" << std::endl;
+							ss << "Devices " << i << ", " << j << " - Frame " << frame << std::endl << std::endl;
+							ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << markerToRelativeTranslation << std::endl << std::endl;
+							ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << markerToRelativeRotation << std::endl << std::endl;
+							ss << "Combined: " << std::endl << relativeTransformation << std::endl;
+							std::cout << ss.str();
+						}
+					}
 				}
 			}
 		});
 #pragma endregion
-
-		
+				
 #pragma region Main loop
 
-	std::vector<std::string> streamNames;
-
-	for each (auto captureDevice in captureDevices)
-	{
-		streamNames.push_back(captureDevice->deviceName);
-	}
-
-	while (streamNames.size() < 4) {
-		streamNames.push_back("");
-	}
-
-	while (window_main)
+	while (app)
 	{
 		int topOffset = 70;
-		const float width = static_cast<float>(window_main.width());
-		const float height = static_cast<float>(window_main.height()) - (topOffset * 0.5f);
-		const int width_half = width / 2;
-		const int height_half = height / 2;
+		const float width = static_cast<float>(app.width());
+		const float height = static_cast<float>(app.height()) - (topOffset * 0.5f);
+		const int widthHalf = width / 2;
+		const int heightHalf = height / 2;
 
 		// Retina display (Mac OS) have double the pixel density
 		int w2, h2;
-		glfwGetFramebufferSize(window_main, &w2, &h2);
-		const bool is_retina_display = w2 == width * 2 && h2 == height * 2;
+		glfwGetFramebufferSize(app, &w2, &h2);
+		const bool isRetinaDisplay = w2 == app.width() * 2 && h2 == app.height() * 2;
 
-		imgui_helpers::initialize(window_main, w2, h2, streamNames, width_half, height_half, width, height);
-		addSwitchViewButton(state.renderState, isColorProcessing);
-		addPauseResumeButton(isPaused);
-		addSaveFramesButton(outputFolders.capturesFolder, captureDevices);
+		vc::imgui_helpers::initialize(app, w2, h2, streamNames, widthHalf, heightHalf, width, height);
+		vc::imgui_helpers::addSwitchViewButton(state.renderState, calibrateCameras);
+		if (vc::imgui_helpers::addPauseResumeToggle(paused)) {
+			for (int i = 0; i < pipelines.size(); i++)
+			{
+				pipelines[i]->paused->store(paused);
+			}
+		}
+
+//		addSaveFramesButton(folderSettings.capturesFolder, pipelines, colorizedDepthFrames, points);
 		if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-			addAlignPointCloudsButton(isPaused, captureDevices);
+			//addAlignPointCloudsButton(paused, points);
 		}
 
 		if (state.renderState != RenderState::ONLY_DEPTH) {
-			addToggleColorProcessingButton(isColorProcessing);
+			if (vc::imgui_helpers::addCalibrateToggle(calibrateCameras)) {
+				for (int i = 0; i < pipelines.size(); i++)
+				{
+					pipelines[i]->calibrateCameras ->store(calibrateCameras);
+				}
+			}
 		}
 		if (state.renderState != RenderState::ONLY_COLOR) {
 			//addToggleDepthProcessingButton(depthProcessing);
 		}
-		imgui_helpers::addGenerateCharucoDiamond(outputFolders.charucoFolder);
-		imgui_helpers::addGenerateCharucoBoard(outputFolders.charucoFolder);
-		imgui_helpers::finalize();
+		vc::imgui_helpers::addGenerateCharucoDiamond(folderSettings.charucoFolder);
+		vc::imgui_helpers::addGenerateCharucoBoard(folderSettings.charucoFolder);
+		vc::imgui_helpers::finalize();
 		
 		switch (state.renderState) {
 		case RenderState::COUNT:
 		case RenderState::MULTI_POINTCLOUD:
 		{
-			int i = 0;
-			for each (auto captureDevice in captureDevices)
+			// Draw the pointclouds
+			for (int i = 0; i < pipelines.size() && i < 4; ++i)
 			{
-				captureDevice->renderPointcloud(i, view_orientation, is_retina_display, width, height, width_half, height_half);
-				i++;
+				if (pipelines[i]->data->colorizedDepthFrames && pipelines[i]->data->points) {
+					viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
+					if (isRetinaDisplay) {
+						glViewport(width * (i % 2), height - (height * (i / 2)), width, height);
+					}
+					else {
+						glViewport(widthHalf * (i % 2), heightHalf - (heightHalf * (i / 2)), widthHalf, heightHalf);
+					}
+
+					if (pipelines[i]->data->filteredColorFrames) {
+						draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);
+					}
+					else {
+						draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
+					}
+
+					if (pipelines.size()) {
+					    draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
+					}
+				}
 			}
 		}
 		break;
 
 		case RenderState::ONLY_COLOR:
 		{
-			int i = 0;
-			for each (auto captureDevice in captureDevices)
+			for (int i = 0; i < pipelines.size() && i < 4; ++i)
 			{
+				if (pipelines[i]->data->filteredColorFrames != false) {
 					rect r{
-							static_cast<float>(width_half * (i % 2)),
-							static_cast<float>(height_half - (height_half * (i / 2))),
-							static_cast<float>(width_half),
-							static_cast<float>(height_half)
+						static_cast<float>(widthHalf * (i % 2)),
+							static_cast<float>(heightHalf - (heightHalf * (i / 2))),
+							static_cast<float>(widthHalf),
+							static_cast<float>(heightHalf)
 					};
-					if (is_retina_display) {
+					if (isRetinaDisplay) {
 						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
 					}
-					captureDevice->renderOnlyColor(r);
-				
-				i++;
+					pipelines[i]->data->tex.render(pipelines[i]->data->filteredColorFrames, r);
+				}
 			}
 
 			break;
@@ -258,22 +287,20 @@ int main(int argc, char* argv[]) try {
 
 		case RenderState::ONLY_DEPTH:
 		{
-			int i = 0;
-			for each (auto captureDevice in captureDevices)
+			for (int i = 0; i < pipelines.size() && i < 4; ++i)
 			{
-				if (captureDevice->filteredDepthFrame) {
+				if (pipelines[i]->data->filteredDepthFrames != false) {
 					rect r{
-					    static_cast<float>(width_half * (i % 2)),
-                        static_cast<float>(height_half - (height_half * (i / 2))),
-                        static_cast<float>(width_half),
-                        static_cast<float>(height_half)
+					    static_cast<float>(widthHalf * (i % 2)),
+                        static_cast<float>(heightHalf - (heightHalf * (i / 2))),
+                        static_cast<float>(widthHalf),
+                        static_cast<float>(heightHalf)
 					};
-					if (is_retina_display) {
+					if (isRetinaDisplay) {
 						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
 					}
-					captureDevice->renderOnlyDepth(r);
+					pipelines[i]->data->tex.render(pipelines[i]->data->colorizer.process(pipelines[i]->data->filteredDepthFrames), r);
 				}
-				i++;
 			}
 
 			break;
@@ -284,13 +311,15 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Final cleanup
 
-	*isStopped = true;
-	for each (auto captureDevice in captureDevices)
-	{
-		captureDevice->stop();
+	stopped.store(true);
+	for (int i = 0; i < pipelines.size(); i++) {
+		pipelines[i]->stopThread();
+		pipelines[i]->thread->join();
 	}
+	calibrationThread.join();
 #pragma endregion
 
+	//std::exit(EXIT_SUCCESS);
 	return EXIT_SUCCESS;
 }
 #pragma region Error handling
@@ -309,12 +338,26 @@ catch (const std::exception& e)
 #pragma region Helper functions
 
 template<typename T, typename V>
-std::vector<T> extract_keys(std::map<T,V> const& input_map) {
+std::vector<T> extractKeys(std::map<T,V> const& input_map) {
 	std::vector<T> retval;
 	for (auto const& element : input_map) {
-		retval.push_back(element.first);
+		retval.emplace_back(element.first);
 	}
 	return retval;
+}
+
+
+template<typename T>
+std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
+	std::vector<T> c;
+	
+	for (T x : a) {
+		if (std::find(b.begin(), b.end(), x) != b.end()) {
+			c.emplace_back(x);
+		}
+	}
+
+	return c;
 }
 
 #pragma endregion
