@@ -1,5 +1,10 @@
 #pragma once
+#if APPLE
+#include "Enums.hpp"
+#else
 #include <VolumetricFusion\Enums.hpp>
+#endif
+
 using namespace vc::enums;
 namespace vc::settings {
 	class State {
