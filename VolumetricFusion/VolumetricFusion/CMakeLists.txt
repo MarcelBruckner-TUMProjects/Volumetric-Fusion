@@ -25,6 +25,7 @@ if (APPLE)
     /usr/local/include/opencv4
     ${OPENGL_INCLUDE_DIR}
     ${GLUT_INCLUDE_DIR}
+    /usr/local/Cellar/eigen/3.3.7/include/eigen3
   )
   add_definitions(-DAPPLE)
 endif (APPLE)

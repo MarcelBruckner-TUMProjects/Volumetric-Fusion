@@ -35,7 +35,12 @@ using namespace vc::enums;
 #include "Settings.hpp"
 #include "Data.hpp"
 #include "CaptureDevice.hpp"
+#if APPLE
+#include "FileAccess.hpp"
+#include <glut.h>
+#else
 #include "VolumetricFusion/FileAccess.hpp"
+#endif
 #include <signal.h>
 
 #pragma endregion
