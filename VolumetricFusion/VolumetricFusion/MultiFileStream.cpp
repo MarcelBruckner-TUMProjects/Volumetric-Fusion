@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) try {
 
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "allCameras/";
-	vc::settings::State state = vc::settings::State(CaptureState::PLAYING);
+	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::MULTI_POINTCLOUD);
 	
 	// Create a simple OpenGL window for rendering:
 	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
@@ -138,7 +138,7 @@ int main(int argc, char* argv[]) try {
 
 	// Camera calibration thread
 	std::thread calibrationThread;
-	std::atomic_bool calibrateCameras = true;
+	std::atomic_bool calibrateCameras = false;
 	
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i]->startPipeline();
@@ -148,50 +148,54 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Camera Calibration Thread
 
-		calibrationThread = std::thread([&pipelines, &stopped, &calibrateCameras, &relativeTransformations]() {
-			while(!stopped){
-				if (!calibrateCameras) {
-					continue;
-				}
+	calibrationThread = std::thread([&pipelines, &stopped, &calibrateCameras, &relativeTransformations]() {
+		while (!stopped) {
+			if (!calibrateCameras) {
+				continue;
+			}
 
-				for (int i = 0; i < pipelines.size(); i++) {
-					std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
-					std::vector<unsigned long long> outerFrameIds = extractKeys(baseCharucoIdBuffer);
+			for (int i = 0; i < pipelines.size(); i++) {
+				std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
+				std::vector<unsigned long long> outerFrameIds = extractKeys(baseCharucoIdBuffer);
 
-					for (int j = 0; j < pipelines.size(); j++) {
-						if (i == j) {
+				for (int j = 0; j < pipelines.size(); j++) {
+					if (i == j) {
+						continue;
+					}
+
+					std::map<unsigned long long, std::vector<int>> relativeCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
+					std::vector<unsigned long long> innerFrameIds = extractKeys(relativeCharucoIdBuffer);
+
+					std::vector<unsigned long long> overlapingFrames = findOverlap(outerFrameIds, innerFrameIds);
+
+					for (auto frame : overlapingFrames)
+					{
+						Eigen::Matrix4d baseToMarkerTranslation = pipelines[i]->processing->translationBuffers[frame];
+						Eigen::Matrix4d baseToMarkerRotation = pipelines[i]->processing->rotationBuffers[frame];
+
+						if (pipelines[j]->processing->translationBuffers[frame].isZero() || pipelines[j]->processing->rotationBuffers[frame].isZero()) {
 							continue;
 						}
 
-						std::map<unsigned long long, std::vector<int>> relativeCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
-						std::vector<unsigned long long> innerFrameIds = extractKeys(relativeCharucoIdBuffer);
+						Eigen::Matrix4d markerToRelativeTranslation = pipelines[j]->processing->translationBuffers[frame].inverse();
+						Eigen::Matrix4d markerToRelativeRotation = pipelines[j]->processing->rotationBuffers[frame].inverse();
 
-						std::vector<unsigned long long> overlapingFrames = findOverlap(outerFrameIds, innerFrameIds);
+						Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
 
-						for (auto frame : overlapingFrames) 
-						{
-							Eigen::Matrix4d baseToMarkerTranslation = pipelines[i]->processing->translationBuffers[frame];
-							Eigen::Matrix4d baseToMarkerRotation = pipelines[i]->processing->rotationBuffers[frame];
+						relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
 
-							Eigen::Matrix4d markerToRelativeTranslation = pipelines[j]->processing->translationBuffers[frame].inverse();
-							Eigen::Matrix4d markerToRelativeRotation = pipelines[j]->processing->rotationBuffers[frame].inverse();
-
-							Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
-
-							relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
-
-							std::stringstream ss;
-							ss << "************************************************************************************" << std::endl;
-							ss << "Devices " << i << ", " << j << " - Frame " << frame << std::endl << std::endl;
-							ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << markerToRelativeTranslation << std::endl << std::endl;
-							ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << markerToRelativeRotation << std::endl << std::endl;
-							ss << "Combined: " << std::endl << relativeTransformation << std::endl;
-							std::cout << ss.str();
-						}
+						std::stringstream ss;
+						ss << "************************************************************************************" << std::endl;
+						ss << "Devices " << i << ", " << j << " - Frame " << frame << std::endl << std::endl;
+						ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << pipelines[j]->processing->translationBuffers[frame] << std::endl << markerToRelativeTranslation << std::endl << std::endl;
+						ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << pipelines[j]->processing->rotationBuffers[frame]  << std::endl << markerToRelativeRotation << std::endl << std::endl;
+						ss << "Combined: " << std::endl << relativeTransformation << std::endl;
+						std::cout << ss.str();
 					}
 				}
 			}
-		});
+		}
+	});
 #pragma endregion
 				
 #pragma region Main loop
@@ -264,6 +268,8 @@ int main(int argc, char* argv[]) try {
 					if (pipelines.size()) {
 					    draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
 					}
+
+					//relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
 				}
 			}
 		}

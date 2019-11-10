@@ -102,8 +102,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\ProgramData\opencv\build\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\ProgramData\opencv\build\x64\vc15\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\dev\eigen;C:\dev\glfw-3.3\include;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\include;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party\glfw-imgui\include;$(OPENCV_DIR)\..\..\..\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(OPENCV_DIR)\lib;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

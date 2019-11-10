@@ -92,6 +92,15 @@ namespace vc::processing {
 		std::map<unsigned long long, Eigen::Matrix4d> rotationBuffers;
 		std::map<unsigned long long, Eigen::Matrix4d> translationBuffers;
 		
+		Processing() {
+			// Initilaize the buffers with zero matrices. Highest frame id discovered during the recording was around 400. 
+			// This should be sufficient
+			for (int i = 0; i < 1024; i++) {
+				rotationBuffers[i] = Eigen::Matrix4d::Zero();
+				translationBuffers[i] = Eigen::Matrix4d::Zero();
+			}
+		}
+
 		void startCharucoProcessing(vc::data::Camera& camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
