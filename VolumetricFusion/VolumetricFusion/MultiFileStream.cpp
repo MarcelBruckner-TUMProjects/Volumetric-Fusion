@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) try {
 
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "allCameras/";
-	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::MULTI_POINTCLOUD);
+	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::ONLY_COLOR);
 	
 	// Create a simple OpenGL window for rendering:
 	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
@@ -99,10 +99,10 @@ int main(int argc, char* argv[]) try {
 		for (auto&& device : ctx.query_devices())
 		{
 			if (state.captureState == CaptureState::RECORDING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, folderSettings.recordingsFolder));
+				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, i, folderSettings.recordingsFolder));
 			}
 			else if (state.captureState == CaptureState::STREAMING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device));
+				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, i));
 			}
 			i++;
 		}
@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) try {
 
 		for (int i = 0; i < filenames.size() && i < 4; i++)
 		{
-			pipelines.emplace_back(std::make_shared < vc::capture::PlayingCaptureDevice>(ctx, filenames[i]));
+			pipelines.emplace_back(std::make_shared < vc::capture::PlayingCaptureDevice>(ctx, i, filenames[i]));
 		}
 	}
 
@@ -138,7 +138,7 @@ int main(int argc, char* argv[]) try {
 
 	// Camera calibration thread
 	std::thread calibrationThread;
-	std::atomic_bool calibrateCameras = false;
+	std::atomic_bool calibrateCameras = true;
 	
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i]->startPipeline();
@@ -154,11 +154,27 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
-			for (int i = 0; i < pipelines.size(); i++) {
-				std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
-				std::vector<unsigned long long> outerFrameIds = extractKeys(baseCharucoIdBuffer);
+            unsigned long long maxFrameId = 0;
+			for (int i = 0; i < pipelines.size(); ++i){
+                maxFrameId = MAX(maxFrameId, pipelines[i]->processing->maxFrameId);
+			}
+            int foundAll = 0;
+            int found[4];
+            std::stringstream foundStr;
+            for (; foundAll < pipelines.size(); foundAll++) {
+                //std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
+                //std::vector<unsigned long long> outerFrameIds = extractKeys(baseCharucoIdBuffer);
+                //auto baseCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
+                //auto baseCharucoCornerBuffer = pipelines[i]->processing->charucoCornerBuffers;
 
-				for (int j = 0; j < pipelines.size(); j++) {
+                found[maxFrameId] = pipelines[foundAll]->processing->charucoIdBuffers.size();
+                foundStr << pipelines[foundAll]->processing->charucoIdBuffers.size() << ",";
+            }
+            std::cout << "Frame " << maxFrameId << ": " << foundStr.str() << std::endl;
+            foundAll = 0;
+
+			/*for (int i = 0; i < maxFrameId; i++) {
+				/*for (int j = 0; j < pipelines.size(); j++) {
 					if (i == j) {
 						continue;
 					}
@@ -193,7 +209,7 @@ int main(int argc, char* argv[]) try {
 						std::cout << ss.str();
 					}
 				}
-			}
+			}*/
 		}
 	});
 #pragma endregion

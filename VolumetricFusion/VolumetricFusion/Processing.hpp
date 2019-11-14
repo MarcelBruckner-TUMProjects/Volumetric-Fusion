@@ -29,7 +29,7 @@ namespace vc::processing {
 				basic lambda syntax: processing_blocks::createProcessingBlock([](cv::Mat &image){...})
 		*/
 		template<typename F>
-		rs2::processing_block createProcessingBlock(F& lambda, int imageDescriptor, int factor, int frame_id = -1) {
+		rs2::processing_block createProcessingBlock(F& lambda, int imageDescriptor, int factor, int pipelineId, int frame_id = -1) {
 			return rs2::processing_block(
 				[=](rs2::frame f, rs2::frame_source& src)
 			{
@@ -43,7 +43,7 @@ namespace vc::processing {
 				// do some (silly) processing
 
 				// Here the magic happens
-				lambda(image, f.get_frame_number());
+				lambda(image, f.get_frame_number(), pipelineId);
 
 				// Allocate new frame. Copy all missing data from f.
 				// This assumes the output is same resolution and format
@@ -60,9 +60,9 @@ namespace vc::processing {
 	}
 
 	template<typename F>
-	rs2::processing_block createColorProcessingBlock(F& lambda) {
+	rs2::processing_block createColorProcessingBlock(F& lambda, int pipelineId) {
 		// Don't bother the magic numbers, they describe the image channels
-		return createProcessingBlock(lambda, CV_8UC3, 3);
+		return createProcessingBlock(lambda, CV_8UC3, 3, pipelineId);
 	}
 
 	//template<typename F>
@@ -88,25 +88,40 @@ namespace vc::processing {
 
 		// Pose estimation buffers
 		// buffer <frame_id, value>
+        std::map<unsigned long long, std::vector<std::vector<cv::Point2f>>> charucoCornerBuffers;
 		std::map<unsigned long long, std::vector<int>> charucoIdBuffers;
 		std::map<unsigned long long, Eigen::Matrix4d> rotationBuffers;
 		std::map<unsigned long long, Eigen::Matrix4d> translationBuffers;
+
+		int pipelineId;
+        unsigned long long maxFrameId = 0;
 		
-		Processing() {
+		Processing(int pipelineId) : pipelineId(pipelineId) {
 			// Initilaize the buffers with zero matrices. Highest frame id discovered during the recording was around 400. 
-			// This should be sufficient
-			for (int i = 0; i < 1024; i++) {
-				rotationBuffers[i] = Eigen::Matrix4d::Zero();
-				translationBuffers[i] = Eigen::Matrix4d::Zero();
-			}
+			// This should be sufficient for now
+			//std::vector<cv::Point2f> nullVector1;
+            std::vector<std::vector<cv::Point2f>> nullVector1024_16(4);
+            for (int i = 0; i < 1024; ++i) {
+                nullVector1024_16.push_back(std::vector<cv::Point2f>(16));
+            }
+			for (int i = 0; i < 4; ++i) {
+                rotationBuffers[i] = Eigen::Matrix4d::Zero();
+                translationBuffers[i] = Eigen::Matrix4d::Zero();
+                // Kevin: This is neccessary so we can simply overwrite them later (we don't want uninitialized indeces).
+                // There is probably an easier way to do this though.
+                charucoCornerBuffers[i] = nullVector1024_16;
+                charucoIdBuffers[i].push_back(-1);
+            }
 		}
 
 		void startCharucoProcessing(vc::data::Camera& camera) {
-			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
+			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId, unsigned long long pipelineId) {
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
 				/*cv::Ptr<cv::aruco::DetectorParameters> params;
 				params->cornerRefinementMethod = cv::aruco::CORNER_REFINE_NONE;*/
+
+				this->maxFrameId = MAX(this->maxFrameId, frameId);
 
 				std::vector<int> ids;
 				std::vector<std::vector<cv::Point2f>> corners;
@@ -117,16 +132,23 @@ namespace vc::processing {
 					std::vector<cv::Point2f> charucoCorners;
 					std::vector<int> charucoIds;
 					cv::aruco::interpolateCornersCharuco(corners, ids, image, board, charucoCorners, charucoIds);
+
+					if (charucoCorners.size() == 16 && charucoIds.size() == 16) {
+                        this->charucoCornerBuffers[pipelineId][frameId] = charucoCorners;
+                        // should be the same for all pipeline ids since we detect the same charuco board from all
+                        // camera angles, actually, these should always be the same
+                        this->charucoIdBuffers[frameId] = charucoIds;
+					}
+
 					// if at least one charuco corner detected
 					if (charucoIds.size() > 0) {
 						cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
-						cv::Vec3d rotation, translation;
+						/*cv::Vec3d rotation, translation;
 						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.cameraMatrices, camera.distCoeffs, rotation, translation);
 						// if charuco pose is valid
 						if (valid) {
 							cv::aruco::drawAxis(image, camera.cameraMatrices, camera.distCoeffs, rotation, translation, 0.1);
 
-							charucoIdBuffers[frameId] = charucoIds;
 							Eigen::Matrix4d tmpTranslation;
 							tmpTranslation.setIdentity();
 							tmpTranslation.block<3, 1>(0, 3) << translation[0], translation[1], translation[2];
@@ -146,13 +168,13 @@ namespace vc::processing {
 							//ss << "************************************************************************************" << std::endl;
 							//ss << "Device " << i << ", Frame " << frame_id << ":" << std::endl << "Translation: " << std::endl << tmpTranslation << std::endl << "Rotation: " << std::endl << tmpRotation << std::endl;
 							//std::cout << ss.str();
-						}
+						}*/
 					}
 				}
 			};
 
 
-			charucoProcessingBlocks = std::make_shared<rs2::processing_block>(vc::processing::createColorProcessingBlock(charucoPoseEstimation));
+			charucoProcessingBlocks = std::make_shared<rs2::processing_block>(vc::processing::createColorProcessingBlock(charucoPoseEstimation, this->pipelineId));
 			charucoProcessingBlocks->start(charucoProcessingQueues); // Bind output of the processing block to be enqueued into the queue
 		}
 	};

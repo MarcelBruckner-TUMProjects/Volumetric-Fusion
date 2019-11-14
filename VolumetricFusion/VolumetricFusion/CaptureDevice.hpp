@@ -29,6 +29,8 @@ namespace vc::capture {
 		std::shared_ptr < std::atomic_bool> paused;
 		std::shared_ptr < std::atomic_bool> calibrateCameras;
 
+		int pipelineId;
+
 		std::shared_ptr < std::thread> thread;
 
 		void startPipeline() {
@@ -52,11 +54,12 @@ namespace vc::capture {
 			this->calibrateCameras->store(calibrate);
 		}
 
-		CaptureDevice(CaptureDevice& other) {
+		CaptureDevice(CaptureDevice& other, int pipelineId) {
 			this->data = other.data;
 			this->processing = other.processing;
 			this->pipeline = other.pipeline;
 			this->cfg = other.cfg;
+			this->pipelineId = pipelineId;
 
 			this->stopped = other.stopped;
 			this->paused = other.paused;
@@ -64,9 +67,9 @@ namespace vc::capture {
 			this->thread = other.thread;
 		}
 				
-		CaptureDevice(rs2::context context) {
+		CaptureDevice(rs2::context context, int pipelineId) : pipelineId(pipelineId) {
 			this->data = std::make_shared<vc::data::Data>();
-			this->processing = std::make_shared<vc::processing::Processing>();
+			this->processing = std::make_shared<vc::processing::Processing>(this->pipelineId);
 			this->pipeline = std::make_shared<rs2::pipeline>(context);
 			this->stopped = std::make_shared<std::atomic_bool>(false);
 			this->paused = std::make_shared<std::atomic_bool>(true);
@@ -135,8 +138,8 @@ namespace vc::capture {
 	/// <seealso cref="CaptureDevice" />
 	class StreamingCaptureDevice : public CaptureDevice {
 	public:
-		StreamingCaptureDevice(rs2::context context, rs2::device device) : 
-		CaptureDevice(context)
+		StreamingCaptureDevice(rs2::context context, rs2::device device, int pipelineId) :
+		CaptureDevice(context, pipelineId)
 		{
 			data->deviceName = device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
 
@@ -151,8 +154,8 @@ namespace vc::capture {
 	/// <seealso cref="StreamingCaptureDevice" />
 	class RecordingCaptureDevice : public StreamingCaptureDevice {
 	public:
-		RecordingCaptureDevice(rs2::context context, rs2::device device, std::string foldername) :
-			StreamingCaptureDevice(context, device)
+		RecordingCaptureDevice(rs2::context context, rs2::device device, int pipelineId, std::string foldername) :
+			StreamingCaptureDevice(context, device, pipelineId)
 		{
 			this->cfg.enable_device(data->deviceName);
 			this->cfg.enable_all_streams();
@@ -166,8 +169,8 @@ namespace vc::capture {
 	/// <seealso cref="CaptureDevice" />
 	class PlayingCaptureDevice : public CaptureDevice {
 	public:
-		PlayingCaptureDevice(rs2::context context, std::string filename) : 
-			CaptureDevice(context)
+		PlayingCaptureDevice(rs2::context context, int pipelineId, std::string filename) :
+			CaptureDevice(context, pipelineId)
 		{
 			data->deviceName = filename;
 
