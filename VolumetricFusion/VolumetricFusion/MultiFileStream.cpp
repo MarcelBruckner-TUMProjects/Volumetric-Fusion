@@ -179,13 +179,16 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
+			// https://github.com/opencv/opencv/blob/master/samples/cpp/3calibration.cpp
+
 			unsigned long long maxFrameId = 0;
 			for (int i = 0; i < pipelines.size(); ++i) {
 				maxFrameId = MAX(maxFrameId, pipelines[i]->processing->maxFrameId);
 			}
 
-			std::vector<std::vector<cv::Point2f>> allCornersConcatenated;
-			allCornersConcatenated.reserve(4);
+			//std::vector<std::vector<cv::Point2f>> allCornersConcatenated;
+			//allCornersConcatenated.reserve(4);
+			std::vector<std::vector<std::vector<cv::Point2f>>> corners{ 4 };
 			std::vector<std::vector<int>> allIdsConcatenated {
 				{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
 				{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
@@ -193,30 +196,41 @@ int main(int argc, char* argv[]) try {
 				{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
 			};
 
-			for (int i = 0; i < pipelines.size(); ++i) {
+			const int minFrameCount = 4;
+			const int pipeCount = pipelines.size();
+
+			int found[4] = { 0, 0, 0, 0 };
+			bool foundEnough = false;
+			for (int i = 0; i < pipeCount; ++i) {
 				for (int j = 0; j < pipelines[i]->processing->charucoCornerBuffers.size(); ++j) {
 					auto charucoCorners = pipelines[i]->processing->charucoCornerBuffers[j];
 					if (charucoCorners.size() == 16) {
-						allCornersConcatenated.push_back(pipelines[i]->processing->charucoCornerBuffers[j]);
-						break;
+						corners[i].push_back(pipelines[i]->processing->charucoCornerBuffers[j]);
+						++found[i];
+						if (found[i] >= minFrameCount) {
+							break;
+						}
 					}
 				}
-				if (allCornersConcatenated.size() == 4) {
+				if (found[0] >= minFrameCount && found[1] >= minFrameCount && found[2] >= minFrameCount && found[3] >= minFrameCount) {
+					foundEnough = true;
 					break;
 				}
 			}
 			//std::cout << "MaxFrame " << maxFrameId << " found " << allCornersConcatenated.size() << std::endl;
 			
-			if (allCornersConcatenated.size() == 4) {
+			if (foundEnough) {
 				// Reference implementation:
 				// https://github.com/opencv/opencv_contrib/blob/master/modules/aruco/samples/calibrate_camera_charuco.cpp
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
 				//cv::Mat cameraMatrix;
-				auto cameraMatrix = pipelines[0]->data->camera.cameraMatrices;
+				//auto cameraMatrix = pipelines[0]->data->camera.cameraMatrices;
 				//cv::Mat distCoeffs { 0, 0, 0, 0 };
-				cv::Mat distCoeffs = pipelines[0]->data->camera.distCoeffs;
-				std::vector<cv::Mat> rvecs{ 4 }, tvecs{ 4 };
+				//cv::Mat distCoeffs = pipelines[0]->data->camera.distCoeffs;
+
+				std::vector<cv::Mat> rvecs, tvecs;
+
 				cv::Size imageSize = { 480, 640 };
 				float aspectRatio = 1;
 				int calibrationFlags = (
@@ -233,15 +247,19 @@ int main(int argc, char* argv[]) try {
 				//}
 				cv::TermCriteria criteria;
 				criteria.type = cv::TermCriteria::EPS;
-				criteria.epsilon = 0.00005;
+				criteria.epsilon = 0.0005;
 
-				double repError = cv::aruco::calibrateCameraCharuco(allCornersConcatenated, allIdsConcatenated, board, imageSize, cameraMatrix, distCoeffs, rvecs, tvecs, calibrationFlags, criteria);
-				std::cout << "repError=" << repError << std::endl;
+				for (int i = 0; i < pipeCount; ++i) {
+					double repError = cv::aruco::calibrateCameraCharuco(
+						corners[i], allIdsConcatenated, board, imageSize,
+						pipelines[i]->data->camera.cameraMatrices, 
+						pipelines[i]->data->camera.distCoeffs, 
+						rvecs[i], tvecs[i], calibrationFlags, criteria
+					);
+					std::cout << "frame=" << i << ", repError=" << repError << std::endl;
+				}
 
 				/*for (int i = 0; i < pipelines.size(); ++i) {
-					cv::Mat rvec, tvec;
-					auto cameraMatrix = pipelines[i]->data->camera.cameraMatrices;
-					cv::Mat distCoeffs = pipelines[i]->data->camera.distCoeffs;
 					cv::aruco::estimatePoseCharucoBoard(
 						allCornersConcatenated[i], 
 						allIdsConcatenated[i],
@@ -261,7 +279,7 @@ int main(int argc, char* argv[]) try {
 
 				// Convert rvecs and tvecs to extrinsics
 				rs2_extrinsics extrinsics[4];
-				for (int i = 0; i < pipelines.size(); ++i) {
+				for (int i = 0; i < pipeCount; ++i) {
 					std::cout << rvecs[i] << std::endl;
 					std::cout << tvecs[i] << std::endl;
 					std::string rty = cvType2str(rvecs[i].type());
