@@ -817,7 +817,7 @@ inline void draw_pointcloud(float width, float height, glfw_state& app_state, rs
     glPopAttrib();
 }
 
-inline void draw_pointcloud_and_colors(float width, float height, glfw_state& app_state, rs2::points& points, rs2::frame color_frame, float alpha)
+inline void draw_pointcloud_and_colors(float width, float height, glfw_state& app_state, rs2::points& points, rs2::frame color_frame, float alpha, cv::Mat extrinsics_rotation, cv::Mat extrinsics_translation)
 {
     if (!points)
         return;
@@ -847,6 +847,40 @@ inline void draw_pointcloud_and_colors(float width, float height, glfw_state& ap
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, app_state.tex.get_gl_handle());
+
+	if (!extrinsics_rotation.empty() && !extrinsics_translation.empty()) {
+		// https://stackoverflow.com/questions/46317246/ar-with-opencv-opengl
+		cv::Mat rotationMatrix;
+		cv::Rodrigues(extrinsics_rotation, rotationMatrix);
+		//std::cout << extrinsics_rotation << std::endl << std::endl;
+		//std::cout << rotationMatrix << std::endl << std::endl;
+		//std::cout << extrinsics_translation << std::endl;
+
+		extrinsics_translation = extrinsics_translation / 250.0;
+
+		GLdouble modelviewMat[16];
+		modelviewMat[0] = rotationMatrix.at<double>(0, 0);
+		modelviewMat[1] = -rotationMatrix.at<double>(1, 0);
+		modelviewMat[2] = -rotationMatrix.at<double>(2, 0);
+		modelviewMat[3] = 0;
+		modelviewMat[4] = rotationMatrix.at<double>(0, 1);
+		modelviewMat[5] = -rotationMatrix.at<double>(1, 1);
+		modelviewMat[6] = -rotationMatrix.at<double>(2, 1);
+		modelviewMat[7] = 0;
+		modelviewMat[8] = rotationMatrix.at<double>(0, 2);
+		modelviewMat[9] = -rotationMatrix.at<double>(1, 2);
+		modelviewMat[10] = -rotationMatrix.at<double>(2, 2);
+		modelviewMat[11] = 0;
+		modelviewMat[12] = extrinsics_translation.at<double>(0, 0);
+		modelviewMat[13] = -extrinsics_translation.at<double>(1, 0);
+		modelviewMat[14] = -extrinsics_translation.at<double>(2, 0);
+		modelviewMat[12] = 0;
+		modelviewMat[13] = 0;
+		modelviewMat[14] = 0;
+		modelviewMat[15] = 1;
+
+		glMultMatrixd(modelviewMat);
+	}
 
     // Alphs does not work :/
     glColor4f(1.0f, 1.0f, 1.0f, alpha);
@@ -900,11 +934,143 @@ inline void draw_pointcloud_and_colors(float width, float height, glfw_state& ap
 
     // OpenGL cleanup
     glEnd();
-    glPopMatrix();
+	glPopMatrix();
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();
     glPopAttrib();
 }
+
+inline void draw_colors(float width, float height, glfw_state& app_state, rs2::points& points, rs2::frame color_frame, float alpha, cv::Mat extrinsics_rotation, cv::Mat extrinsics_translation, rect r)
+{
+	if (!points)
+		return;
+
+	// OpenGL commands that prep screen for the pointcloud
+	glLoadIdentity();
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+	glClearColor(153.f / 255, 153.f / 255, 153.f / 255, 1);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	glMatrixMode(GL_PROJECTION);
+	glOrtho(0, r.w, r.h, 0, -1, +1);
+	glViewport((int)r.x, (int)r.y, (int)r.w, (int)r.h);
+	glPushMatrix();
+
+
+	//glMatrixMode(GL_PROJECTION);
+	//glPushMatrix();
+	//gluPerspective(0, width / height, 0.01f, 10.0f);
+
+	//glMatrixMode(GL_MODELVIEW);
+	//glPushMatrix();
+	//gluLookAt(0, 0, 0, 0, 0, 1, 0, -1, 0);
+
+	glPointSize(width / 640);
+	glEnable(GL_DEPTH_TEST);
+
+	glMatrixMode(GL_MODELVIEW);
+	glEnable(GL_TEXTURE_2D);
+	glPushMatrix();
+
+	glTranslated((r.w / 2), (r.h / 2), 0);
+	glRotated(extrinsics_rotation.at<double>(2, 0) * (180 / 3.141592653589793238463), 0, 0, 1);
+	glTranslated(-(r.w / 2), -(r.h / 2), 0);
+
+	/*
+	if (!extrinsics_rotation.empty() && !extrinsics_translation.empty()) {
+		// https://stackoverflow.com/questions/46317246/ar-with-opencv-opengl
+		cv::Mat rotationMatrix;
+		cv::Rodrigues(extrinsics_rotation, rotationMatrix);
+		//std::cout << extrinsics_rotation << std::endl << std::endl;
+		//std::cout << rotationMatrix << std::endl << std::endl;
+		//std::cout << extrinsics_translation << std::endl;
+
+		extrinsics_translation = extrinsics_translation / 250.0;
+
+		GLdouble modelviewMat[16];
+		modelviewMat[0] = rotationMatrix.at<double>(0, 0);
+		modelviewMat[1] = -rotationMatrix.at<double>(1, 0);
+		modelviewMat[2] = -rotationMatrix.at<double>(2, 0);
+		modelviewMat[3] = 0;
+		modelviewMat[4] = rotationMatrix.at<double>(0, 1);
+		modelviewMat[5] = -rotationMatrix.at<double>(1, 1);
+		modelviewMat[6] = -rotationMatrix.at<double>(2, 1);
+		modelviewMat[7] = 0;
+		modelviewMat[8] = rotationMatrix.at<double>(0, 2);
+		modelviewMat[9] = -rotationMatrix.at<double>(1, 2);
+		modelviewMat[10] = -rotationMatrix.at<double>(2, 2);
+		modelviewMat[11] = 0;
+		modelviewMat[12] = 0; // extrinsics_translation.at<double>(0, 0);
+		modelviewMat[13] = 0; // -extrinsics_translation.at<double>(1, 0);
+		modelviewMat[14] = 0; // -extrinsics_translation.at<double>(2, 0);
+		modelviewMat[12] = 0;
+		modelviewMat[13] = 0;
+		modelviewMat[14] = 0;
+		modelviewMat[15] = 1;
+
+		glMultMatrixd(modelviewMat);
+	}*/
+
+	// Alphs does not work :/
+	//glColor4f(1.0f, 1.0f, 1.0f, alpha);
+
+
+
+
+
+
+
+
+
+	auto format = color_frame.get_profile().format();
+	switch (format)
+	{
+	case RS2_FORMAT_RGB8:
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, color_frame.get_data());
+		break;
+	case RS2_FORMAT_RGBA8:
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, color_frame.get_data());
+		break;
+	case RS2_FORMAT_Y8:
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, color_frame.get_data());
+		break;
+	case RS2_FORMAT_Y10BPACK:
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, color_frame.get_data());
+		break;
+	default:
+		throw std::runtime_error("The requested format is not supported!");
+	}
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glColor4f(1.0f, 1.0f, 1.0f, alpha);
+	glEnable(GL_TEXTURE_2D);
+	glBegin(GL_QUADS);
+	glTexCoord2f(0, 0); glVertex2f(0, 0);
+	glTexCoord2f(0, 1); glVertex2f(0, r.h);
+	glTexCoord2f(1, 1); glVertex2f(r.w, r.h);
+	glTexCoord2f(1, 0); glVertex2f(r.w, 0);
+	glEnd();
+	glDisable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+
+
+
+	// OpenGL cleanup
+	glEnd();
+	glPopMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glPopAttrib();
+}
+
 
 inline void quat2mat(rs2_quaternion& q, GLfloat H[16])  // to column-major matrix
 {
@@ -1039,12 +1205,6 @@ inline void register_glfw_callbacks(window& app, glfw_state& app_state)
 
 inline void draw_rectangle(float width, float height, float x, float y, float z, glfw_state& app_state) {
 
-
-
-
-
-
-
     // OpenGL commands that prep screen for the pointcloud
     glLoadIdentity();
     glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -1065,14 +1225,10 @@ inline void draw_rectangle(float width, float height, float x, float y, float z,
     glRotated(app_state.pitch, 1, 0, 0);
     glRotated(app_state.yaw, 0, 1, 0);
 
-
     glScalef( 0.02, 0.02, 0.02);
 
     glPointSize(width / 640);
     glEnable(GL_DEPTH_TEST);
-
-
-
 
     glBegin(GL_QUADS);        // Draw The Cube Using quads
     glColor3f(0.0f,1.0f,0.0f);    // Color Blue

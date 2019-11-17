@@ -88,7 +88,7 @@ namespace vc::processing {
 
 		// Pose estimation buffers
 		// buffer <frame_id, value>
-        std::map<unsigned long long, std::vector<std::vector<cv::Point2f>>> charucoCornerBuffers;
+        std::map<unsigned long long, std::vector<cv::Point2f>> charucoCornerBuffers;
 		std::map<unsigned long long, std::vector<int>> charucoIdBuffers;
 		std::map<unsigned long long, Eigen::Matrix4d> rotationBuffers;
 		std::map<unsigned long long, Eigen::Matrix4d> translationBuffers;
@@ -100,7 +100,7 @@ namespace vc::processing {
 			// Initilaize the buffers with zero matrices. Highest frame id discovered during the recording was around 400. 
 			// This should be sufficient for now
 			//std::vector<cv::Point2f> nullVector1;
-            std::vector<std::vector<cv::Point2f>> nullVector1024_16(4);
+            /*std::vector<std::vector<cv::Point2f>> nullVector1024_16(4);
             for (int i = 0; i < 1024; ++i) {
                 nullVector1024_16.push_back(std::vector<cv::Point2f>(16));
             }
@@ -111,7 +111,7 @@ namespace vc::processing {
                 // There is probably an easier way to do this though.
                 charucoCornerBuffers[i] = nullVector1024_16;
                 charucoIdBuffers[i].push_back(-1);
-            }
+            }*/
 		}
 
 		void startCharucoProcessing(vc::data::Camera& camera) {
@@ -134,7 +134,9 @@ namespace vc::processing {
 					cv::aruco::interpolateCornersCharuco(corners, ids, image, board, charucoCorners, charucoIds);
 
 					if (charucoCorners.size() == 16 && charucoIds.size() == 16) {
-                        this->charucoCornerBuffers[pipelineId][frameId] = charucoCorners;
+						if (this->charucoCornerBuffers[frameId].empty()) {
+						}
+						this->charucoCornerBuffers[frameId] = charucoCorners;
                         // should be the same for all pipeline ids since we detect the same charuco board from all
                         // camera angles, actually, these should always be the same
                         this->charucoIdBuffers[frameId] = charucoIds;

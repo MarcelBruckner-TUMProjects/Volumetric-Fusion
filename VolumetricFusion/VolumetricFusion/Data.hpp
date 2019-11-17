@@ -47,12 +47,21 @@ namespace vc::data {
 	const size_t IMU_FRAME_WIDTH = 1280;
 	const size_t IMU_FRAME_HEIGHT = 720;
 	
+	struct cv_extrinsics {
+		cv::Mat rotation;
+		cv::Mat translation;
+	};
+
 	class Camera {
 	public:
 		// Pose estimation camera stuff
 		rs2_intrinsics intrinsics;
+		rs2_extrinsics extrinsics;
+		vc::data::cv_extrinsics cv_extrinsics;
+
 		cv::Matx33f cameraMatrices;
-		std::vector<float> distCoeffs;
+		//std::vector<float> distCoeffs;
+		cv::Mat distCoeffs;
 	};
 
 	class Data {
@@ -84,8 +93,9 @@ namespace vc::data {
 				0, 0, 1
 			);
 
-			for (float c : intrinsics.coeffs) {
-				camera.distCoeffs.push_back(c);
+			camera.distCoeffs = cv::Mat(cv::Size(1, 5), CV_64FC1);
+			for (int i = 0; i < 5; ++i) {
+				camera.distCoeffs.at<double>(i, 0) = camera.intrinsics.coeffs[i];
 			}
 		}
 	};

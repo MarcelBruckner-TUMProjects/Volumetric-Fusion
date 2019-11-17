@@ -11,6 +11,7 @@
 #include <opencv2/aruco.hpp>
 #include <opencv2/aruco/charuco.hpp>
 #include <opencv2/calib3d.hpp>
+//#include <opencv2/ccalib/multicalib.hpp>
 
 #include <map>
 #include <iostream>
@@ -53,6 +54,29 @@ std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b);
 
 void my_function_to_handle_aborts(int signalNumber) {
 	std::cout << "Something aborted" << std::endl;
+}
+
+std::string cvType2str(int type) {
+	std::string r;
+
+	uchar depth = type & CV_MAT_DEPTH_MASK;
+	uchar chans = 1 + (type >> CV_CN_SHIFT);
+
+	switch (depth) {
+	case CV_8U:  r = "8U"; break;
+	case CV_8S:  r = "8S"; break;
+	case CV_16U: r = "16U"; break;
+	case CV_16S: r = "16S"; break;
+	case CV_32S: r = "32S"; break;
+	case CV_32F: r = "32F"; break;
+	case CV_64F: r = "64F"; break;
+	default:     r = "User"; break;
+	}
+
+	r += "C";
+	r += (chans + '0');
+
+	return r;
 }
 
 int main(int argc, char* argv[]) try {
@@ -139,6 +163,7 @@ int main(int argc, char* argv[]) try {
 	// Camera calibration thread
 	std::thread calibrationThread;
 	std::atomic_bool calibrateCameras = true;
+	std::atomic_bool loadedExtrinsics = true;
 	
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i]->startPipeline();
@@ -148,30 +173,133 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Camera Calibration Thread
 
-	calibrationThread = std::thread([&pipelines, &stopped, &calibrateCameras, &relativeTransformations]() {
+	calibrationThread = std::thread([&pipelines, &stopped, &calibrateCameras, &loadedExtrinsics, &relativeTransformations]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
 				continue;
 			}
 
-            unsigned long long maxFrameId = 0;
-			for (int i = 0; i < pipelines.size(); ++i){
-                maxFrameId = MAX(maxFrameId, pipelines[i]->processing->maxFrameId);
+			unsigned long long maxFrameId = 0;
+			for (int i = 0; i < pipelines.size(); ++i) {
+				maxFrameId = MAX(maxFrameId, pipelines[i]->processing->maxFrameId);
 			}
-            int foundAll = 0;
-            int found[4];
-            std::stringstream foundStr;
-            for (; foundAll < pipelines.size(); foundAll++) {
-                //std::map<unsigned long long, std::vector<int>> baseCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
-                //std::vector<unsigned long long> outerFrameIds = extractKeys(baseCharucoIdBuffer);
-                //auto baseCharucoIdBuffer = pipelines[i]->processing->charucoIdBuffers;
-                //auto baseCharucoCornerBuffer = pipelines[i]->processing->charucoCornerBuffers;
 
-                found[maxFrameId] = pipelines[foundAll]->processing->charucoIdBuffers.size();
-                foundStr << pipelines[foundAll]->processing->charucoIdBuffers.size() << ",";
-            }
-            std::cout << "Frame " << maxFrameId << ": " << foundStr.str() << std::endl;
-            foundAll = 0;
+			std::vector<std::vector<cv::Point2f>> allCornersConcatenated;
+			allCornersConcatenated.reserve(4);
+			std::vector<std::vector<int>> allIdsConcatenated {
+				{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
+				{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
+				{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
+				{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
+			};
+
+			for (int i = 0; i < pipelines.size(); ++i) {
+				for (int j = 0; j < pipelines[i]->processing->charucoCornerBuffers.size(); ++j) {
+					auto charucoCorners = pipelines[i]->processing->charucoCornerBuffers[j];
+					if (charucoCorners.size() == 16) {
+						allCornersConcatenated.push_back(pipelines[i]->processing->charucoCornerBuffers[j]);
+						break;
+					}
+				}
+				if (allCornersConcatenated.size() == 4) {
+					break;
+				}
+			}
+			//std::cout << "MaxFrame " << maxFrameId << " found " << allCornersConcatenated.size() << std::endl;
+			
+			if (allCornersConcatenated.size() == 4) {
+				// Reference implementation:
+				// https://github.com/opencv/opencv_contrib/blob/master/modules/aruco/samples/calibrate_camera_charuco.cpp
+				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
+				//cv::Mat cameraMatrix;
+				auto cameraMatrix = pipelines[0]->data->camera.cameraMatrices;
+				//cv::Mat distCoeffs { 0, 0, 0, 0 };
+				cv::Mat distCoeffs = pipelines[0]->data->camera.distCoeffs;
+				std::vector<cv::Mat> rvecs{ 4 }, tvecs{ 4 };
+				cv::Size imageSize = { 480, 640 };
+				float aspectRatio = 1;
+				int calibrationFlags = (
+					0
+					//| cv::CALIB_FIX_PRINCIPAL_POINT
+					| cv::CALIB_FIX_INTRINSIC
+					//| cv::CALIB_FIX_ASPECT_RATIO
+					//| cv::CALIB_ZERO_TANGENT_DIST
+					//| cv::CALIB_FIX_K1 | cv::CALIB_FIX_K2 | cv::CALIB_FIX_K3 | cv::CALIB_FIX_K4 | cv::CALIB_FIX_K5
+				);
+				//if (calibrationFlags & cv::CALIB_FIX_ASPECT_RATIO) {
+				//	cameraMatrix = cv::Mat::eye(3, 3, CV_64F);
+				//	cameraMatrix.at< double >(0, 0) = aspectRatio;
+				//}
+				cv::TermCriteria criteria;
+				criteria.type = cv::TermCriteria::EPS;
+				criteria.epsilon = 0.00005;
+
+				double repError = cv::aruco::calibrateCameraCharuco(allCornersConcatenated, allIdsConcatenated, board, imageSize, cameraMatrix, distCoeffs, rvecs, tvecs, calibrationFlags, criteria);
+				std::cout << "repError=" << repError << std::endl;
+
+				/*for (int i = 0; i < pipelines.size(); ++i) {
+					cv::Mat rvec, tvec;
+					auto cameraMatrix = pipelines[i]->data->camera.cameraMatrices;
+					cv::Mat distCoeffs = pipelines[i]->data->camera.distCoeffs;
+					cv::aruco::estimatePoseCharucoBoard(
+						allCornersConcatenated[i], 
+						allIdsConcatenated[i],
+						board, 
+						pipelines[i]->data->camera.cameraMatrices,
+						pipelines[i]->data->camera.distCoeffs,
+						rvecs[i],
+						tvecs[i]);
+				}*/
+
+				/*bool saveOk = vc::file_access::saveCvExtrinsics("extrinsics.txt", imageSize, aspectRatio, calibrationFlags,
+					cameraMatrix, distCoeffs, repError);
+				if (!saveOk) {
+					std::cerr << "Cannot save extrinsics, extrinsics.txt cannot be opened!" << std::endl;
+					return 0;
+				}*/
+
+				// Convert rvecs and tvecs to extrinsics
+				rs2_extrinsics extrinsics[4];
+				for (int i = 0; i < pipelines.size(); ++i) {
+					std::cout << rvecs[i] << std::endl;
+					std::cout << tvecs[i] << std::endl;
+					std::string rty = cvType2str(rvecs[i].type());
+					printf("R Matrix: %s %dx%d \n", rty.c_str(), rvecs[i].cols, rvecs[i].rows);
+					std::string tty = cvType2str(tvecs[i].type());
+					printf("T Matrix: %s %dx%d \n", tty.c_str(), tvecs[i].cols, tvecs[i].rows);
+					std::cout << std::endl;
+
+					for (int j = 0; j < 3; ++j) {
+						extrinsics[i].translation[j] = tvecs[i].at<double>(j, 0);
+					}
+
+					cv::Mat rotationMatrix;
+					cv::Rodrigues(rvecs[i], rotationMatrix);
+					for (int j = 0; j < 3; ++j) {
+						for (int k = 0; k < 3; ++k) {
+							auto jk = j * 3 + k;
+							extrinsics[i].rotation[jk] = rotationMatrix.at<double>(j, k);
+						}
+					}
+
+					pipelines[i]->data->camera.extrinsics = extrinsics[i];
+					pipelines[i]->data->camera.cv_extrinsics.translation = tvecs[i];
+					pipelines[i]->data->camera.cv_extrinsics.rotation = rvecs[i];
+					//pipelines[i]->data->camera.cv_extrinsics.cameraMatrix = cameraMatrix;
+					//pipelines[i]->data->camera.cv_extrinsics.distCoeffs = distCoeffs;
+				}
+
+				calibrateCameras = false;
+				loadedExtrinsics = true;
+
+				// How to continue from here?
+				/*
+				cv::calibrationMatrixValues
+				cv::composeRT
+				cv::projectPoints
+				*/
+			}
 
 			/*for (int i = 0; i < maxFrameId; i++) {
 				/*for (int j = 0; j < pipelines.size(); j++) {
@@ -274,8 +402,12 @@ int main(int argc, char* argv[]) try {
 						glViewport(widthHalf * (i % 2), heightHalf - (heightHalf * (i / 2)), widthHalf, heightHalf);
 					}
 
+					vc::data::cv_extrinsics cv_extrinsics;
+					//cv_extrinsics.rotation = cv::Mat::zeros(3, 1, CV_64F);
+					//cv_extrinsics.translation = cv::Mat::zeros(3, 1, CV_64F);
+
 					if (pipelines[i]->data->filteredColorFrames) {
-						draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);
+						draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f, cv_extrinsics.rotation, cv_extrinsics.translation);
 					}
 					else {
 						draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
@@ -283,6 +415,57 @@ int main(int argc, char* argv[]) try {
 
 					if (pipelines.size()) {
 					    draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
+					}
+				}
+			}
+		}
+		break;
+
+
+		case RenderState::CALIBRATED_POINTCLOUD:
+		{
+			// Draw the pointclouds
+			for (int i = 0; i < pipelines.size() && i < 4; ++i)
+			{
+				if (pipelines[i]->data->colorizedDepthFrames && pipelines[i]->data->points) {
+					viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
+					
+					if (isRetinaDisplay) {
+						glViewport(0, 0, width * 2, height * 2);
+					}
+					else {
+						glViewport(0, 0, width, height);
+					}
+
+					vc::data::cv_extrinsics cv_extrinsics;
+					if (loadedExtrinsics) {
+						cv_extrinsics = pipelines[i]->data->camera.cv_extrinsics;
+					}
+					else {
+						cv_extrinsics.rotation = cv::Mat::zeros(3, 1, CV_64F);
+						cv_extrinsics.translation = cv::Mat::zeros(3, 1, CV_64F);
+					}
+
+					/*rect r{
+						static_cast<float>(widthHalf * (i % 2)),
+						static_cast<float>(heightHalf - (heightHalf * (i / 2))),
+						static_cast<float>(widthHalf),
+						static_cast<float>(heightHalf)
+					};
+					if (pipelines[i]->data->filteredColorFrames) {
+						draw_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f, cv_extrinsics.rotation, cv_extrinsics.translation, r);
+					}*/
+
+
+					if (pipelines[i]->data->filteredColorFrames) {
+						draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f, cv_extrinsics.rotation, cv_extrinsics.translation);
+					}
+					else {
+						draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
+					}
+
+					if (pipelines.size()) {
+						draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
 					}
 
 					//relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
