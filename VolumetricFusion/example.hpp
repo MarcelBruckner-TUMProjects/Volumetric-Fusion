@@ -855,7 +855,8 @@ inline void draw_pointcloud_and_colors(float width, float height, glfw_state& ap
 		//std::cout << extrinsics_rotation << std::endl << std::endl;
 		//std::cout << rotationMatrix << std::endl << std::endl;
 		//std::cout << extrinsics_translation << std::endl;
-
+		
+		//auto rotation = extrinsics_rotation * (180 / 3.141592653589793238463);
 		extrinsics_translation = extrinsics_translation / 250.0;
 
 		GLdouble modelviewMat[16];
@@ -879,7 +880,7 @@ inline void draw_pointcloud_and_colors(float width, float height, glfw_state& ap
 		modelviewMat[14] = 0;
 		modelviewMat[15] = 1;
 
-		glMultMatrixd(modelviewMat);
+		//glMultMatrixd(modelviewMat);
 	}
 
     // Alphs does not work :/

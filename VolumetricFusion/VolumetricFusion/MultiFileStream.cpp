@@ -186,18 +186,16 @@ int main(int argc, char* argv[]) try {
 				maxFrameId = MAX(maxFrameId, pipelines[i]->processing->maxFrameId);
 			}
 
+			const int minFrameCount = 20;
+			const int pipeCount = pipelines.size();
+
 			//std::vector<std::vector<cv::Point2f>> allCornersConcatenated;
 			//allCornersConcatenated.reserve(4);
-			std::vector<std::vector<std::vector<cv::Point2f>>> corners{ 4 };
-			std::vector<std::vector<int>> allIdsConcatenated {
-				{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
-				{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
-				{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
-				{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
-			};
-
-			const int minFrameCount = 4;
-			const int pipeCount = pipelines.size();
+			std::vector<std::vector<std::vector<cv::Point2f>>> corners{ static_cast<unsigned __int64>(pipeCount) };
+			std::vector<std::vector<int>> allIdsConcatenated;
+			for (int i = 0; i < minFrameCount; ++i) {
+				allIdsConcatenated.push_back({ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 });
+			}
 
 			int found[4] = { 0, 0, 0, 0 };
 			bool foundEnough = false;
@@ -229,7 +227,7 @@ int main(int argc, char* argv[]) try {
 				//cv::Mat distCoeffs { 0, 0, 0, 0 };
 				//cv::Mat distCoeffs = pipelines[0]->data->camera.distCoeffs;
 
-				std::vector<cv::Mat> rvecs, tvecs;
+				std::vector<std::vector<cv::Mat>> rvecs{ 4 }, tvecs{ 4 };
 
 				cv::Size imageSize = { 480, 640 };
 				float aspectRatio = 1;
@@ -247,17 +245,19 @@ int main(int argc, char* argv[]) try {
 				//}
 				cv::TermCriteria criteria;
 				criteria.type = cv::TermCriteria::EPS;
-				criteria.epsilon = 0.0005;
+				criteria.epsilon = 0.05;
 
+				double repErrors[4];
 				for (int i = 0; i < pipeCount; ++i) {
-					double repError = cv::aruco::calibrateCameraCharuco(
+					repErrors[i] = cv::aruco::calibrateCameraCharuco(
 						corners[i], allIdsConcatenated, board, imageSize,
 						pipelines[i]->data->camera.cameraMatrices, 
 						pipelines[i]->data->camera.distCoeffs, 
 						rvecs[i], tvecs[i], calibrationFlags, criteria
 					);
-					std::cout << "frame=" << i << ", repError=" << repError << std::endl;
+					std::cout << "frame=" << i << ", repError=" << repErrors[i] << std::endl;
 				}
+				std::cout << std::endl;
 
 				/*for (int i = 0; i < pipelines.size(); ++i) {
 					cv::aruco::estimatePoseCharucoBoard(
@@ -279,21 +279,38 @@ int main(int argc, char* argv[]) try {
 
 				// Convert rvecs and tvecs to extrinsics
 				rs2_extrinsics extrinsics[4];
+				std::vector<cv::Mat> meanRvecs, meanTvecs;
 				for (int i = 0; i < pipeCount; ++i) {
-					std::cout << rvecs[i] << std::endl;
-					std::cout << tvecs[i] << std::endl;
-					std::string rty = cvType2str(rvecs[i].type());
-					printf("R Matrix: %s %dx%d \n", rty.c_str(), rvecs[i].cols, rvecs[i].rows);
-					std::string tty = cvType2str(tvecs[i].type());
-					printf("T Matrix: %s %dx%d \n", tty.c_str(), tvecs[i].cols, tvecs[i].rows);
-					std::cout << std::endl;
+					cv::Mat meanRvec, meanTvec;
+					meanRvec = abs(rvecs[i][0]);
+					meanTvec = abs(tvecs[i][0]);
+
+					std::cout << "=== Pipe " << i << std::endl;
+					for (int j = 0; j < minFrameCount; ++j) {
+						if (j > 0) {
+							meanRvec += abs(rvecs[i][j]);
+							meanTvec += abs(tvecs[i][j]);
+						}
+
+						std::cout << rvecs[i][j] << std::endl;
+						std::cout << tvecs[i][j] << std::endl;
+						std::string rty = cvType2str(rvecs[i][j].type());
+						printf("R Matrix: %s %dx%d \n", rty.c_str(), rvecs[i][j].cols, rvecs[i][j].rows);
+						std::string tty = cvType2str(tvecs[i][j].type());
+						printf("T Matrix: %s %dx%d \n", tty.c_str(), tvecs[i][j].cols, tvecs[i][j].rows);
+						std::cout << std::endl << std::endl;
+					}
+					meanRvec /= minFrameCount;
+					meanTvec /= minFrameCount;
+					std::cout << "R mean" << meanRvec << std::endl;
+					std::cout << "T mean" << meanTvec << std::endl;
 
 					for (int j = 0; j < 3; ++j) {
-						extrinsics[i].translation[j] = tvecs[i].at<double>(j, 0);
+						extrinsics[i].translation[j] = tvecs[i][0].at<double>(j, 0);
 					}
 
 					cv::Mat rotationMatrix;
-					cv::Rodrigues(rvecs[i], rotationMatrix);
+					cv::Rodrigues(rvecs[i][0], rotationMatrix);
 					for (int j = 0; j < 3; ++j) {
 						for (int k = 0; k < 3; ++k) {
 							auto jk = j * 3 + k;
@@ -302,8 +319,8 @@ int main(int argc, char* argv[]) try {
 					}
 
 					pipelines[i]->data->camera.extrinsics = extrinsics[i];
-					pipelines[i]->data->camera.cv_extrinsics.translation = tvecs[i];
-					pipelines[i]->data->camera.cv_extrinsics.rotation = rvecs[i];
+					pipelines[i]->data->camera.cv_extrinsics.translation = tvecs[i][0];
+					pipelines[i]->data->camera.cv_extrinsics.rotation = rvecs[i][0];
 					//pipelines[i]->data->camera.cv_extrinsics.cameraMatrix = cameraMatrix;
 					//pipelines[i]->data->camera.cv_extrinsics.distCoeffs = distCoeffs;
 				}
@@ -456,7 +473,7 @@ int main(int argc, char* argv[]) try {
 					}
 
 					vc::data::cv_extrinsics cv_extrinsics;
-					if (loadedExtrinsics) {
+					if (false && loadedExtrinsics) {
 						cv_extrinsics = pipelines[i]->data->camera.cv_extrinsics;
 					}
 					else {
