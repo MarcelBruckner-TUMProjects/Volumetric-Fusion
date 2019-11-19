@@ -122,7 +122,7 @@ namespace vc::capture {
 
 					for (int i = 0; i < data->points.size(); i++) {
 						auto point = data->points.get_vertices()[i];
-						data->vertices.push_back(Vertex3D(point.x, point.y, point.z));
+						data->vertices.push_back(vc::data::Vertex3D(point.x, point.y, point.z));
 					}
 				}
 				catch (const std::exception & e) {

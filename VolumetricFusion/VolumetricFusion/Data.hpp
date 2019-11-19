@@ -55,6 +55,16 @@ namespace vc::data {
 		std::vector<float> distCoeffs;
 	};
 
+    class Vertex3D {
+    public:
+        Eigen::Vector4d position;
+        int u, v;
+
+        Vertex3D(int x, int y, int z, int u = 0, int v = 0) : u(u), v(v){
+            position << x, y, z, 1;
+        }
+    };
+
 	class Data {
 	public:
 
@@ -91,14 +101,5 @@ namespace vc::data {
 	};
 }
 
-class Vertex3D {
-public:
-	Eigen::Vector4d position;
-	int u, v;
-
-	Vertex3D(int x, int y, int z, int u = 0, int v = 0) : u(u), v(v){	
-		position << x, y, z, 1;
-	}
-};
 #endif // !_DATA_HEADER_
 
