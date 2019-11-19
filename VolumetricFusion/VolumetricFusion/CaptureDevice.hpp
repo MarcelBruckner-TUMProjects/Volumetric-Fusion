@@ -120,9 +120,10 @@ namespace vc::capture {
 					data->colorizedDepthFrames = data->colorizer.process(depthFrame);		// Colorize the depth frame with a color map
 					data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud
 
+					data->vertices = Eigen::Matrix4Xd::Zero(4,data->points.size());
 					for (int i = 0; i < data->points.size(); i++) {
 						auto point = data->points.get_vertices()[i];
-						data->vertices.push_back(vc::data::Vertex3D(point.x, point.y, point.z));
+						data->vertices.col(i) << point.x, point.y, point.z, 1;
 					}
 				}
 				catch (const std::exception & e) {

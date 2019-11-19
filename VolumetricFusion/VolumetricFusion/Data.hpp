@@ -55,16 +55,6 @@ namespace vc::data {
 		std::vector<float> distCoeffs;
 	};
 
-    class Vertex3D {
-    public:
-        Eigen::Vector4d position;
-        int u, v;
-
-        Vertex3D(int x, int y, int z, int u = 0, int v = 0) : u(u), v(v){
-            position << x, y, z, 1;
-        }
-    };
-
 	class Data {
 	public:
 
@@ -78,7 +68,8 @@ namespace vc::data {
 		rs2::pointcloud pointclouds;
 		rs2::frame colorizedDepthFrames;
 		rs2::points points;
-		std::vector<Vertex3D> vertices;
+
+        Eigen::Matrix4Xd vertices;
 
 		Camera camera;
 		vc::processing::Processing* processing;

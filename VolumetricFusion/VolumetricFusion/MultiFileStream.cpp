@@ -277,10 +277,7 @@ std::cout << ss.str();
 
 					
 					if (i != 0 && relativeTransformations.count(i)) {
-						for (auto vertex : pipelines[i]->data->vertices) {
-							auto transformedVertex = relativeTransformations[i] * vertex.position;
-							std::cout << std::endl;
-						}
+                        auto transformedVertex = relativeTransformations[i] * pipelines[i]->data->vertices;
 					}
 
 					/*vc::data::cv_extrinsics cv_extrinsics;
