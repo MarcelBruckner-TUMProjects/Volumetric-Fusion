@@ -119,6 +119,11 @@ namespace vc::capture {
 					data->points = data->pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
 					data->colorizedDepthFrames = data->colorizer.process(depthFrame);		// Colorize the depth frame with a color map
 					data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud
+
+					for (int i = 0; i < data->points.size(); i++) {
+						auto point = data->points.get_vertices()[i];
+						data->vertices.push_back(Vertex3D(point.x, point.y, point.z));
+					}
 				}
 				catch (const std::exception & e) {
 					std::stringstream stream;

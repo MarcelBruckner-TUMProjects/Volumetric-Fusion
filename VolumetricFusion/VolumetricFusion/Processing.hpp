@@ -88,9 +88,10 @@ namespace vc::processing {
 
 		// Pose estimation buffers
 		// buffer <frame_id, value>
-		std::map<unsigned long long, std::vector<int>> charucoIdBuffers;
-		std::map<unsigned long long, Eigen::Matrix4d> rotationBuffers;
-		std::map<unsigned long long, Eigen::Matrix4d> translationBuffers;
+		bool hasMarkersDetected = false;
+		std::vector<int> charucoIdBuffers;
+		Eigen::Matrix4d rotation;
+		Eigen::Matrix4d translation;
 		
 		void startCharucoProcessing(vc::data::Camera& camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
@@ -111,27 +112,29 @@ namespace vc::processing {
 					// if at least one charuco corner detected
 					if (charucoIds.size() > 0) {
 						cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
-						cv::Vec3d rotation, translation;
-						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.cameraMatrices, camera.distCoeffs, rotation, translation);
+						cv::Vec3d r, t;
+						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.cameraMatrices, camera.distCoeffs, r, t);
 						// if charuco pose is valid
 						if (valid) {
-							cv::aruco::drawAxis(image, camera.cameraMatrices, camera.distCoeffs, rotation, translation, 0.1);
+							cv::aruco::drawAxis(image, camera.cameraMatrices, camera.distCoeffs, r, t, 0.1);
 
-							charucoIdBuffers[frameId] = charucoIds;
+							charucoIdBuffers = charucoIds;
 							Eigen::Matrix4d tmpTranslation;
 							tmpTranslation.setIdentity();
-							tmpTranslation.block<3, 1>(0, 3) << translation[0], translation[1], translation[2];
-							translationBuffers[frameId] = tmpTranslation;
+							tmpTranslation.block<3, 1>(0, 3) << t[0], t[1], t[2];
+							translation = tmpTranslation;
 
 							cv::Matx33d tmp;
-							cv::Rodrigues(rotation, tmp);
+							cv::Rodrigues(r, tmp);
 							Eigen::Matrix4d tmpRotation;
 							tmpRotation.setIdentity();
 							tmpRotation.block<3, 3>(0, 0) <<
 								tmp.val[0], tmp.val[1], tmp.val[2],
 								tmp.val[3], tmp.val[4], tmp.val[5],
 								tmp.val[6], tmp.val[7], tmp.val[8];
-							rotationBuffers[frameId] = tmpRotation;
+							rotation = tmpRotation;
+
+							hasMarkersDetected = true;
 
 							//std::stringstream ss;
 							//ss << "************************************************************************************" << std::endl;
