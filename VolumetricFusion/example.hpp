@@ -24,6 +24,8 @@
 #include <map>
 #include <functional>
 
+#include <Eigen/Dense>
+
 #ifndef PI
 const double PI = 3.14159265358979323846;
 #endif
@@ -906,9 +908,11 @@ inline void draw_pointcloud_and_colors(float width, float height, glfw_state& ap
 	glPopAttrib();
 }
 
-
-inline void draw_verteces_and_colors(float width, float height, glfw_state& app_state, Eigen::MatrixXd vertices, rs2::frame color_frame, float alpha)
+inline void draw_vertices_and_colors(float width, float height, glfw_state& app_state, rs2::points& points, const Eigen::Ref<const Eigen::MatrixXd> &vertices, rs2::frame color_frame, float alpha)
 {
+	if (!points)
+		return;
+	
 	// OpenGL commands that prep screen for the pointcloud
 	glLoadIdentity();
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -973,13 +977,15 @@ inline void draw_verteces_and_colors(float width, float height, glfw_state& app_
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	/* this segment actually prints the pointcloud */
+	//auto vertices = points.get_vertices();              // get vertices
 	auto tex_coords = points.get_texture_coordinates(); // and texture coordinates
 	for (int i = 0; i < points.size(); i++)
 	{
-		if (vertices[i].z)
+		if (vertices(2,i))
 		{
 			// upload the point and texture coordinates only for points we have depth data for
-			glVertex3fv(vertices[i]);
+			GLfloat vertex[3] = { vertices(0,i), vertices(1,i), vertices(2,i) };
+			glVertex3fv(vertex);
 			glTexCoord2fv(tex_coords[i]);
 		}
 	}

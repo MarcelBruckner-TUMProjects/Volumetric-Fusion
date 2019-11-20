@@ -134,8 +134,8 @@ int main(int argc, char* argv[]) try {
 	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
 
 	// Calculated relative transformations between cameras per frame
-	std::map<int, Eigen::Matrix4d> relativeTransformations = {
-		{0, Eigen::Matrix4d::Identity()}
+	std::map<int, Eigen::MatrixXd> relativeTransformations = {
+		{0, Eigen::MatrixXd::Identity(4,4)}
 	};
 
 	// Camera calibration thread
@@ -178,7 +178,7 @@ int main(int argc, char* argv[]) try {
 					ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << markerToRelativeTranslation << std::endl << std::endl;
 					ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << markerToRelativeRotation << std::endl << std::endl;
 					ss << "Combined: " << std::endl << relativeTransformation << std::endl;
-					//std::cout << ss.str();
+					std::cout << ss.str();
 				}
 			}
 		}
@@ -276,33 +276,30 @@ int main(int argc, char* argv[]) try {
 					viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
 
 
-					if (i != 0 && relativeTransformations.count(i)) {
-						auto transformedVertex = relativeTransformations[i] * pipelines[i]->data->vertices;
+					if (i == 0 || !relativeTransformations.count(i)) {
+						continue;
 					}
 
-					/*vc::data::cv_extrinsics cv_extrinsics;
-					if (false && loadedExtrinsics) {
-						cv_extrinsics = pipelines[i]->data->camera.cv_extrinsics;
+					auto count = relativeTransformations.count(i);
+					auto rt = relativeTransformations[i];
+					auto vs = pipelines[i]->data->vertices;
+					auto cols = pipelines[i]->data->vertices.cols();
+					auto rows = pipelines[i]->data->vertices.rows();
+					auto cols2 = relativeTransformations[i].cols();
+					auto rows2 = relativeTransformations[i].rows();
+					//Eigen::MatrixXd transformedVertices = relativeTransformations[i].cwiseProduct(pipelines[i]->data->vertices).colwise().sum();
+					//auto transformedVertices = pipelines[i]->data->vertices.transpose().rowwise() * relativeTransformations[i];
+					// (AB)^T = (B^T A^T) => AB = AB^T^T = (B^T A^T)^T
+					Eigen::MatrixXd transformedVertices(4, cols);
+					//= (pipelines[i]->data->vertices.transpose() * relativeTransformations[i].transpose()).transpose();
+					// HOW THE FUCK DOES THIS SYNTAX WORK ffs!"§$"$
+					for (int i = 0; i < cols; ++i) {
+						transformedVertices.col(i) = rt * vs.col(i);
 					}
-					else {
-						cv_extrinsics.rotation = cv::Mat::zeros(3, 1, CV_64F);
-						cv_extrinsics.translation = cv::Mat::zeros(3, 1, CV_64F);
-					}*/
-
-					/*rect r{
-						static_cast<float>(widthHalf * (i % 2)),
-						static_cast<float>(heightHalf - (heightHalf * (i / 2))),
-						static_cast<float>(widthHalf),
-						static_cast<float>(heightHalf)
-					};
-					if (pipelines[i]->data->filteredColorFrames) {
-						draw_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f, cv_extrinsics.rotation, cv_extrinsics.translation, r);
-					}*/
-
 
 					if (pipelines[i]->data->filteredColorFrames) {
 						//draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);;
-						draw_verteces_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);
+						draw_vertices_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, transformedVertices, pipelines[i]->data->filteredColorFrames, 0.2f);
 					}
 					else {
 						draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
