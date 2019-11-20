@@ -9,11 +9,12 @@
 #include <string>
 #include <thread>
 #include <atomic>
+#include <chrono>
 #include "Data.hpp"
 #include "Processing.hpp"
 
 namespace vc::capture {
-		
+
 	/// <summary>
 	/// Base class for capturing devices
 	/// </summary>
@@ -28,8 +29,6 @@ namespace vc::capture {
 		std::shared_ptr < std::atomic_bool> stopped;
 		std::shared_ptr < std::atomic_bool> paused;
 		std::shared_ptr < std::atomic_bool> calibrateCameras;
-
-		int pipelineId;
 
 		std::shared_ptr < std::thread> thread;
 
@@ -54,22 +53,21 @@ namespace vc::capture {
 			this->calibrateCameras->store(calibrate);
 		}
 
-		CaptureDevice(CaptureDevice& other, int pipelineId) {
+		CaptureDevice(CaptureDevice& other) {
 			this->data = other.data;
 			this->processing = other.processing;
 			this->pipeline = other.pipeline;
 			this->cfg = other.cfg;
-			this->pipelineId = pipelineId;
 
 			this->stopped = other.stopped;
 			this->paused = other.paused;
 			this->calibrateCameras = other.calibrateCameras;
 			this->thread = other.thread;
 		}
-				
-		CaptureDevice(rs2::context context, int pipelineId) : pipelineId(pipelineId) {
+
+		CaptureDevice(rs2::context context) {
 			this->data = std::make_shared<vc::data::Data>();
-			this->processing = std::make_shared<vc::processing::Processing>(this->pipelineId);
+			this->processing = std::make_shared<vc::processing::Processing>();
 			this->pipeline = std::make_shared<rs2::pipeline>(context);
 			this->stopped = std::make_shared<std::atomic_bool>(false);
 			this->paused = std::make_shared<std::atomic_bool>(true);
@@ -77,7 +75,7 @@ namespace vc::capture {
 
 			this->thread = std::make_shared<std::thread>(&vc::capture::CaptureDevice::captureThreadFunction, this);
 		}
-		
+
 		void captureThreadFunction() {
 			rs2::align alignToColor(RS2_STREAM_COLOR);
 			processing->startCharucoProcessing(data->camera);
@@ -122,6 +120,36 @@ namespace vc::capture {
 					data->points = data->pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
 					data->colorizedDepthFrames = data->colorizer.process(depthFrame);		// Colorize the depth frame with a color map
 					data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud
+
+					auto startTime = std::chrono::steady_clock::now();
+
+					auto pointCount = data->points.size();
+					auto vertices = data->points.get_vertices();
+					
+					//float* fs = const_cast<float*>(reinterpret_cast<const float*>(vertices));
+
+					//new (&this->data->vertices) Eigen::Map<Eigen::MatrixXf>(fs, 3, pointCount);
+					
+					//Eigen::Map<Eigen::MatrixXf> eigenVertices(fs, 3, pointCount);
+					//this->data->vertices = Eigen::MatrixXd::Ones(4, pointCount);
+					//this->data->vertices.block(0, 0, 3, pointCount) << eigenVertices.cast<double>();
+
+					//this->data->vertices = Eigen::Map<Eigen::MatrixXf>(fs, 3, pointCount);
+
+					data->vertices = Eigen::MatrixXd(4, pointCount);
+					pointCount = pointCount - (pointCount % 5);
+					// 64 KB cache lines, (4+4+4) * 5 = 60;
+					for (int i = 0; i < pointCount; i+= 5) {
+						data->vertices.block(0, i, 4, 5) <<
+							vertices[i + 0].x, vertices[i + 0].y, vertices[i + 0].z, 1,
+							vertices[i + 1].x, vertices[i + 1].y, vertices[i + 1].z, 1,
+							vertices[i + 2].x, vertices[i + 2].y, vertices[i + 2].z, 1,
+							vertices[i + 3].x, vertices[i + 3].y, vertices[i + 3].z, 1,
+							vertices[i + 4].x, vertices[i + 4].y, vertices[i + 4].z, 1;
+					}
+
+					auto endTime = std::chrono::steady_clock::now();
+					std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() << " ms" << std::endl;
 				}
 				catch (const std::exception & e) {
 					std::stringstream stream;
@@ -131,15 +159,15 @@ namespace vc::capture {
 			this->pipeline->stop();
 		}
 	};
-	
+
 	/// <summary>
 	/// A capture device for streaming the live RGB-D data from the device.
 	/// </summary>
 	/// <seealso cref="CaptureDevice" />
 	class StreamingCaptureDevice : public CaptureDevice {
 	public:
-		StreamingCaptureDevice(rs2::context context, rs2::device device, int pipelineId) :
-		CaptureDevice(context, pipelineId)
+		StreamingCaptureDevice(rs2::context context, rs2::device device) :
+			CaptureDevice(context)
 		{
 			data->deviceName = device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
 
@@ -147,30 +175,30 @@ namespace vc::capture {
 			this->cfg.enable_all_streams();
 		}
 	};
-	
+
 	/// <summary>
 	///  A capture device for streaming the live RGB-D data from the device and to record it to a file.
 	/// </summary>
 	/// <seealso cref="StreamingCaptureDevice" />
 	class RecordingCaptureDevice : public StreamingCaptureDevice {
 	public:
-		RecordingCaptureDevice(rs2::context context, rs2::device device, int pipelineId, std::string foldername) :
-			StreamingCaptureDevice(context, device, pipelineId)
+		RecordingCaptureDevice(rs2::context context, rs2::device device, std::string foldername) :
+			StreamingCaptureDevice(context, device)
 		{
 			this->cfg.enable_device(data->deviceName);
 			this->cfg.enable_all_streams();
 			this->cfg.enable_record_to_file(foldername + data->deviceName + ".bag");
 		}
 	};
-	
+
 	/// <summary>
 	///  A capture device for streaming the RGB-D data from a file.
 	/// </summary>
 	/// <seealso cref="CaptureDevice" />
 	class PlayingCaptureDevice : public CaptureDevice {
 	public:
-		PlayingCaptureDevice(rs2::context context, int pipelineId, std::string filename) :
-			CaptureDevice(context, pipelineId)
+		PlayingCaptureDevice(rs2::context context, std::string filename) :
+			CaptureDevice(context)
 		{
 			data->deviceName = filename;
 
