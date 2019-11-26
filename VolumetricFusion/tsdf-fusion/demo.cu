@@ -71,10 +71,10 @@ void Integrate(float* cam_K, float* cam2base, float* depth_im,
 int main(int argc, char* argv[]) {
 
 	// Location of camera intrinsic file
-	std::string cam_K_file = "data/camera-intrinsics.txt";
+	std::string cam_K_file = "data2/camera-intrinsics.txt";
 
 	// Location of folder containing RGB-D frames and camera pose files
-	std::string data_path = "data/rgbd-frames";
+	std::string data_path = "data2/rgbd-frames";
 	int base_frame_idx = 150;
 	int first_frame_idx = 150;
 	float num_frames = 50;
@@ -152,7 +152,8 @@ int main(int argc, char* argv[]) {
 	checkCUDA(__LINE__, cudaGetLastError());
 
 	// Loop through each depth frame and integrate TSDF voxel grid
-	for (int frame_idx = first_frame_idx; frame_idx < first_frame_idx + (int)num_frames; ++frame_idx) {
+	//first_frame_idx + (int)num_frames
+	for (int frame_idx = first_frame_idx; frame_idx < 151; ++frame_idx) {
 
 		std::ostringstream curr_frame_prefix;
 		curr_frame_prefix << std::setw(6) << std::setfill('0') << frame_idx;
