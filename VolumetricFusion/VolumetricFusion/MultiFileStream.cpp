@@ -35,6 +35,7 @@ using namespace vc::enums;
 #include "Settings.hpp"
 #include "Data.hpp"
 #include "CaptureDevice.hpp"
+#include "Rendering.hpp"
 #if APPLE
 #include "FileAccess.hpp"
 #include <glut.h>
@@ -61,7 +62,7 @@ int main(int argc, char* argv[]) try {
 
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "allCameras/";
-	vc::settings::State state = vc::settings::State(CaptureState::PLAYING);
+	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
 
 	// Create a simple OpenGL window for rendering:
 	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
@@ -80,8 +81,7 @@ int main(int argc, char* argv[]) try {
 	viewOrientation.offset_x = 2.0;
 	viewOrientation.offset_y = -2.0;
 
-
-	/*Do this early in your program's initialization */
+	//vc::rendering::Rendering rendering(app, viewOrientation);
 
 	rs2::context ctx; // Create librealsense context for managing devices
 	//std::vector<vc::data::Data> datas;
@@ -115,7 +115,6 @@ int main(int argc, char* argv[]) try {
 			pipelines.emplace_back(std::make_shared < vc::capture::PlayingCaptureDevice>(ctx, filenames[i]));
 		}
 	}
-
 
 	if (pipelines.size() <= 0) {
 		throw(rs2::error("No device or file found!"));
@@ -158,17 +157,22 @@ int main(int argc, char* argv[]) try {
 
 			for (int i = 1; i < pipelines.size(); i++) {
 				{
-					if (!pipelines[0]->processing->hasMarkersDetected || !pipelines[i]->processing->hasMarkersDetected) {
+					//if (!pipelines[0]->processing->hasMarkersDetected || !pipelines[i]->processing->hasMarkersDetected) {
+					if (!pipelines[i]->processing->hasMarkersDetected) {
 						continue;
 					}
 
-					Eigen::Matrix4d baseToMarkerTranslation = pipelines[0]->processing->translation;
-					Eigen::Matrix4d baseToMarkerRotation = pipelines[0]->processing->rotation;
+					Eigen::Matrix4d baseToMarkerTranslation = pipelines[i == 0 ? 1 : 0]->processing->translation;
+					Eigen::Matrix4d baseToMarkerRotation = pipelines[i == 0 ? 1 : 0]->processing->rotation;
 
 					Eigen::Matrix4d markerToRelativeTranslation = pipelines[i]->processing->translation.inverse();
 					Eigen::Matrix4d markerToRelativeRotation = pipelines[i]->processing->rotation.inverse();
 
-					Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
+					//Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
+					Eigen::Matrix4d relativeTransformation = (
+						markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation
+						//markerToRelativeTranslation * markerToRelativeRotation
+					);
 
 					relativeTransformations[i] = relativeTransformation;
 
@@ -209,7 +213,7 @@ int main(int argc, char* argv[]) try {
 			}
 		}
 
-		//		addSaveFramesButton(folderSettings.capturesFolder, pipelines, colorizedDepthFrames, points);
+		// addSaveFramesButton(folderSettings.capturesFolder, pipelines, colorizedDepthFrames, points);
 		if (state.renderState == RenderState::MULTI_POINTCLOUD) {
 			//addAlignPointCloudsButton(paused, points);
 		}
@@ -262,6 +266,7 @@ int main(int argc, char* argv[]) try {
 
 		case RenderState::CALIBRATED_POINTCLOUD:
 		{
+			if (!calibrateCameras)
 			if (isRetinaDisplay) {
 				glViewport(0, 0, width * 2, height * 2);
 			}
@@ -272,41 +277,50 @@ int main(int argc, char* argv[]) try {
 			// Draw the pointclouds
 			for (int i = 0; i < pipelines.size() && i < 4; ++i)
 			{
-				if (pipelines[i]->data->colorizedDepthFrames && pipelines[i]->data->points) {
+				auto data = pipelines[i]->data;
+				if (data->colorizedDepthFrames && data->points) {
 					viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
 
 
-					if (i == 0 || !relativeTransformations.count(i)) {
+					if (!relativeTransformations.count(i)) {
 						continue;
 					}
 
 					auto count = relativeTransformations.count(i);
 					auto rt = relativeTransformations[i];
-					auto vs = pipelines[i]->data->vertices;
-					auto cols = pipelines[i]->data->vertices.cols();
-					auto rows = pipelines[i]->data->vertices.rows();
+					auto vs = data->vertices;
+					auto cols = data->vertices.cols();
+					auto rows = data->vertices.rows();
 					auto cols2 = relativeTransformations[i].cols();
 					auto rows2 = relativeTransformations[i].rows();
 					//Eigen::MatrixXd transformedVertices = relativeTransformations[i].cwiseProduct(pipelines[i]->data->vertices).colwise().sum();
 					//auto transformedVertices = pipelines[i]->data->vertices.transpose().rowwise() * relativeTransformations[i];
 					// (AB)^T = (B^T A^T) => AB = AB^T^T = (B^T A^T)^T
-					Eigen::MatrixXd transformedVertices(4, cols);
+					//Eigen::MatrixXd transformedVertices(4, cols);
 					//= (pipelines[i]->data->vertices.transpose() * relativeTransformations[i].transpose()).transpose();
 					// HOW THE FUCK DOES THIS SYNTAX WORK ffs!"§$"$
-					for (int i = 0; i < cols; ++i) {
+					/*for (int i = 0; i < cols; ++i) {
 						transformedVertices.col(i) = rt * vs.col(i);
-					}
+					}*/
 
-					if (pipelines[i]->data->filteredColorFrames) {
+					if (data->filteredColorFrames) {
 						//draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);;
-						draw_vertices_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, transformedVertices, pipelines[i]->data->filteredColorFrames, 0.2f);
+						//draw_vertices_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, transformedVertices, pipelines[i]->data->filteredColorFrames, 0.2f);
+						vc::rendering::draw_vertices_and_colors(
+							widthHalf, heightHalf, viewOrientation, 
+							data->points,
+							data->filteredColorFrames,
+							relativeTransformations[i]
+						);
 					}
 					else {
 						draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
 					}
+					//rendering->test();
 
 					if (pipelines.size()) {
-						draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
+						//draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
+						vc::rendering::draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation, relativeTransformations[i]);
 					}
 
 					//relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;

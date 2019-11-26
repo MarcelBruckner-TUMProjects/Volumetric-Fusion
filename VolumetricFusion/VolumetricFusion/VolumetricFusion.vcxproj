@@ -39,6 +39,7 @@
     <ClInclude Include="MultiFileStream.h" />
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Recorder.h" />
+    <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

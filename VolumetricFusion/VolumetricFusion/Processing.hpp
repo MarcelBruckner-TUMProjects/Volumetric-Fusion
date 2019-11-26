@@ -67,7 +67,7 @@ namespace vc::processing {
 
 	//template<typename F>
 	//rs2::processing_block createDepthProcessingBlock(F& lambda, int frame_id=-1) {
-	//	// Don't bother the magic numbers, they describe the image channels
+	//	gl// Don't bother the magic numbers, they describe the image channels
 	//	return createProcessingBlock(lambda, CV_8UC1, 2);
 	//}
 

@@ -136,7 +136,7 @@ namespace vc::capture {
 
 					//this->data->vertices = Eigen::Map<Eigen::MatrixXf>(fs, 3, pointCount);
 
-					data->vertices = Eigen::MatrixXd(4, pointCount);
+					/*data->vertices = Eigen::MatrixXd(4, pointCount);
 					pointCount = pointCount - (pointCount % 5);
 					// 64 KB cache lines, (4+4+4) * 5 = 60;
 					for (int i = 0; i < pointCount; i+= 5) {
@@ -146,7 +146,7 @@ namespace vc::capture {
 							vertices[i + 2].x, vertices[i + 2].y, vertices[i + 2].z, 1,
 							vertices[i + 3].x, vertices[i + 3].y, vertices[i + 3].z, 1,
 							vertices[i + 4].x, vertices[i + 4].y, vertices[i + 4].z, 1;
-					}
+					}*/
 
 					auto endTime = std::chrono::steady_clock::now();
 					std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() << " ms" << std::endl;
