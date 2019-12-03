@@ -165,13 +165,15 @@ int main(int argc, char* argv[]) try {
 					Eigen::Matrix4d baseToMarkerTranslation = pipelines[i == 0 ? 1 : 0]->processing->translation;
 					Eigen::Matrix4d baseToMarkerRotation = pipelines[i == 0 ? 1 : 0]->processing->rotation;
 
-					Eigen::Matrix4d markerToRelativeTranslation = pipelines[i]->processing->translation.inverse();
-					Eigen::Matrix4d markerToRelativeRotation = pipelines[i]->processing->rotation.inverse();
+                    //Eigen::Matrix4d markerToRelativeTranslation = pipelines[i]->processing->translation.inverse();
+                    //Eigen::Matrix4d markerToRelativeRotation = pipelines[i]->processing->rotation.inverse();
+                    Eigen::Matrix4d markerToRelativeTranslation = pipelines[i]->processing->translation;
+                    Eigen::Matrix4d markerToRelativeRotation = pipelines[i]->processing->rotation;
 
 					//Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
 					Eigen::Matrix4d relativeTransformation = (
-						markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation
-						//markerToRelativeTranslation * markerToRelativeRotation
+						//markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation
+						(markerToRelativeTranslation * markerToRelativeRotation).inverse() * baseToMarkerTranslation * baseToMarkerRotation
 					);
 
 					relativeTransformations[i] = relativeTransformation;
@@ -257,7 +259,7 @@ int main(int argc, char* argv[]) try {
 					}
 
 					if (pipelines.size()) {
-						draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
+						//draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
 					}
 				}
 			}
@@ -275,15 +277,16 @@ int main(int argc, char* argv[]) try {
 			}
 
 			// Draw the pointclouds
-			for (int i = 0; i < pipelines.size() && i < 4; ++i)
+			int i = 0;
+			for (; i < pipelines.size() && i < 4; ++i)
 			{
 				auto data = pipelines[i]->data;
 				if (data->colorizedDepthFrames && data->points) {
-					viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
+					//viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
 
 
 					if (!relativeTransformations.count(i)) {
-						continue;
+						break;
 					}
 
 					auto count = relativeTransformations.count(i);
@@ -293,12 +296,13 @@ int main(int argc, char* argv[]) try {
 					auto rows = data->vertices.rows();
 					auto cols2 = relativeTransformations[i].cols();
 					auto rows2 = relativeTransformations[i].rows();
+                    continue;
 					//Eigen::MatrixXd transformedVertices = relativeTransformations[i].cwiseProduct(pipelines[i]->data->vertices).colwise().sum();
 					//auto transformedVertices = pipelines[i]->data->vertices.transpose().rowwise() * relativeTransformations[i];
 					// (AB)^T = (B^T A^T) => AB = AB^T^T = (B^T A^T)^T
 					//Eigen::MatrixXd transformedVertices(4, cols);
 					//= (pipelines[i]->data->vertices.transpose() * relativeTransformations[i].transpose()).transpose();
-					// HOW THE FUCK DOES THIS SYNTAX WORK ffs!"§$"$
+					// HOW THE FUCK DOES THIS SYNTAX WORK ffs!"ï¿½$"$
 					/*for (int i = 0; i < cols; ++i) {
 						transformedVertices.col(i) = rt * vs.col(i);
 					}*/
@@ -307,25 +311,33 @@ int main(int argc, char* argv[]) try {
 						//draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);;
 						//draw_vertices_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, transformedVertices, pipelines[i]->data->filteredColorFrames, 0.2f);
 						vc::rendering::draw_vertices_and_colors(
-							widthHalf, heightHalf, viewOrientation, 
+							widthHalf, heightHalf,
+							viewOrientation,
 							data->points,
 							data->filteredColorFrames,
 							relativeTransformations[i]
 						);
 					}
-					else {
-						draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
-					}
+					//else {
+					//	draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
+					//}
 					//rendering->test();
 
-					if (pipelines.size()) {
+					//if (pipelines.size()) {
 						//draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
-						vc::rendering::draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation, relativeTransformations[i]);
-					}
+						//vc::rendering::draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation, relativeTransformations[i]);
+					//}
 
 					//relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
 				}
 			}
+
+            vc::rendering::draw_all_vertices_and_colors(
+                    widthHalf, heightHalf,
+                    viewOrientation,
+                    pipelines,
+                    relativeTransformations
+            );
 		}
 		break;
 

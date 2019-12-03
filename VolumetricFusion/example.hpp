@@ -984,7 +984,8 @@ inline void draw_vertices_and_colors(float width, float height, glfw_state& app_
 		if (vertices(2,i))
 		{
 			// upload the point and texture coordinates only for points we have depth data for
-			GLfloat vertex[3] = { vertices(0,i), vertices(1,i), vertices(2,i) };
+			GLfloat vertex[3] = {
+                    static_cast<GLfloat>(vertices(0,i)), static_cast<GLfloat>(vertices(1,i)), static_cast<GLfloat>(vertices(2,i)) };
 			glVertex3fv(vertex);
 			glTexCoord2fv(tex_coords[i]);
 		}
