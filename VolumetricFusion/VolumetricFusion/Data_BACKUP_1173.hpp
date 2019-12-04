@@ -69,8 +69,12 @@ namespace vc::data {
 		rs2::frame colorizedDepthFrames;
 		rs2::points points;
 
+<<<<<<< HEAD
+        Eigen::Matrix4Xd vertices;
+=======
 		Eigen::MatrixXd vertices;
 		//Eigen::Map<Eigen::MatrixXf> *vertices;
+>>>>>>> kevin
 
 		Camera camera;
 		vc::processing::Processing* processing;
@@ -92,4 +96,10 @@ namespace vc::data {
 		}
 	};
 }
+<<<<<<< HEAD
+
+#endif // !_DATA_HEADER_
+=======
+>>>>>>> kevin
+
 #endif // !_DATA_HEADER_

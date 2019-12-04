@@ -35,6 +35,7 @@ using namespace vc::enums;
 #include "Settings.hpp"
 #include "Data.hpp"
 #include "CaptureDevice.hpp"
+#include "Rendering.hpp"
 #if APPLE
 #include "FileAccess.hpp"
 #include <glut.h>
@@ -61,7 +62,7 @@ int main(int argc, char* argv[]) try {
 
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "allCameras/";
-	vc::settings::State state = vc::settings::State(CaptureState::PLAYING);
+	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::MULTI_POINTCLOUD);
 
 	// Create a simple OpenGL window for rendering:
 	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
@@ -80,8 +81,7 @@ int main(int argc, char* argv[]) try {
 	viewOrientation.offset_x = 2.0;
 	viewOrientation.offset_y = -2.0;
 
-
-	/*Do this early in your program's initialization */
+	//vc::rendering::Rendering rendering(app, viewOrientation);
 
 	rs2::context ctx; // Create librealsense context for managing devices
 	//std::vector<vc::data::Data> datas;
@@ -116,7 +116,6 @@ int main(int argc, char* argv[]) try {
 		}
 	}
 
-
 	if (pipelines.size() <= 0) {
 		throw(rs2::error("No device or file found!"));
 	}
@@ -134,8 +133,8 @@ int main(int argc, char* argv[]) try {
 	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
 
 	// Calculated relative transformations between cameras per frame
-	std::map<int, Eigen::Matrix4d> relativeTransformations = {
-		{0, Eigen::Matrix4d::Identity()}
+	std::map<int, Eigen::MatrixXd> relativeTransformations = {
+		{0, Eigen::MatrixXd::Identity(4,4)}
 	};
 
 	// Camera calibration thread
@@ -158,27 +157,34 @@ int main(int argc, char* argv[]) try {
 
 			for (int i = 1; i < pipelines.size(); i++) {
 				{
-					if (!pipelines[0]->processing->hasMarkersDetected || !pipelines[i]->processing->hasMarkersDetected) {
+					//if (!pipelines[0]->processing->hasMarkersDetected || !pipelines[i]->processing->hasMarkersDetected) {
+					if (!pipelines[i]->processing->hasMarkersDetected) {
 						continue;
 					}
 
-					Eigen::Matrix4d baseToMarkerTranslation = pipelines[0]->processing->translation;
-					Eigen::Matrix4d baseToMarkerRotation = pipelines[0]->processing->rotation;
+					Eigen::Matrix4d baseToMarkerTranslation = pipelines[i == 0 ? 1 : 0]->processing->translation;
+					Eigen::Matrix4d baseToMarkerRotation = pipelines[i == 0 ? 1 : 0]->processing->rotation;
 
-					Eigen::Matrix4d markerToRelativeTranslation = pipelines[i]->processing->translation.inverse();
-					Eigen::Matrix4d markerToRelativeRotation = pipelines[i]->processing->rotation.inverse();
+                    //Eigen::Matrix4d markerToRelativeTranslation = pipelines[i]->processing->translation.inverse();
+                    //Eigen::Matrix4d markerToRelativeRotation = pipelines[i]->processing->rotation.inverse();
+                    Eigen::Matrix4d markerToRelativeTranslation = pipelines[i]->processing->translation;
+                    Eigen::Matrix4d markerToRelativeRotation = pipelines[i]->processing->rotation;
 
-					Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
+					//Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
+					Eigen::Matrix4d relativeTransformation = (
+						//markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation
+						(markerToRelativeTranslation * markerToRelativeRotation).inverse() * baseToMarkerTranslation * baseToMarkerRotation
+					);
 
 					relativeTransformations[i] = relativeTransformation;
 
-					std::stringstream ss;
+				/*	std::stringstream ss;
 					ss << "************************************************************************************" << std::endl;
 					ss << "Devices " << i << ", " << i << std::endl << std::endl;
-ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << markerToRelativeTranslation << std::endl << std::endl;
-ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << markerToRelativeRotation << std::endl << std::endl;
-ss << "Combined: " << std::endl << relativeTransformation << std::endl;
-std::cout << ss.str();
+					ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << markerToRelativeTranslation << std::endl << std::endl;
+					ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << markerToRelativeRotation << std::endl << std::endl;
+					ss << "Combined: " << std::endl << relativeTransformation << std::endl;
+					std::cout << ss.str();*/
 				}
 			}
 		}
@@ -209,7 +215,7 @@ std::cout << ss.str();
 			}
 		}
 
-		//		addSaveFramesButton(folderSettings.capturesFolder, pipelines, colorizedDepthFrames, points);
+		// addSaveFramesButton(folderSettings.capturesFolder, pipelines, colorizedDepthFrames, points);
 		if (state.renderState == RenderState::MULTI_POINTCLOUD) {
 			//addAlignPointCloudsButton(paused, points);
 		}
@@ -253,8 +259,10 @@ std::cout << ss.str();
 					}
 
 					if (pipelines.size()) {
-						draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
+						//draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
 					}
+
+					//relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
 				}
 			}
 		}
@@ -262,6 +270,7 @@ std::cout << ss.str();
 
 		case RenderState::CALIBRATED_POINTCLOUD:
 		{
+			if (!calibrateCameras)
 			if (isRetinaDisplay) {
 				glViewport(0, 0, width * 2, height * 2);
 			}
@@ -270,50 +279,67 @@ std::cout << ss.str();
 			}
 
 			// Draw the pointclouds
-			for (int i = 0; i < pipelines.size() && i < 4; ++i)
+			int i = 0;
+			for (; i < pipelines.size() && i < 4; ++i)
 			{
-				if (pipelines[i]->data->colorizedDepthFrames && pipelines[i]->data->points) {
-					viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
+				auto data = pipelines[i]->data;
+				if (data->colorizedDepthFrames && data->points) {
+					//viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
 
-					
-					if (i != 0 && relativeTransformations.count(i)) {
-                        auto transformedVertex = relativeTransformations[i] * pipelines[i]->data->vertices;
+
+					if (!relativeTransformations.count(i)) {
+						break;
 					}
 
-					/*vc::data::cv_extrinsics cv_extrinsics;
-					if (false && loadedExtrinsics) {
-						cv_extrinsics = pipelines[i]->data->camera.cv_extrinsics;
-					}
-					else {
-						cv_extrinsics.rotation = cv::Mat::zeros(3, 1, CV_64F);
-						cv_extrinsics.translation = cv::Mat::zeros(3, 1, CV_64F);
+					auto count = relativeTransformations.count(i);
+					auto rt = relativeTransformations[i];
+					auto vs = data->vertices;
+					auto cols = data->vertices.cols();
+					auto rows = data->vertices.rows();
+					auto cols2 = relativeTransformations[i].cols();
+					auto rows2 = relativeTransformations[i].rows();
+                    continue;
+					//Eigen::MatrixXd transformedVertices = relativeTransformations[i].cwiseProduct(pipelines[i]->data->vertices).colwise().sum();
+					//auto transformedVertices = pipelines[i]->data->vertices.transpose().rowwise() * relativeTransformations[i];
+					// (AB)^T = (B^T A^T) => AB = AB^T^T = (B^T A^T)^T
+					//Eigen::MatrixXd transformedVertices(4, cols);
+					//= (pipelines[i]->data->vertices.transpose() * relativeTransformations[i].transpose()).transpose();
+					// HOW THE FUCK DOES THIS SYNTAX WORK ffs!"�$"$
+					/*for (int i = 0; i < cols; ++i) {
+						transformedVertices.col(i) = rt * vs.col(i);
 					}*/
 
-					/*rect r{
-						static_cast<float>(widthHalf * (i % 2)),
-						static_cast<float>(heightHalf - (heightHalf * (i / 2))),
-						static_cast<float>(widthHalf),
-						static_cast<float>(heightHalf)
-					};
-					if (pipelines[i]->data->filteredColorFrames) {
-						draw_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f, cv_extrinsics.rotation, cv_extrinsics.translation, r);
-					}*/
-
-
-					if (pipelines[i]->data->filteredColorFrames) {
-						draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);// , cv_extrinsics.rotation, cv_extrinsics.translation);
+					if (data->filteredColorFrames) {
+						//draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);;
+						//draw_vertices_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, transformedVertices, pipelines[i]->data->filteredColorFrames, 0.2f);
+						vc::rendering::draw_vertices_and_colors(
+							widthHalf, heightHalf,
+							viewOrientation,
+							data->points,
+							data->filteredColorFrames,
+							relativeTransformations[i]
+						);
 					}
-					else {
-						draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
-					}
+					//else {
+					//	draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
+					//}
+					//rendering->test();
 
-					if (pipelines.size()) {
-						draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
-					}
+					//if (pipelines.size()) {
+						//draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
+						//vc::rendering::draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation, relativeTransformations[i]);
+					//}
 
 					//relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
 				}
 			}
+
+            vc::rendering::draw_all_vertices_and_colors(
+                    widthHalf, heightHalf,
+                    viewOrientation,
+                    pipelines,
+                    relativeTransformations
+            );
 		}
 		break;
 
@@ -378,13 +404,13 @@ std::cout << ss.str();
 #pragma region Error handling
 catch (const rs2::error & e)
 {
-    std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
-    return EXIT_FAILURE;
+	std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
+	return EXIT_FAILURE;
 }
-catch (const std::exception& e)
+catch (const std::exception & e)
 {
-    std::cerr << e.what() << std::endl;
-    return EXIT_FAILURE;
+	std::cerr << e.what() << std::endl;
+	return EXIT_FAILURE;
 }
 #pragma endregion
 

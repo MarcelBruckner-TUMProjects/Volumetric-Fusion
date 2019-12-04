@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-namespace vc::enums{
+namespace vc::enums {
 	enum class RenderState {
 		MULTI_POINTCLOUD,
 		CALIBRATED_POINTCLOUD,

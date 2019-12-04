@@ -67,7 +67,7 @@ namespace vc::processing {
 
 	//template<typename F>
 	//rs2::processing_block createDepthProcessingBlock(F& lambda, int frame_id=-1) {
-	//	// Don't bother the magic numbers, they describe the image channels
+	//	gl// Don't bother the magic numbers, they describe the image channels
 	//	return createProcessingBlock(lambda, CV_8UC1, 2);
 	//}
 
@@ -92,7 +92,6 @@ namespace vc::processing {
 		std::vector<int> charucoIdBuffers;
 		Eigen::Matrix4d rotation;
 		Eigen::Matrix4d translation;
-		
 		void startCharucoProcessing(vc::data::Camera& camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
