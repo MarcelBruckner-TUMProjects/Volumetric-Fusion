@@ -89,6 +89,10 @@ namespace vc::rendering {
             auto color_frame = pipelines[i]->data->filteredColorFrames;
             auto points = pipelines[i]->data->points;
 
+			if (color_frame == NULL || points == NULL) {
+				continue;
+			}
+
             const double* tdata = transformation.data();
             glLoadMatrixd(tdata);
 
@@ -106,7 +110,6 @@ namespace vc::rendering {
             glBindTexture(GL_TEXTURE_2D, app_state.tex.get_gl_handle());
 
             // print cube at center
-
 
             // print the colors
             auto format = color_frame.get_profile().format();
@@ -145,6 +148,7 @@ namespace vc::rendering {
             /* this segment actually prints the pointcloud */
             auto vertices = points.get_vertices();              // get vertices
             auto tex_coords = points.get_texture_coordinates(); // and texture coordinates
+		
             for (int i = 0; i < points.size(); i++)
             {
                 if (vertices[i].z)

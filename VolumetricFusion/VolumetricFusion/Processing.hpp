@@ -144,7 +144,6 @@ namespace vc::processing {
 				}
 			};
 
-
 			charucoProcessingBlocks = std::make_shared<rs2::processing_block>(vc::processing::createColorProcessingBlock(charucoPoseEstimation));
 			charucoProcessingBlocks->start(charucoProcessingQueues); // Bind output of the processing block to be enqueued into the queue
 		}

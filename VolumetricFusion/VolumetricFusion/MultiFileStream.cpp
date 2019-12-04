@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) try {
 
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "allCameras/";
-	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::MULTI_POINTCLOUD);
+	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
 
 	// Create a simple OpenGL window for rendering:
 	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
@@ -133,9 +133,7 @@ int main(int argc, char* argv[]) try {
 	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
 
 	// Calculated relative transformations between cameras per frame
-	std::map<int, Eigen::MatrixXd> relativeTransformations = {
-		{0, Eigen::MatrixXd::Identity(4,4)}
-	};
+	std::map<int, Eigen::MatrixXd> relativeTransformations;
 
 	// Camera calibration thread
 	std::thread calibrationThread;
@@ -145,6 +143,7 @@ int main(int argc, char* argv[]) try {
 		pipelines[i]->startPipeline();
 		pipelines[i]->resumeThread();
 		pipelines[i]->calibrate(calibrateCameras);
+		relativeTransformations[i] = Eigen::MatrixXd::Identity(4,4);
 	}
 
 #pragma region Camera Calibration Thread
@@ -270,68 +269,14 @@ int main(int argc, char* argv[]) try {
 
 		case RenderState::CALIBRATED_POINTCLOUD:
 		{
-			if (!calibrateCameras)
+			if (!calibrateCameras) {
+
+			}
 			if (isRetinaDisplay) {
 				glViewport(0, 0, width * 2, height * 2);
 			}
 			else {
 				glViewport(0, 0, width, height);
-			}
-
-			// Draw the pointclouds
-			int i = 0;
-			for (; i < pipelines.size() && i < 4; ++i)
-			{
-				auto data = pipelines[i]->data;
-				if (data->colorizedDepthFrames && data->points) {
-					//viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
-
-
-					if (!relativeTransformations.count(i)) {
-						break;
-					}
-
-					auto count = relativeTransformations.count(i);
-					auto rt = relativeTransformations[i];
-					auto vs = data->vertices;
-					auto cols = data->vertices.cols();
-					auto rows = data->vertices.rows();
-					auto cols2 = relativeTransformations[i].cols();
-					auto rows2 = relativeTransformations[i].rows();
-                    continue;
-					//Eigen::MatrixXd transformedVertices = relativeTransformations[i].cwiseProduct(pipelines[i]->data->vertices).colwise().sum();
-					//auto transformedVertices = pipelines[i]->data->vertices.transpose().rowwise() * relativeTransformations[i];
-					// (AB)^T = (B^T A^T) => AB = AB^T^T = (B^T A^T)^T
-					//Eigen::MatrixXd transformedVertices(4, cols);
-					//= (pipelines[i]->data->vertices.transpose() * relativeTransformations[i].transpose()).transpose();
-					// HOW THE FUCK DOES THIS SYNTAX WORK ffs!"�$"$
-					/*for (int i = 0; i < cols; ++i) {
-						transformedVertices.col(i) = rt * vs.col(i);
-					}*/
-
-					if (data->filteredColorFrames) {
-						//draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);;
-						//draw_vertices_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, transformedVertices, pipelines[i]->data->filteredColorFrames, 0.2f);
-						vc::rendering::draw_vertices_and_colors(
-							widthHalf, heightHalf,
-							viewOrientation,
-							data->points,
-							data->filteredColorFrames,
-							relativeTransformations[i]
-						);
-					}
-					//else {
-					//	draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
-					//}
-					//rendering->test();
-
-					//if (pipelines.size()) {
-						//draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
-						//vc::rendering::draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation, relativeTransformations[i]);
-					//}
-
-					//relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
-				}
 			}
 
             vc::rendering::draw_all_vertices_and_colors(
