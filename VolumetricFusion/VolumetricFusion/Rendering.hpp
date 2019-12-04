@@ -72,13 +72,17 @@ namespace vc::rendering {
         glLoadIdentity();
         glPushAttrib(GL_ALL_ATTRIB_BITS);
 
-        glClearColor(153.f / 255, 153.f / 255, 153.f / 255, 1);
+        glClearColor(0.5f, 0.5f, 0.5f , 1); 
+		glClear(GL_COLOR_BUFFER_BIT);
         glClear(GL_DEPTH_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
 
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
         gluPerspective(60, width / height, 0.01f, 10.0f);
+
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
 
         for (int i = 0; i < pipelines.size(); ++i) {
             auto transformation = relativeTransformations[i];
@@ -88,14 +92,12 @@ namespace vc::rendering {
             const double* tdata = transformation.data();
             glLoadMatrixd(tdata);
 
-            glMatrixMode(GL_MODELVIEW);
-            glPushMatrix();
-            gluLookAt(0, 0, 0, 0, 0, 1, 0, -1, 0);
+			gluLookAt(0, 0, 0, 0, 0, 1, 0, -1, 0);
 
-            glTranslatef(0, 0, +0.5f + app_state.offset_y * 0.05f);
-            glRotated(app_state.pitch, 1, 0, 0);
-            glRotated(app_state.yaw, 0, 1, 0);
-            glTranslatef(0, 0, -0.5f);
+			glTranslatef(0, 0, +0.5f + app_state.offset_y * 0.05f);
+			glRotated(app_state.pitch, 1, 0, 0);
+			glRotated(app_state.yaw, 0, 1, 0);
+			glTranslatef(0, 0, -0.5f);
 
             glPointSize(width / 640);
             glColor4f(1.0f, 1.0f, 1.0f, 1.0f);

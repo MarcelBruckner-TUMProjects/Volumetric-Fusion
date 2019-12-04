@@ -121,7 +121,7 @@ namespace vc::capture {
 					data->colorizedDepthFrames = data->colorizer.process(depthFrame);		// Colorize the depth frame with a color map
 					data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud
 
-					auto startTime = std::chrono::steady_clock::now();
+					//auto startTime = std::chrono::steady_clock::now();
 
 					auto pointCount = data->points.size();
 					auto vertices = data->points.get_vertices();
@@ -148,8 +148,8 @@ namespace vc::capture {
 							vertices[i + 4].x, vertices[i + 4].y, vertices[i + 4].z, 1;
 					}*/
 
-					auto endTime = std::chrono::steady_clock::now();
-					std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() << " ms" << std::endl;
+					//auto endTime = std::chrono::steady_clock::now();
+					//std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() << " ms" << std::endl;
 				}
 				catch (const std::exception & e) {
 					std::stringstream stream;
