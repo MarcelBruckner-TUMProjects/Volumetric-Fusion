@@ -123,8 +123,8 @@ namespace vc::capture {
 
 					//auto startTime = std::chrono::steady_clock::now();
 
-					auto pointCount = data->points.size();
-					auto vertices = data->points.get_vertices();
+					//auto pointCount = data->points.size();
+					//auto vertices = data->points.get_vertices();
 					
 					//float* fs = const_cast<float*>(reinterpret_cast<const float*>(vertices));
 

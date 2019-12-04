@@ -107,7 +107,9 @@ namespace vc::rendering {
             glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
             //glEnable(GL_DEPTH_TEST);
             glEnable(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D, app_state.tex.get_gl_handle());
+			GLuint texPtr;
+			glGenTextures(1, &texPtr);
+			glBindTexture(GL_TEXTURE_2D, color_frame); // app_state.tex.get_gl_handle());
 
             // print cube at center
 
@@ -143,7 +145,7 @@ namespace vc::rendering {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
             glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-            glBindTexture(GL_TEXTURE_2D, 0);
+            
 
             /* this segment actually prints the pointcloud */
             auto vertices = points.get_vertices();              // get vertices
@@ -159,6 +161,8 @@ namespace vc::rendering {
                 }
             }
             glPopMatrix();
+
+			glBindTexture(GL_TEXTURE_2D, 0);
         }
 
         // OpenGL cleanup
