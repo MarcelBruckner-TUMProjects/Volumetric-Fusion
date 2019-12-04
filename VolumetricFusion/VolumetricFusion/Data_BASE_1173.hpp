@@ -46,7 +46,7 @@ namespace vc::data {
 #endif
 	const size_t IMU_FRAME_WIDTH = 1280;
 	const size_t IMU_FRAME_HEIGHT = 720;
-
+	
 	class Camera {
 	public:
 		// Pose estimation camera stuff
@@ -69,13 +69,11 @@ namespace vc::data {
 		rs2::frame colorizedDepthFrames;
 		rs2::points points;
 
-		Eigen::MatrixXd vertices;
-		//Eigen::Map<Eigen::MatrixXf> *vertices;
-
 		Camera camera;
 		vc::processing::Processing* processing;
 
-		Data() {}
+		Data() {
+		}
 
 		// TODO maybe more mvvc
 		void setIntrinsics(rs2_intrinsics intrinsics) {
@@ -93,3 +91,4 @@ namespace vc::data {
 	};
 }
 #endif // !_DATA_HEADER_
+

@@ -92,4 +92,5 @@ namespace vc::data {
 		}
 	};
 }
+
 #endif // !_DATA_HEADER_
