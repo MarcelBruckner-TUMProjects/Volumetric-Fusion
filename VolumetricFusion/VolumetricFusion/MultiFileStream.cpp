@@ -19,14 +19,12 @@
 #include <atomic>
 #include <filesystem>
 
-
-#include <GL/glew.h>
-#include <GL/GL.h>
-#include <GL/GLU.h>
-
-#define GL_SILENCE_DEPRECATION
+//#define GL_SILENCE_DEPRECATION
 #define GLFW_INCLUDE_GLU
-#include <GLFW/glfw3.h>
+
+#include <glad/glad.h>
+//#include <GL/glew.h>
+#include <GLFW/glfw3.h> // glfw_state
 
 #include <imgui.h>
 #include "imgui_impl_glfw.h"
@@ -72,17 +70,20 @@ int main(int argc, char* argv[]) try {
 	folderSettings.recordingsFolder = "allCameras/";
 	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
 
+	float screenWidth = 1280;
+	float screenHeight = 960;
+
 	// Create a simple OpenGL window for rendering:
-	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
+	window app(screenWidth, screenHeight, "VolumetricFusion - MultiStreamViewer");
 
 	ImGui_ImplGlfw_Init(app, false);
 
-	// Construct an object to manage view state
+	// Construct an object to manage view 
 	glfw_state viewOrientation;
 	// Let the user control and manipulate the scenery orientation
 	register_glfw_callbacks(app, viewOrientation);
 
-	vc::rendering::Rendering *rendering = new vc::rendering::Rendering(&viewOrientation);
+	vc::rendering::Rendering *rendering = new vc::rendering::Rendering(screenWidth, screenHeight, &viewOrientation);
 
 	viewOrientation.yaw = -2.6;
 	viewOrientation.pitch = 0.8;
