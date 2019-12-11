@@ -9,11 +9,7 @@
 
 #include <librealsense2/rs.hpp>
 
-//#include <GLFW/glfw3.h>
-
 #define GL_GLEXT_PROTOTYPES
-
-//#include <GL/GL.h>
 
 #include <librealsense2/rs.hpp> 
 
@@ -25,7 +21,7 @@ namespace vc::rendering {
 
 	class Rendering {
 	private:
-		GLFWwindow* window;
+		GLFWwindow* window = nullptr;
 		glfw_state* app_state;
 
 		void gl_render_cube(float width, float height, float x, float y, float z) {
@@ -33,30 +29,142 @@ namespace vc::rendering {
 		}
 
 	public:
-		Rendering(GLFWwindow *window, glfw_state* app_sate)
-			: window(window), app_state(app_state)
+		Rendering(glfw_state* app_sate)
+			: app_state(app_state)
 		{
+			GLenum err = glewInit();
+			if (GLEW_OK != err) {
+				fprintf(stderr, "Error initializing GLEW: %s\n", glewGetErrorString(err));
+			}
+
+			const GLubyte* renderer = glGetString(GL_RENDERER);
+			const GLubyte* vendor = glGetString(GL_VENDOR);
+			const GLubyte* version = glGetString(GL_VERSION);
+			const GLubyte* glslVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
+			GLint major, minor;
+			glGetIntegerv(GL_MAJOR_VERSION, &major);
+			glGetIntegerv(GL_MINOR_VERSION, &minor);
+			printf("GL Vendor : %s\n", vendor);
+			printf("GL Renderer : %s\n", renderer);
+			printf("GL Version (string) : %s\n", version);
+			printf("GL Version (integer) : %d.%d\n", major, minor);
+			printf("GLSL Version : %s\n", glslVersion);
+
 		}
 
-		void test() {
-			glPushMatrix();
+		void opengl4_draw_all_vertices_and_colors(
+			float width, float height,
+			glfw_state& app_state,
+			std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines,
+			std::map<int, Eigen::MatrixXd> relativeTransformations,
+			GLFWwindow* window = nullptr
+		) {
+			if (window != nullptr) {
+				glfwMakeContextCurrent(window);
+			}
 
-			// Initial scene settings
+			// OpenGL commands that prep screen for the pointcloud
 			glLoadIdentity();
 			glPushAttrib(GL_ALL_ATTRIB_BITS);
-			// Reset the background to be black
-			glClearColor(153.f / 255, 153.f / 255, 153.f / 255, 1);
+
+			glClearColor(0.5f, 0.5f, 0.5f, 1);
+			glClear(GL_COLOR_BUFFER_BIT);
 			glClear(GL_DEPTH_BUFFER_BIT);
-			//glDisable(GL_DEPTH_TEST);
+			glDisable(GL_DEPTH_TEST);
 
 			glMatrixMode(GL_PROJECTION);
-			//gluPerspective(60, width / height, 0.01f, 10.0f);
+			glPushMatrix();
+			gluPerspective(60, width / height, 0.01f, 10.0f);
 
-			glPopMatrix();
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+
+			for (int i = 0; i < pipelines.size(); ++i) {
+				auto transformation = relativeTransformations[i];
+				auto color_frame = pipelines[i]->data->filteredColorFrames;
+				auto points = pipelines[i]->data->points;
+				if (points.size() == 0 || transformation.data() == 0) {
+					continue;
+				}
+
+				const double* tdata = transformation.data();
+				glLoadMatrixd(tdata);
+
+				gluLookAt(0, 0, 0, 0, 0, 1, 0, -1, 0);
+
+				glTranslatef(0, 0, +0.5f + app_state.offset_y * 0.05f);
+				glRotated(app_state.pitch, 1, 0, 0);
+				glRotated(app_state.yaw, 0, 1, 0);
+				glTranslatef(0, 0, -0.5f);
+
+				glPointSize(width / 640);
+				glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+				//glEnable(GL_DEPTH_TEST);
+				glEnable(GL_TEXTURE_2D);
+				glBindTexture(GL_TEXTURE_2D, app_state.tex.get_gl_handle());
+
+				// print cube at center
+
+
+				// print the colors
+				auto format = color_frame.get_profile().format();
+				switch (format)
+				{
+				case RS2_FORMAT_RGB8:
+					glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, color_frame.get_data());
+					break;
+				case RS2_FORMAT_RGBA8:
+					glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, color_frame.get_data());
+					break;
+				case RS2_FORMAT_Y8:
+					glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, color_frame.get_data());
+					break;
+				case RS2_FORMAT_Y10BPACK:
+					glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, color_frame.get_data());
+					break;
+				default:
+					throw std::runtime_error("The requested format is not supported!");
+				}
+
+				//float tex_border_color[] = { 0.8f, 0.8f, 0.8f, 0.8f };
+				//glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, tex_border_color);
+
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, 0x812F); // GL_CLAMP_TO_EDGE
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, 0x812F); // GL_CLAMP_TO_EDGE
+				glBegin(GL_POINTS);
+
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+				glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+				glBindTexture(GL_TEXTURE_2D, 0);
+
+				/* this segment actually prints the pointcloud */
+				auto vertices = points.get_vertices();              // get vertices
+				auto tex_coords = points.get_texture_coordinates(); // and texture coordinates
+				for (int i = 0; i < points.size(); i++)
+				{
+					if (vertices[i].z)
+					{
+						// upload the point and texture coordinates only for points we have depth data for
+						glVertex3fv(vertices[i]);
+						glTexCoord2fv(tex_coords[i]);
+					}
+				}
+				glPopMatrix();
+			}
+
+			// OpenGL cleanup
 			glEnd();
+			glMatrixMode(GL_PROJECTION);
+			glPopMatrix();
+			glPopAttrib();
 		}
+
 	};
 
+	
     void draw_all_vertices_and_colors(
             float width, float height,
             glfw_state& app_state,

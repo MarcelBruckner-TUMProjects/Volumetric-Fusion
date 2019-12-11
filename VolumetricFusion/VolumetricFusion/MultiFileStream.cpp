@@ -20,6 +20,14 @@
 #include <filesystem>
 
 
+#include <GL/glew.h>
+#include <GL/GL.h>
+#include <GL/GLU.h>
+
+#define GL_SILENCE_DEPRECATION
+#define GLFW_INCLUDE_GLU
+#include <GLFW/glfw3.h>
+
 #include <imgui.h>
 #include "imgui_impl_glfw.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -28,10 +36,10 @@
 #include "Enums.hpp"
 using namespace vc::enums;
 
+#include "Eigen/Dense"
 #include "ImGuiHelpers.hpp"
 #include "Processing.hpp"
 #include "MultiFileStream.h"
-#include "Eigen/Dense"
 #include "Settings.hpp"
 #include "Data.hpp"
 #include "CaptureDevice.hpp"
@@ -62,7 +70,7 @@ int main(int argc, char* argv[]) try {
 
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "allCameras/";
-	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::MULTI_POINTCLOUD);
+	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
 
 	// Create a simple OpenGL window for rendering:
 	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
@@ -73,6 +81,8 @@ int main(int argc, char* argv[]) try {
 	glfw_state viewOrientation;
 	// Let the user control and manipulate the scenery orientation
 	register_glfw_callbacks(app, viewOrientation);
+
+	vc::rendering::Rendering *rendering = new vc::rendering::Rendering(&viewOrientation);
 
 	viewOrientation.yaw = -2.6;
 	viewOrientation.pitch = 0.8;
@@ -334,12 +344,19 @@ int main(int argc, char* argv[]) try {
 				}
 			}
 
-            vc::rendering::draw_all_vertices_and_colors(
+			rendering->opengl4_draw_all_vertices_and_colors(
+				widthHalf, heightHalf,
+				viewOrientation,
+				pipelines,
+				relativeTransformations
+			);
+
+           /*vc::rendering::draw_all_vertices_and_colors(
                     widthHalf, heightHalf,
                     viewOrientation,
                     pipelines,
                     relativeTransformations
-            );
+            );*/
 		}
 		break;
 
