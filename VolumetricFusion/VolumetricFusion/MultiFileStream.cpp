@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) try {
 
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "allCameras/";
-	vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::CALIBRATED_POINTCLOUD);
+	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
 
 	// Create a simple OpenGL window for rendering:
 	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
@@ -264,8 +264,8 @@ int main(int argc, char* argv[]) try {
 					//relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
 				}
 			}
+			break;
 		}
-		break;
 
 		case RenderState::CALIBRATED_POINTCLOUD:
 		{
@@ -285,8 +285,8 @@ int main(int argc, char* argv[]) try {
                     pipelines,
                     relativeTransformations
             );
+			break;
 		}
-		break;
 
 		case RenderState::ONLY_COLOR:
 		{
