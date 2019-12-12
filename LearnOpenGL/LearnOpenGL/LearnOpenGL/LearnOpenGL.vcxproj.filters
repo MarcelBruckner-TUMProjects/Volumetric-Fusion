@@ -21,10 +21,24 @@
     <ClCompile Include="..\..\..\..\..\..\..\Program Files\OpenGL\glad\src\glad.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="std_image.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="shader.hpp">
       <Filter>Quelldateien</Filter>
     </ClInclude>
+    <ClInclude Include="stb_image.h">
+      <Filter>Quelldateien</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shader.vs">
+      <Filter>Ressourcendateien</Filter>
+    </None>
+    <None Include="shader.fs">
+      <Filter>Ressourcendateien</Filter>
+    </None>
   </ItemGroup>
 </Project>

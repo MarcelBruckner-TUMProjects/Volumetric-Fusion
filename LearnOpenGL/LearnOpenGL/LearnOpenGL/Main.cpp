@@ -1,35 +1,12 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include "shader.hpp"
+#include "stb_image.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
-
-const char* vertexShaderSource =
-"#version 330 core" "\n"
-"layout (location = 0) in vec3 aPos;""\n"
-"void main()""\n"
-"{""\n"
-"	gl_Position = vec4(aPos, 1.0);""\n"
-"}";
-
-const char* fragmentShaderSource =
-"#version 330 core" "\n"
-"out vec4 FragColor;""\n"
-"void main()""\n"
-"{""\n"
-"	FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);""\n"
-"}""\n"
-;
-
-const char* fragmentShaderSource_yellow =
-"#version 330 core" "\n"
-"out vec4 FragColor;""\n"
-"void main()""\n"
-"{""\n"
-"	FragColor = vec4(1.0f, 1.0f, 0.0f, 1.0f);""\n"
-"}""\n"
-;
+GLuint createTexture(const char* path);
 
 int main() {
 	glfwInit();
@@ -53,53 +30,16 @@ int main() {
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 	float vertices[] = {
-		 0.5f,  0.5f, 0.0f,  // top right
-		 0.5f, -0.5f, 0.0f,  // bottom right
-		-0.5f, -0.5f, 0.0f,  // bottom left
-		-0.5f,  0.5f, 0.0f   // top left 
+		// positions          // colors           // texture coords
+		 0.5f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,   // top right
+		 0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 0.0f,   // bottom right
+		-0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // bottom left
+		-0.5f,  0.5f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 1.0f    // top left 
 	};
-	unsigned int indices[] = {  
-		0, 1, 3,   
-		1, 2, 3   
+	unsigned int indices[] = {  // note that we start from 0!
+		0, 1, 3,   // first triangle
+		1, 2, 3    // second triangle
 	};
-
-	float vertices_ex1[] = {
-		-1, 0, 0,
-		-0.5f, 1.f, 0,
-		0, 0, 0,
-
-		0,0,0,
-		0.5f, -1.f, 0,
-		1, 0, 0
-	};
-
-
-	float vertices_ex2_1[] = {
-		-1, 0, 0,
-		-0.5f, 1.f, 0,
-		0, 0, 0,
-	};
-	float vertices_ex2_2[] = {
-		0,0,0,
-		0.5f, -1.f, 0,
-		1, 0, 0
-	};
-
-	unsigned int VBO_EX2_1, VBO_EX2_2, VAO_EX2_1, VAO_EX2_2;
-	glGenVertexArrays(1, &VAO_EX2_1);
-	glGenVertexArrays(1, &VAO_EX2_2);
-	glGenBuffers(1, &VBO_EX2_1);
-	glGenBuffers(1, &VBO_EX2_2);
-	glBindVertexArray(VAO_EX2_1);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO_EX2_1);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_ex2_1), vertices_ex2_1, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-	glBindVertexArray(VAO_EX2_2);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO_EX2_2);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_ex2_2), vertices_ex2_2, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
 
 	unsigned int VBO, VAO, EBO;
 	glGenBuffers(1, &VBO);
@@ -110,92 +50,77 @@ int main() {
 	glGenBuffers(1, &EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(2);
 
-	unsigned int vertexShader;
-	vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-	glCompileShader(vertexShader);
+	Shader ourShader("shader.vs", "shader.fs");
 
-	int success;
-	char infoLog[512];
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-	if (!success)
+	unsigned int texture1;
+	glGenTextures(1, &texture1);
+	glBindTexture(GL_TEXTURE_2D, texture1);
+	// set the texture wrapping/filtering options (on the currently bound texture object)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	// load and generate the texture
+	int width, height, nrChannels;
+	unsigned char* data = stbi_load("container.jpg", &width, &height, &nrChannels, 0);
+	if (data)
 	{
-		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
 	}
-
-	unsigned int fragmentShader;
-	fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-	glCompileShader(fragmentShader);
-
-	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+	else
+	{
+		std::cout << "Failed to load texture1" << std::endl;
 	}
+	stbi_image_free(data);
 
-	unsigned int fragmentShader_yellow;
-	fragmentShader_yellow = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShader_yellow, 1, &fragmentShaderSource_yellow, NULL);
-	glCompileShader(fragmentShader_yellow);
+	stbi_set_flip_vertically_on_load(true);
+	unsigned int texture2;
+	glGenTextures(1, &texture2);
+	glBindTexture(GL_TEXTURE_2D, texture2);
+	// set the texture wrapping/filtering options (on the currently bound texture object)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	glGetShaderiv(fragmentShader_yellow, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		glGetShaderInfoLog(fragmentShader_yellow, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+	data = stbi_load("awesomeface.png", &width, &height, &nrChannels, 0);
+	if (data) {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
 	}
-
-	unsigned int shaderProgram = glCreateProgram();
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-	glLinkProgram(shaderProgram);
-
-	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-	if (!success) {
-		glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::LINK_FAILED\n" << infoLog << std::endl;
+	else
+	{
+		std::cout << "Failed to load texture2" << std::endl;
 	}
+	stbi_image_free(data);
 
-	unsigned int shaderProgram_yellow = glCreateProgram();
-	glAttachShader(shaderProgram_yellow, vertexShader);
-	glAttachShader(shaderProgram_yellow, fragmentShader_yellow);
-	glLinkProgram(shaderProgram_yellow);
-
-	glGetProgramiv(shaderProgram_yellow, GL_LINK_STATUS, &success);
-	if (!success) {
-		glGetProgramInfoLog(shaderProgram_yellow, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::LINK_FAILED\n" << infoLog << std::endl;
-	}
-	
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
-	glDeleteShader(fragmentShader_yellow);
-
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	ourShader.use();
+	ourShader.setInt("texture1", 0);
+	ourShader.setInt("texture2", 1);
 
 	while (!glfwWindowShouldClose(window)) {
 		processInput(window);
 
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
+		
 
-		glUseProgram(shaderProgram);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texture1);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, texture2);
 
-		glBindVertexArray(VAO_EX2_1);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-
-		glUseProgram(shaderProgram_yellow);
-
-		glBindVertexArray(VAO_EX2_2);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-
-		//glBindVertexArray(VAO);
+		glBindVertexArray(VAO);
 		//glDrawArrays(GL_TRIANGLES, 0, 6);
-		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -222,4 +147,3 @@ void processInput(GLFWwindow* window)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
 }
-
