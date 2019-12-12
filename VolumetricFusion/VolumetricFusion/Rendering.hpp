@@ -7,7 +7,12 @@
 #pragma message("Included on Mac OS")
 #endif
 
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include "stb_image.h"
 #include <librealsense2/rs.hpp>
+#include <stdio.h>
+#include <stdlib.h>
 
 //#include <GLFW/glfw3.h>
 
@@ -21,443 +26,85 @@
 #include <sstream>
 #include <iostream>
 
+#include "shader.hpp"
+
 namespace vc::rendering {
+    const float COLOR_vertices[] = {
+         0.0f, 1.0f,  1.0f, 1.0f, // top right
+        0.0f, 0.f,  1.0f, 0.0f, // bottom right
+        -1.f, 0.f,  0.0f, 0.0f, // bottom left
+        -1.f, 1.f,  0.0f, 1.0f  // top left 
+    };
+    const unsigned int COLOR_indices[] = {  // note that we start from 0!
+        0, 1, 3,   // first triangle
+        1, 2, 3    // second triangle
+    };
 
-	class Rendering {
-	private:
-		GLFWwindow* window;
-		glfw_state* app_state;
+    class Rendering {
+    private:
+        unsigned int COLOR_VBO, COLOR_VAO, COLOR_EBO, COLOR_texture;
+        vc::rendering::Shader* COLOR_shader;
 
-		void gl_render_cube(float width, float height, float x, float y, float z) {
+    public:
+        Rendering() {
+            COLOR_shader = new vc::rendering::Shader("shader/only_color.vs", "shader/only_color.fs");
 
-		}
+            glGenVertexArrays(1, &COLOR_VAO);
+            glGenBuffers(1, &COLOR_VBO);
+            glGenBuffers(1, &COLOR_EBO);
 
-	public:
-		Rendering(GLFWwindow *window, glfw_state* app_sate)
-			: window(window), app_state(app_state)
-		{
-		}
+            glBindVertexArray(COLOR_VAO);
 
-		void test() {
-			glPushMatrix();
+            glBindBuffer(GL_ARRAY_BUFFER, COLOR_VBO);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(COLOR_vertices), COLOR_vertices, GL_STATIC_DRAW);
 
-			// Initial scene settings
-			glLoadIdentity();
-			glPushAttrib(GL_ALL_ATTRIB_BITS);
-			// Reset the background to be black
-			glClearColor(153.f / 255, 153.f / 255, 153.f / 255, 1);
-			glClear(GL_DEPTH_BUFFER_BIT);
-			//glDisable(GL_DEPTH_TEST);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, COLOR_EBO);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(COLOR_indices), COLOR_indices, GL_STATIC_DRAW);
 
-			glMatrixMode(GL_PROJECTION);
-			//gluPerspective(60, width / height, 0.01f, 10.0f);
-
-			glPopMatrix();
-			glEnd();
-		}
-	};
-
-    void draw_all_vertices_and_colors(
-            float width, float height,
-            glfw_state& app_state,
-            std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines,
-            std::map<int, Eigen::MatrixXd> relativeTransformations,
-            GLFWwindow* window = nullptr
-    ) {
-        if (window != nullptr) {
-            glfwMakeContextCurrent(window);
-        }
-
-        // OpenGL commands that prep screen for the pointcloud
-        glLoadIdentity();
-        glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-        glClearColor(0.5f, 0.5f, 0.5f , 1); 
-		glClear(GL_COLOR_BUFFER_BIT);
-        glClear(GL_DEPTH_BUFFER_BIT);
-        glDisable(GL_DEPTH_TEST);
-
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        gluPerspective(60, width / height, 0.01f, 10.0f);
-
-		glMatrixMode(GL_MODELVIEW);
-		glPushMatrix();
-
-        for (int i = 0; i < pipelines.size(); ++i) {
-            auto transformation = relativeTransformations[i];
-            auto color_frame = pipelines[i]->data->filteredColorFrames;
-            auto points = pipelines[i]->data->points;
-
-            const double* tdata = transformation.data();
-            glLoadMatrixd(tdata);
-
-			gluLookAt(0, 0, 0, 0, 0, 1, 0, -1, 0);
-
-			glTranslatef(0, 0, +0.5f + app_state.offset_y * 0.05f);
-			glRotated(app_state.pitch, 1, 0, 0);
-			glRotated(app_state.yaw, 0, 1, 0);
-			glTranslatef(0, 0, -0.5f);
-
-            glPointSize(width / 640);
-            glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-            //glEnable(GL_DEPTH_TEST);
-            glEnable(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D, app_state.tex.get_gl_handle());
-
-            // print cube at center
-
-
-            // print the colors
-            auto format = color_frame.get_profile().format();
-            switch (format)
-            {
-                case RS2_FORMAT_RGB8:
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, color_frame.get_data());
-                    break;
-                case RS2_FORMAT_RGBA8:
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, color_frame.get_data());
-                    break;
-                case RS2_FORMAT_Y8:
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, color_frame.get_data());
-                    break;
-                case RS2_FORMAT_Y10BPACK:
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, color_frame.get_data());
-                    break;
-                default:
-                    throw std::runtime_error("The requested format is not supported!");
-            }
-
-            //float tex_border_color[] = { 0.8f, 0.8f, 0.8f, 0.8f };
-            //glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, tex_border_color);
-
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, 0x812F); // GL_CLAMP_TO_EDGE
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, 0x812F); // GL_CLAMP_TO_EDGE
-            glBegin(GL_POINTS);
-
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            // position attribute
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+            glEnableVertexAttribArray(0);
+            // color attribute
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+            glEnableVertexAttribArray(1);
+             
+            glGenTextures(1, &COLOR_texture);
+            glBindTexture(GL_TEXTURE_2D, COLOR_texture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
+            // set the texture wrapping parameters
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            // set texture filtering parameters
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-            glBindTexture(GL_TEXTURE_2D, 0);
-
-            /* this segment actually prints the pointcloud */
-            auto vertices = points.get_vertices();              // get vertices
-            auto tex_coords = points.get_texture_coordinates(); // and texture coordinates
-            for (int i = 0; i < points.size(); i++)
-            {
-                if (vertices[i].z)
-                {
-                    // upload the point and texture coordinates only for points we have depth data for
-                    glVertex3fv(vertices[i]);
-                    glTexCoord2fv(tex_coords[i]);
-                }
-            }
-            glPopMatrix();
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         }
 
-        // OpenGL cleanup
-        glEnd();
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glPopAttrib();
+        void renderOnlyColor(rs2::frame color_image, const float pos_x, const float pos_y) {
+            const int width = color_image.as<rs2::video_frame>().get_width();
+            const int height = color_image.as<rs2::video_frame>().get_height();
+            glBindTexture(GL_TEXTURE_2D, COLOR_texture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, color_image.get_data());
+
+            glBindTexture(GL_TEXTURE_2D, COLOR_texture);
+
+            COLOR_shader->use();
+            COLOR_shader->setVec2("offset", pos_x, pos_y);
+            glBindVertexArray(COLOR_VAO);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            glBindVertexArray(0);
+
+            std::cout << std::endl;
+           /* glBindBuffer(GL_ARRAY_BUFFER, COLOR_VBO);
+            glBufferData(GL_ARRAY_BUFFER, vertices.size(), vertices.data(), GL_STREAM_DRAW);*/
+        }
+    };
+
+    void startFrame(GLFWwindow* window) {
+        glfwMakeContextCurrent(window);
+        // render
+        // ------
+        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
-
-	void draw_vertices_and_colors(
-		float width, float height, glfw_state& app_state, 
-		rs2::points& points, 
-		rs2::frame color_frame,
-		const Eigen::Ref<const Eigen::MatrixXd>& transformation,
-		GLFWwindow* window = nullptr
-	) {
-		if (window != nullptr) {
-			glfwMakeContextCurrent(window);
-		}
-		if (!points)
-			return;
-
-		// OpenGL commands that prep screen for the pointcloud
-		glLoadIdentity();
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-		glClearColor(153.f / 255, 153.f / 255, 153.f / 255, 1);
-		glClear(GL_DEPTH_BUFFER_BIT);
-		glDisable(GL_DEPTH_TEST);
-
-		glMatrixMode(GL_PROJECTION);
-		glPushMatrix();
-		gluPerspective(60, width / height, 0.01f, 10.0f);
-
-		if (transformation.rows() > 0) {
-			const double* tdata = transformation.data();
-			glLoadMatrixd(tdata);
-		}
-
-		glMatrixMode(GL_MODELVIEW);
-		glPushMatrix();
-		gluLookAt(0, 0, 0, 0, 0, 1, 0, -1, 0);
-
-		glTranslatef(0, 0, +0.5f + app_state.offset_y * 0.05f);
-		glRotated(app_state.pitch, 1, 0, 0);
-		glRotated(app_state.yaw, 0, 1, 0);
-		glTranslatef(0, 0, -0.5f);
-
-		glPointSize(width / 640);
-		glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-		//glEnable(GL_DEPTH_TEST);
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, app_state.tex.get_gl_handle());
-
-		// print cube at center
-
-
-		// print the colors
-		auto format = color_frame.get_profile().format();
-		switch (format)
-		{
-		case RS2_FORMAT_RGB8:
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, color_frame.get_data());
-			break;
-		case RS2_FORMAT_RGBA8:
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, color_frame.get_data());
-			break;
-		case RS2_FORMAT_Y8:
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, color_frame.get_data());
-			break;
-		case RS2_FORMAT_Y10BPACK:
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, color_frame.get_data());
-			break;
-		default:
-			throw std::runtime_error("The requested format is not supported!");
-		}
-
-		//float tex_border_color[] = { 0.8f, 0.8f, 0.8f, 0.8f };
-		//glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, tex_border_color);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, 0x812F); // GL_CLAMP_TO_EDGE
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, 0x812F); // GL_CLAMP_TO_EDGE
-		glBegin(GL_POINTS);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-		glBindTexture(GL_TEXTURE_2D, 0);
-
-		/* this segment actually prints the pointcloud */
-		auto vertices = points.get_vertices();              // get vertices
-		auto tex_coords = points.get_texture_coordinates(); // and texture coordinates
-		for (int i = 0; i < points.size(); i++)
-		{
-			if (vertices[i].z)
-			{
-				// upload the point and texture coordinates only for points we have depth data for
-				glVertex3fv(vertices[i]);
-				glTexCoord2fv(tex_coords[i]);
-			}
-		}
-
-		// OpenGL cleanup
-		glEnd();
-		glPopMatrix();
-		glMatrixMode(GL_PROJECTION);
-		glPopMatrix();
-		glPopAttrib();
-	}
-
-
-	void draw_rectangle(float width, float height, float x, float y, float z, glfw_state& app_state, const Eigen::Ref<const Eigen::MatrixXd>& transformation, GLFWwindow* window = nullptr) {
-		if (window != nullptr) {
-			glfwMakeContextCurrent(window);
-		}
-
-		// OpenGL commands that prep screen for the pointcloud
-		glLoadIdentity();
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-		//glClearColor(153.f / 255, 153.f / 255, 153.f / 255, 1);
-		//glClear(GL_DEPTH_BUFFER_BIT);
-
-
-
-
-
-
-		glMatrixMode(GL_PROJECTION);
-		glPushMatrix();
-		gluPerspective(60, width / height, 0.01f, 10.0f);
-
-		if (transformation.rows() > 0) {
-			const double* tdata = transformation.data();
-			glLoadMatrixd(tdata);
-		}
-
-		glMatrixMode(GL_MODELVIEW);
-		glPushMatrix();
-		gluLookAt(0, 0, 0, 0, 0, 1, 0, -1, 0);
-
-		glTranslatef(x, y, z + 0.5f + app_state.offset_y * 0.05f);
-		//glTranslatef(x,y,z);
-		glRotated(app_state.pitch, 1, 0, 0);
-		glRotated(app_state.yaw, 0, 1, 0);
-
-
-
-
-
-
-
-		glScalef(0.02, 0.02, 0.02);
-
-		glPointSize(width / 640);
-		glEnable(GL_DEPTH_TEST);
-
-		glBegin(GL_QUADS);        // Draw The Cube Using quads
-		glColor3f(0.0f, 1.0f, 0.0f);    // Color Blue
-		glVertex3f(1.0f, 1.0f, -1.0f);    // Top Right Of The Quad (Top)
-		glVertex3f(-1.0f, 1.0f, -1.0f);    // Top Left Of The Quad (Top)
-		glVertex3f(-1.0f, 1.0f, 1.0f);    // Bottom Left Of The Quad (Top)
-		glVertex3f(1.0f, 1.0f, 1.0f);    // Bottom Right Of The Quad (Top)
-		glColor3f(1.0f, 0.5f, 0.0f);    // Color Orange
-		glVertex3f(1.0f, -1.0f, 1.0f);    // Top Right Of The Quad (Bottom)
-		glVertex3f(-1.0f, -1.0f, 1.0f);    // Top Left Of The Quad (Bottom)
-		glVertex3f(-1.0f, -1.0f, -1.0f);    // Bottom Left Of The Quad (Bottom)
-		glVertex3f(1.0f, -1.0f, -1.0f);    // Bottom Right Of The Quad (Bottom)
-		glColor3f(1.0f, 0.0f, 0.0f);    // Color Red
-		glVertex3f(1.0f, 1.0f, 1.0f);    // Top Right Of The Quad (Front)
-		glVertex3f(-1.0f, 1.0f, 1.0f);    // Top Left Of The Quad (Front)
-		glVertex3f(-1.0f, -1.0f, 1.0f);    // Bottom Left Of The Quad (Front)
-		glVertex3f(1.0f, -1.0f, 1.0f);    // Bottom Right Of The Quad (Front)
-		glColor3f(1.0f, 1.0f, 0.0f);    // Color Yellow
-		glVertex3f(1.0f, -1.0f, -1.0f);    // Top Right Of The Quad (Back)
-		glVertex3f(-1.0f, -1.0f, -1.0f);    // Top Left Of The Quad (Back)
-		glVertex3f(-1.0f, 1.0f, -1.0f);    // Bottom Left Of The Quad (Back)
-		glVertex3f(1.0f, 1.0f, -1.0f);    // Bottom Right Of The Quad (Back)
-		glColor3f(0.0f, 0.0f, 1.0f);    // Color Blue
-		glVertex3f(-1.0f, 1.0f, 1.0f);    // Top Right Of The Quad (Left)
-		glVertex3f(-1.0f, 1.0f, -1.0f);    // Top Left Of The Quad (Left)
-		glVertex3f(-1.0f, -1.0f, -1.0f);    // Bottom Left Of The Quad (Left)
-		glVertex3f(-1.0f, -1.0f, 1.0f);    // Bottom Right Of The Quad (Left)
-		glColor3f(1.0f, 0.0f, 1.0f);    // Color Violet
-		glVertex3f(1.0f, 1.0f, -1.0f);    // Top Right Of The Quad (Right)
-		glVertex3f(1.0f, 1.0f, 1.0f);    // Top Left Of The Quad (Right)
-		glVertex3f(1.0f, -1.0f, 1.0f);    // Bottom Left Of The Quad (Right)
-		glVertex3f(1.0f, -1.0f, -1.0f);    // Bottom Right Of The Quad (Right)
-		glEnd();            // End Drawing The Cube
-		glFlush();
-
-
-
-		// OpenGL cleanup
-		glEnd();
-		glPopMatrix();
-		glMatrixMode(GL_PROJECTION);
-		glPopMatrix();
-		glPopAttrib();
-	}
-
-	// Working copy
-	void _draw_vertices_and_colors(
-		float width, float height, glfw_state& app_state,
-		rs2::points& points,
-		rs2::frame color_frame,
-		const Eigen::Ref<const Eigen::MatrixXd>& transformation,
-		GLFWwindow* window = nullptr
-	) {
-		if (window != nullptr) {
-			glfwMakeContextCurrent(window);
-		}
-		if (!points)
-			return;
-
-		// OpenGL commands that prep screen for the pointcloud
-		glLoadIdentity();
-		glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-		glClearColor(153.f / 255, 153.f / 255, 153.f / 255, 1);
-		glClear(GL_DEPTH_BUFFER_BIT);
-		glDisable(GL_DEPTH_TEST);
-
-		glMatrixMode(GL_PROJECTION);
-		glPushMatrix();
-		gluPerspective(60, width / height, 0.01f, 10.0f);
-
-		if (transformation.rows() > 0) {
-			const double* tdata = transformation.data();
-			glLoadMatrixd(tdata);
-		}
-
-		glMatrixMode(GL_MODELVIEW);
-		glPushMatrix();
-		gluLookAt(0, 0, 0, 0, 0, 1, 0, -1, 0);
-
-		glTranslatef(0, 0, +0.5f + app_state.offset_y * 0.05f);
-		glRotated(app_state.pitch, 1, 0, 0);
-		glRotated(app_state.yaw, 0, 1, 0);
-		glTranslatef(0, 0, -0.5f);
-
-		glPointSize(width / 640);
-		glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-		//glEnable(GL_DEPTH_TEST);
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, app_state.tex.get_gl_handle());
-
-		// print the colors
-		auto format = color_frame.get_profile().format();
-		switch (format)
-		{
-		case RS2_FORMAT_RGB8:
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, color_frame.get_data());
-			break;
-		case RS2_FORMAT_RGBA8:
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, color_frame.get_data());
-			break;
-		case RS2_FORMAT_Y8:
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, color_frame.get_data());
-			break;
-		case RS2_FORMAT_Y10BPACK:
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, color_frame.get_data());
-			break;
-		default:
-			throw std::runtime_error("The requested format is not supported!");
-		}
-
-		//float tex_border_color[] = { 0.8f, 0.8f, 0.8f, 0.8f };
-		//glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, tex_border_color);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, 0x812F); // GL_CLAMP_TO_EDGE
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, 0x812F); // GL_CLAMP_TO_EDGE
-		glBegin(GL_POINTS);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-		glBindTexture(GL_TEXTURE_2D, 0);
-
-		/* this segment actually prints the pointcloud */
-		auto vertices = points.get_vertices();              // get vertices
-		auto tex_coords = points.get_texture_coordinates(); // and texture coordinates
-		for (int i = 0; i < points.size(); i++)
-		{
-			if (vertices[i].z)
-			{
-				// upload the point and texture coordinates only for points we have depth data for
-				glVertex3fv(vertices[i]);
-				glTexCoord2fv(tex_coords[i]);
-			}
-		}
-
-		// OpenGL cleanup
-		glEnd();
-		glPopMatrix();
-		glMatrixMode(GL_PROJECTION);
-		glPopMatrix();
-		glPopAttrib();
-	}
 }
 
 #endif // !_RENDERING_HEADER_

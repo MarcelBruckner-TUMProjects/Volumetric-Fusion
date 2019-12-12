@@ -2,6 +2,10 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include "stb_image.h"
+
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 // Include short list of convenience functions for rendering
 
@@ -29,8 +33,8 @@
 using namespace vc::enums;
 
 #include "ImGuiHelpers.hpp"
-#include "Processing.hpp"
-#include "MultiFileStream.h"
+#include "processing.hpp"
+
 #include "Eigen/Dense"
 #include "Settings.hpp"
 #include "Data.hpp"
@@ -44,6 +48,13 @@ using namespace vc::enums;
 #endif
 #include <signal.h>
 
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include "camera.hpp"
+#include "shader.hpp"
+
 #pragma endregion
 
 template<typename T, typename V>
@@ -56,31 +67,65 @@ void my_function_to_handle_aborts(int signalNumber) {
 	std::cout << "Something aborted" << std::endl;
 }
 
+void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void processInput(GLFWwindow* window);
+
+// settings
+const unsigned int SCR_WIDTH = 800;
+const unsigned int SCR_HEIGHT = 600;
+
+// camera
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+float lastX = SCR_WIDTH / 2.0f;
+float lastY = SCR_HEIGHT / 2.0f;
+bool firstMouse = true;
+
+// timing
+float deltaTime = 0.0f;	// time between current frame and last frame
+float lastFrame = 0.0f;
+
 int main(int argc, char* argv[]) try {
-
-	signal(SIGABRT, &my_function_to_handle_aborts);
-
+	
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "allCameras/";
-	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::MULTI_POINTCLOUD);
+	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::ONLY_COLOR);
 
-	// Create a simple OpenGL window for rendering:
-	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
+	// glfw: initialize and configure
+	// ------------------------------
+	glfwInit();
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	
+	// glfw window creation
+	// --------------------
+	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+	if (window == NULL)
+	{
+		std::cout << "Failed to create GLFW window" << std::endl;
+		glfwTerminate();
+		return -1;
+	}
+	glfwMakeContextCurrent(window);
+	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	glfwSetCursorPosCallback(window, mouse_callback);
+	glfwSetScrollCallback(window, scroll_callback);
 
-	ImGui_ImplGlfw_Init(app, false);
+	// tell GLFW to capture our mouse
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-	// Construct an object to manage view state
-	glfw_state viewOrientation;
-	// Let the user control and manipulate the scenery orientation
-	register_glfw_callbacks(app, viewOrientation);
+	// glad: load all OpenGL function pointers
+	// ---------------------------------------
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	{
+		std::cout << "Failed to initialize GLAD" << std::endl;
+		return -1;
+	}
 
-	viewOrientation.yaw = -2.6;
-	viewOrientation.pitch = 0.8;
-	viewOrientation.last_x = 738.7;
-	viewOrientation.last_y = 1015.8;
-	viewOrientation.offset_x = 2.0;
-	viewOrientation.offset_y = -2.0;
-
+	ImGui_ImplGlfw_Init(window, false);
+	
 	//vc::rendering::Rendering rendering(app, viewOrientation);
 
 	rs2::context ctx; // Create librealsense context for managing devices
@@ -193,20 +238,49 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Main loop
 
-	while (app)
+	while (!glfwWindowShouldClose(window))
 	{
-		int topOffset = 70;
-		const float width = static_cast<float>(app.width());
-		const float height = static_cast<float>(app.height()) - (topOffset * 0.5f);
-		const int widthHalf = width / 2;
-		const int heightHalf = height / 2;
+		// per-frame time logic
+		// --------------------
+		float currentFrame = glfwGetTime();
+		deltaTime = currentFrame - lastFrame;
+		lastFrame = currentFrame;
 
-		// Retina display (Mac OS) have double the pixel density
-		int w2, h2;
-		glfwGetFramebufferSize(app, &w2, &h2);
-		const bool isRetinaDisplay = w2 == app.width() * 2 && h2 == app.height() * 2;
+		// input
+		// -----
+		processInput(window);
 
-		vc::imgui_helpers::initialize(app, w2, h2, streamNames, widthHalf, heightHalf, width, height);
+		vc::rendering::startFrame(window);
+
+		switch (state.renderState) {
+		case RenderState::ONLY_COLOR:
+		{
+			for (int i = 0; i < pipelines.size() && i < 4; ++i)
+			{
+				int x = i % 2;
+				int y = floor(i / 2);
+				//std::cout << i << ": x=" << x << " - y=" << y << std::endl;
+				if (pipelines[i]->data->filteredColorFrames) {
+					pipelines[i]->rendering->renderOnlyColor(pipelines[i]->data->filteredColorFrames, x, -y);
+				}
+			}
+		}
+		break;
+		}
+		
+		
+
+		int numPipelines = pipelines.size();
+
+		//int width, height;
+		//glfwGetWindowSize(window, &width, &height);
+		//
+		//// Retina display (Mac OS) have double the pixel density
+		//int w2, h2;
+		//glfwGetFramebufferSize(window, &w2, &h2);
+		//const bool isRetinaDisplay = w2 == width * 2 && h2 == width * 2;
+
+	/*	vc::imgui_helpers::initialize(streamNames, width, height);
 		vc::imgui_helpers::addSwitchViewButton(state.renderState, calibrateCameras);
 		if (vc::imgui_helpers::addPauseResumeToggle(paused)) {
 			for (int i = 0; i < pipelines.size(); i++)
@@ -214,12 +288,7 @@ int main(int argc, char* argv[]) try {
 				pipelines[i]->paused->store(paused);
 			}
 		}
-
-		// addSaveFramesButton(folderSettings.capturesFolder, pipelines, colorizedDepthFrames, points);
-		if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-			//addAlignPointCloudsButton(paused, points);
-		}
-
+		
 		if (state.renderState != RenderState::ONLY_DEPTH) {
 			if (vc::imgui_helpers::addCalibrateToggle(calibrateCameras)) {
 				for (int i = 0; i < pipelines.size(); i++)
@@ -228,163 +297,71 @@ int main(int argc, char* argv[]) try {
 				}
 			}
 		}
-		if (state.renderState != RenderState::ONLY_COLOR) {
-			//addToggleDepthProcessingButton(depthProcessing);
-		}
+
 		vc::imgui_helpers::addGenerateCharucoDiamond(folderSettings.charucoFolder);
 		vc::imgui_helpers::addGenerateCharucoBoard(folderSettings.charucoFolder);
-		vc::imgui_helpers::finalize();
+		vc::imgui_helpers::finalize();*/
 
-		switch (state.renderState) {
-		case RenderState::COUNT:
-		case RenderState::MULTI_POINTCLOUD:
-		{
-			// Draw the pointclouds
-			for (int i = 0; i < pipelines.size() && i < 4; ++i)
-			{
-				if (pipelines[i]->data->colorizedDepthFrames && pipelines[i]->data->points) {
-					viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
-					if (isRetinaDisplay) {
-						glViewport(width * (i % 2), height - (height * (i / 2)), width, height);
-					}
-					else {
-						glViewport(widthHalf * (i % 2), heightHalf - (heightHalf * (i / 2)), widthHalf, heightHalf);
-					}
+		//switch (state.renderState) {
+		//case RenderState::COUNT:
+		//case RenderState::MULTI_POINTCLOUD:
+		//{
+		//	// Draw the pointclouds
+		//	for (int i = 0; i < pipelines.size() && i < 4; ++i)
+		//	{
+		//		if (pipelines[i]->data->colorizedDepthFrames && pipelines[i]->data->points) {
+		//			// TODO MULTI POINTCLOUDS 
+		//		}
+		//	}
+		//}
+		//break;
 
-					if (pipelines[i]->data->filteredColorFrames) {
-						draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);
-					}
-					else {
-						draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
-					}
+		//case RenderState::CALIBRATED_POINTCLOUD:
+		//{
+		//	if (!calibrateCameras)
+		//	if (isRetinaDisplay) {
+		//		glViewport(0, 0, width * 2, height * 2);
+		//	}
+		//	else {
+		//		glViewport(0, 0, width, height);
+		//	}
 
-					if (pipelines.size()) {
-						//draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
-					}
+		//	for (int i = 0; i < pipelines.size() && i < 4; ++i)
+		//	{
+		//		// TODO CALIBRATED POINTCLOUDS
+		//	}
+		//}
+		//break;
 
-					//relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
-				}
-			}
-		}
-		break;
+		//case RenderState::ONLY_COLOR:
+		//{
+		//	for (int i = 0; i < pipelines.size() && i < 4; ++i)
+		//	{
+		//		if (pipelines[i]->data->filteredColorFrames != false) {
+		//			// TODO ONLY COLOR
+		//		}
+		//	}
 
-		case RenderState::CALIBRATED_POINTCLOUD:
-		{
-			if (!calibrateCameras)
-			if (isRetinaDisplay) {
-				glViewport(0, 0, width * 2, height * 2);
-			}
-			else {
-				glViewport(0, 0, width, height);
-			}
+		//	break;
+		//}
 
-			// Draw the pointclouds
-			int i = 0;
-			for (; i < pipelines.size() && i < 4; ++i)
-			{
-				auto data = pipelines[i]->data;
-				if (data->colorizedDepthFrames && data->points) {
-					//viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
+		//case RenderState::ONLY_DEPTH:
+		//{
+		//	for (int i = 0; i < pipelines.size() && i < 4; ++i)
+		//	{
+		//		if (pipelines[i]->data->filteredDepthFrames != false) {
+		//			// TODO ONLY DEPTH
+		//		}
+		//	}
 
+		//	break;
+		//}
+		//}
 
-					if (!relativeTransformations.count(i)) {
-						break;
-					}
-
-					auto count = relativeTransformations.count(i);
-					auto rt = relativeTransformations[i];
-					auto vs = data->vertices;
-					auto cols = data->vertices.cols();
-					auto rows = data->vertices.rows();
-					auto cols2 = relativeTransformations[i].cols();
-					auto rows2 = relativeTransformations[i].rows();
-                    continue;
-					//Eigen::MatrixXd transformedVertices = relativeTransformations[i].cwiseProduct(pipelines[i]->data->vertices).colwise().sum();
-					//auto transformedVertices = pipelines[i]->data->vertices.transpose().rowwise() * relativeTransformations[i];
-					// (AB)^T = (B^T A^T) => AB = AB^T^T = (B^T A^T)^T
-					//Eigen::MatrixXd transformedVertices(4, cols);
-					//= (pipelines[i]->data->vertices.transpose() * relativeTransformations[i].transpose()).transpose();
-					// HOW THE FUCK DOES THIS SYNTAX WORK ffs!"�$"$
-					/*for (int i = 0; i < cols; ++i) {
-						transformedVertices.col(i) = rt * vs.col(i);
-					}*/
-
-					if (data->filteredColorFrames) {
-						//draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);;
-						//draw_vertices_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, transformedVertices, pipelines[i]->data->filteredColorFrames, 0.2f);
-						vc::rendering::draw_vertices_and_colors(
-							widthHalf, heightHalf,
-							viewOrientation,
-							data->points,
-							data->filteredColorFrames,
-							relativeTransformations[i]
-						);
-					}
-					//else {
-					//	draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
-					//}
-					//rendering->test();
-
-					//if (pipelines.size()) {
-						//draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
-						//vc::rendering::draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation, relativeTransformations[i]);
-					//}
-
-					//relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
-				}
-			}
-
-            vc::rendering::draw_all_vertices_and_colors(
-                    widthHalf, heightHalf,
-                    viewOrientation,
-                    pipelines,
-                    relativeTransformations
-            );
-		}
-		break;
-
-		case RenderState::ONLY_COLOR:
-		{
-			for (int i = 0; i < pipelines.size() && i < 4; ++i)
-			{
-				if (pipelines[i]->data->filteredColorFrames != false) {
-					rect r{
-						static_cast<float>(widthHalf * (i % 2)),
-							static_cast<float>(heightHalf - (heightHalf * (i / 2))),
-							static_cast<float>(widthHalf),
-							static_cast<float>(heightHalf)
-					};
-					if (isRetinaDisplay) {
-						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
-					}
-					pipelines[i]->data->tex.render(pipelines[i]->data->filteredColorFrames, r);
-				}
-			}
-
-			break;
-		}
-
-		case RenderState::ONLY_DEPTH:
-		{
-			for (int i = 0; i < pipelines.size() && i < 4; ++i)
-			{
-				if (pipelines[i]->data->filteredDepthFrames != false) {
-					rect r{
-						static_cast<float>(widthHalf * (i % 2)),
-						static_cast<float>(heightHalf - (heightHalf * (i / 2))),
-						static_cast<float>(widthHalf),
-						static_cast<float>(heightHalf)
-					};
-					if (isRetinaDisplay) {
-						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
-					}
-					pipelines[i]->data->tex.render(pipelines[i]->data->colorizer.process(pipelines[i]->data->filteredDepthFrames), r);
-				}
-			}
-
-			break;
-		}
-		}
+		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+		// -------------------------------------------------------------------------------
+		glfwSwapBuffers(window);
+		glfwPollEvents();
 	}
 #pragma endregion
 
@@ -397,7 +374,7 @@ int main(int argc, char* argv[]) try {
 	}
 	calibrationThread.join();
 #pragma endregion
-
+	glfwTerminate();
 	//std::exit(EXIT_SUCCESS);
 	return EXIT_SUCCESS;
 }
@@ -437,6 +414,66 @@ std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
 	}
 
 	return c;
+}
+
+
+// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
+// ---------------------------------------------------------------------------------------------------------
+void processInput(GLFWwindow* window)
+{
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+		glfwSetWindowShouldClose(window, true);
+	if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	}
+	if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		camera.ProcessKeyboard(FORWARD, deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		camera.ProcessKeyboard(BACKWARD, deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		camera.ProcessKeyboard(LEFT, deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		camera.ProcessKeyboard(RIGHT, deltaTime);
+}
+
+// glfw: whenever the window size changed (by OS or user resize) this callback function executes
+// ---------------------------------------------------------------------------------------------
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+	// make sure the viewport matches the new window dimensions; note that width and 
+	// height will be significantly larger than specified on retina displays.
+	glViewport(0, 0, width, height);
+}
+
+
+// glfw: whenever the mouse moves, this callback is called
+// -------------------------------------------------------
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+{
+	if (firstMouse)
+	{
+		lastX = xpos;
+		lastY = ypos;
+		firstMouse = false;
+	}
+
+	float xoffset = xpos - lastX;
+	float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+
+	lastX = xpos;
+	lastY = ypos;
+
+	camera.ProcessMouseMovement(xoffset, yoffset);
+}
+
+// glfw: whenever the mouse scroll wheel scrolls, this callback is called
+// ----------------------------------------------------------------------
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+	camera.ProcessMouseScroll(yoffset);
 }
 
 #pragma endregion

@@ -60,7 +60,7 @@ namespace vc::data {
 
 		std::string deviceName;
 
-		texture tex;
+		//texture tex;
 		rs2::colorizer colorizer;
 		rs2::frame  filteredColorFrames;
 		rs2::frame  filteredDepthFrames;
