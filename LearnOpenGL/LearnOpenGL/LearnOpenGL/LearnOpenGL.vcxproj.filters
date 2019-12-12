@@ -32,6 +32,9 @@
     <ClInclude Include="stb_image.h">
       <Filter>Quelldateien</Filter>
     </ClInclude>
+    <ClInclude Include="camera.hpp">
+      <Filter>Quelldateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="shader.vs">
