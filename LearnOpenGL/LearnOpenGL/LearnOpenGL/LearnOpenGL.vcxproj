@@ -76,7 +76,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Program Files\OpenGL\glad\include;C:\Program Files\OpenGL\glfw-3.3\include;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Program Files\OpenGL\glm-stable;C:\Program Files\OpenGL\glad\include;C:\Program Files\OpenGL\glfw-3.3\include;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Program Files\OpenGL\glfw-3.3\build\src\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
