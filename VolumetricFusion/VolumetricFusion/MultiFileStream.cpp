@@ -24,7 +24,7 @@
 #include <filesystem>
 
 
-#include <imgui.h>
+#include "imgui.h"
 #include "imgui_impl_glfw.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -54,6 +54,7 @@ using namespace vc::enums;
 #include <glm/gtc/type_ptr.hpp>
 #include "camera.hpp"
 #include "shader.hpp"
+#include <io.h>
 
 #pragma endregion
 
@@ -69,11 +70,13 @@ void my_function_to_handle_aborts(int signalNumber) {
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
+const unsigned int TOP_BAR_HEIGHT = 0;
 const unsigned int SCR_HEIGHT = 600;
 
 // camera
@@ -86,11 +89,12 @@ bool firstMouse = true;
 float deltaTime = 0.0f;	// time between current frame and last frame
 float lastFrame = 0.0f;
 
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::ONLY_COLOR);
+
 int main(int argc, char* argv[]) try {
 	
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "allCameras/";
-	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::ONLY_COLOR);
 
 	// glfw: initialize and configure
 	// ------------------------------
@@ -99,9 +103,10 @@ int main(int argc, char* argv[]) try {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	
+
 	// glfw window creation
 	// --------------------
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Volumetric Capture", NULL, NULL);
 	if (window == NULL)
 	{
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -112,7 +117,8 @@ int main(int argc, char* argv[]) try {
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetScrollCallback(window, scroll_callback);
-
+	glfwSetKeyCallback(window, key_callback);
+	
 	// tell GLFW to capture our mouse
 	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -124,7 +130,7 @@ int main(int argc, char* argv[]) try {
 		return -1;
 	}
 
-	ImGui_ImplGlfw_Init(window, false);
+	//ImGui_ImplGlfw_Init(window, false);
 	
 	//vc::rendering::Rendering rendering(app, viewOrientation);
 
@@ -238,6 +244,7 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Main loop
 
+	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT - TOP_BAR_HEIGHT);
 	while (!glfwWindowShouldClose(window))
 	{
 		// per-frame time logic
@@ -255,35 +262,33 @@ int main(int argc, char* argv[]) try {
 		const bool isRetinaDisplay = w2 == width * 2 && h2 == width * 2;
 
 		const float aspect = 1.0f * width / height;
-
-		// input
-		// -----
-		processInput(window);
+		
+		//processInput(window);
 
 		vc::rendering::startFrame(window);
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
-			switch (state.renderState) {
-			case RenderState::ONLY_COLOR:
+			int x = i % 2;
+			int y = floor(i / 2);
+			if(state.renderState == RenderState::ONLY_COLOR || state.renderState == RenderState::ONLY_DEPTH)
 			{
-				int x = i % 2;
-				int y = floor(i / 2);
 				//std::cout << i << ": x=" << x << " - y=" << y << std::endl;
-				if (pipelines[i]->data->filteredColorFrames) {
+				if (state.renderState == RenderState::ONLY_COLOR && pipelines[i]->data->filteredColorFrames) {
 					pipelines[i]->rendering->renderOnlyColor(pipelines[i]->data->filteredColorFrames, x, y, aspect);
 				}
-				break;
+				else if (state.renderState == RenderState::ONLY_DEPTH && pipelines[i]->data->colorizedDepthFrames) {
+					pipelines[i]->rendering->renderOnlyColor(pipelines[i]->data->colorizedDepthFrames, x, y, aspect);
+				}
 			}
+			else if (state.renderState == RenderState::MULTI_POINTCLOUD && pipelines[i]->data->points) {
+				pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, width, height, x, y);
 			}
 		}
 		
 		
-
-		int numPipelines = pipelines.size();
-
-
-	/*	vc::imgui_helpers::initialize(streamNames, width, height);
+		/*
+		vc::imgui_helpers::initialize(width, height);
 		vc::imgui_helpers::addSwitchViewButton(state.renderState, calibrateCameras);
 		if (vc::imgui_helpers::addPauseResumeToggle(paused)) {
 			for (int i = 0; i < pipelines.size(); i++)
@@ -303,7 +308,8 @@ int main(int argc, char* argv[]) try {
 
 		vc::imgui_helpers::addGenerateCharucoDiamond(folderSettings.charucoFolder);
 		vc::imgui_helpers::addGenerateCharucoBoard(folderSettings.charucoFolder);
-		vc::imgui_helpers::finalize();*/
+		vc::imgui_helpers::finalize();
+		*/
 
 		//switch (state.renderState) {
 		//case RenderState::COUNT:
@@ -419,28 +425,37 @@ std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
 	return c;
 }
 
-
-// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow* window)
-{
-	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-		glfwSetWindowShouldClose(window, true);
-	if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	if (action == GLFW_PRESS) {
+		switch (key) {
+		case GLFW_KEY_ESCAPE: {
+			glfwSetWindowShouldClose(window, true);
+			break;
+		}
+		case GLFW_KEY_1: {
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			break;
+		}
+		case GLFW_KEY_2: {
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			break;
+		}
+		case GLFW_KEY_C: {
+			state.renderState = RenderState::ONLY_COLOR;
+			break;
+		}
+		case GLFW_KEY_D: {
+			state.renderState = RenderState::ONLY_DEPTH;
+			break;
+		}
+		case GLFW_KEY_P: {
+			state.renderState = RenderState::MULTI_POINTCLOUD;
+			break;
+		}
+		}
 	}
-	if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	}
-	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		camera.ProcessKeyboard(FORWARD, deltaTime);
-	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		camera.ProcessKeyboard(BACKWARD, deltaTime);
-	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		camera.ProcessKeyboard(LEFT, deltaTime);
-	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		camera.ProcessKeyboard(RIGHT, deltaTime);
 }
+
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
@@ -448,7 +463,8 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	// make sure the viewport matches the new window dimensions; note that width and 
 	// height will be significantly larger than specified on retina displays.
-	glViewport(0, 0, width, height);
+	glfwMakeContextCurrent(window);
+	glViewport(0, 0, width, height - 50);
 }
 
 

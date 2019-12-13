@@ -14,7 +14,7 @@
 
 namespace vc::imgui_helpers {
 
-	void initialize(std::vector<std::string>& stream_names, const float& width, const float& height)
+	void initialize(const float& width, const float& height)
 	{
 		/*draw_text(10, 20, stream_names[0].c_str());
 		draw_text(width / 2.0f, 20, stream_names[1].c_str());
