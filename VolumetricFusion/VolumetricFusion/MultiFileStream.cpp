@@ -246,39 +246,42 @@ int main(int argc, char* argv[]) try {
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 
+		int width, height;
+		glfwGetWindowSize(window, &width, &height);
+		
+		// Retina display (Mac OS) have double the pixel density
+		int w2, h2;
+		glfwGetFramebufferSize(window, &w2, &h2);
+		const bool isRetinaDisplay = w2 == width * 2 && h2 == width * 2;
+
+		const float aspect = 1.0f * width / height;
+
 		// input
 		// -----
 		processInput(window);
 
 		vc::rendering::startFrame(window);
 
-		switch (state.renderState) {
-		case RenderState::ONLY_COLOR:
+		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
-			for (int i = 0; i < pipelines.size() && i < 4; ++i)
+			switch (state.renderState) {
+			case RenderState::ONLY_COLOR:
 			{
 				int x = i % 2;
 				int y = floor(i / 2);
 				//std::cout << i << ": x=" << x << " - y=" << y << std::endl;
 				if (pipelines[i]->data->filteredColorFrames) {
-					pipelines[i]->rendering->renderOnlyColor(pipelines[i]->data->filteredColorFrames, x, -y);
+					pipelines[i]->rendering->renderOnlyColor(pipelines[i]->data->filteredColorFrames, x, y, aspect);
 				}
+				break;
 			}
-		}
-		break;
+			}
 		}
 		
 		
 
 		int numPipelines = pipelines.size();
 
-		//int width, height;
-		//glfwGetWindowSize(window, &width, &height);
-		//
-		//// Retina display (Mac OS) have double the pixel density
-		//int w2, h2;
-		//glfwGetFramebufferSize(window, &w2, &h2);
-		//const bool isRetinaDisplay = w2 == width * 2 && h2 == width * 2;
 
 	/*	vc::imgui_helpers::initialize(streamNames, width, height);
 		vc::imgui_helpers::addSwitchViewButton(state.renderState, calibrateCameras);

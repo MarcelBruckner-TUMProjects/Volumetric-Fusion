@@ -78,7 +78,7 @@ namespace vc::rendering {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         }
 
-        void renderOnlyColor(rs2::frame color_image, const float pos_x, const float pos_y) {
+        void renderOnlyColor(rs2::frame color_image, const float pos_x, const float pos_y, const float aspect) {
             const int width = color_image.as<rs2::video_frame>().get_width();
             const int height = color_image.as<rs2::video_frame>().get_height();
             glBindTexture(GL_TEXTURE_2D, COLOR_texture);
@@ -86,8 +86,20 @@ namespace vc::rendering {
 
             glBindTexture(GL_TEXTURE_2D, COLOR_texture);
 
+            const float image_aspect = 1.0f * width / height;
+
+            float x_aspect = 1;
+            float y_aspect = 1;
+            if (image_aspect < aspect) {
+                x_aspect = image_aspect / aspect;
+            }
+            else {
+                y_aspect = aspect / image_aspect;
+            }
+
             COLOR_shader->use();
             COLOR_shader->setVec2("offset", pos_x, pos_y);
+            COLOR_shader->setVec2("aspect", x_aspect, y_aspect );
             glBindVertexArray(COLOR_VAO);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
             glBindVertexArray(0);
