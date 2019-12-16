@@ -10,7 +10,7 @@ uniform vec2 aspect;
 void main()
 {
     vec2 pos = aPos;
-    gl_Position = vec4((pos + offset) * aspect, 1.0f, 1.0f);
+    gl_Position = vec4(pos * aspect, 1.0f, 1.0f);
 
     texCoord = aTexCoord;
 }

@@ -73,6 +73,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow*, int button, int action, int mods);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void processMouse(float xoffset, float yoffset, GLboolean constrainPitch = true);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -84,6 +85,10 @@ Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
+float MouseSensitivity = 0.1;
+float Yaw = 0;
+float Pitch = 0;
+glm::mat4 model = glm::mat4(1.0f);
 
 // timing
 float deltaTime = 0.0f;	// time between current frame and last frame
@@ -269,7 +274,7 @@ int main(int argc, char* argv[]) try {
 		
 		//processInput(window);
 
-		glm::mat4 model = glm::mat4(1.0f);
+		//model = glm::mat4(1.0f);
 		glm::mat4 view = camera.GetViewMatrix();
 		// pass projection matrix to shader (note that in this case it could change every frame)
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -284,98 +289,22 @@ int main(int argc, char* argv[]) try {
 			{
 				//std::cout << i << ": x=" << x << " - y=" << y << std::endl;
 				if (state.renderState == RenderState::ONLY_COLOR && pipelines[i]->data->filteredColorFrames) {
-					pipelines[i]->rendering->renderTexture(pipelines[i]->data->filteredColorFrames, x, y, aspect);
+					pipelines[i]->rendering->renderTexture(pipelines[i]->data->filteredColorFrames, x, y, aspect, width, height);
 				}
 				else if (state.renderState == RenderState::ONLY_DEPTH && pipelines[i]->data->colorizedDepthFrames) {
-					pipelines[i]->rendering->renderTexture(pipelines[i]->data->colorizedDepthFrames, x, y, aspect);
+					pipelines[i]->rendering->renderTexture(pipelines[i]->data->colorizedDepthFrames, x, y, aspect, width, height);
 				}
 			}
-			else if (state.renderState == RenderState::MULTI_POINTCLOUD && pipelines[i]->data->points && pipelines[i]->data->filteredColorFrames) {
-				pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y);
-			}
-		}
-		
-		
-		/*
-		vc::imgui_helpers::initialize(width, height);
-		vc::imgui_helpers::addSwitchViewButton(state.renderState, calibrateCameras);
-		if (vc::imgui_helpers::addPauseResumeToggle(paused)) {
-			for (int i = 0; i < pipelines.size(); i++)
-			{
-				pipelines[i]->paused->store(paused);
-			}
-		}
-		
-		if (state.renderState != RenderState::ONLY_DEPTH) {
-			if (vc::imgui_helpers::addCalibrateToggle(calibrateCameras)) {
-				for (int i = 0; i < pipelines.size(); i++)
-				{
-					pipelines[i]->calibrateCameras->store(calibrateCameras);
+			else if ((state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) && pipelines[i]->data->points && pipelines[i]->data->filteredColorFrames) {
+				if (state.renderState == RenderState::MULTI_POINTCLOUD) {
+					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y);
+				}
+				else {
+					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height);
 				}
 			}
 		}
-
-		vc::imgui_helpers::addGenerateCharucoDiamond(folderSettings.charucoFolder);
-		vc::imgui_helpers::addGenerateCharucoBoard(folderSettings.charucoFolder);
-		vc::imgui_helpers::finalize();
-		*/
-
-		//switch (state.renderState) {
-		//case RenderState::COUNT:
-		//case RenderState::MULTI_POINTCLOUD:
-		//{
-		//	// Draw the pointclouds
-		//	for (int i = 0; i < pipelines.size() && i < 4; ++i)
-		//	{
-		//		if (pipelines[i]->data->colorizedDepthFrames && pipelines[i]->data->points) {
-		//			// TODO MULTI POINTCLOUDS 
-		//		}
-		//	}
-		//}
-		//break;
-
-		//case RenderState::CALIBRATED_POINTCLOUD:
-		//{
-		//	if (!calibrateCameras)
-		//	if (isRetinaDisplay) {
-		//		glViewport(0, 0, width * 2, height * 2);
-		//	}
-		//	else {
-		//		glViewport(0, 0, width, height);
-		//	}
-
-		//	for (int i = 0; i < pipelines.size() && i < 4; ++i)
-		//	{
-		//		// TODO CALIBRATED POINTCLOUDS
-		//	}
-		//}
-		//break;
-
-		//case RenderState::ONLY_COLOR:
-		//{
-		//	for (int i = 0; i < pipelines.size() && i < 4; ++i)
-		//	{
-		//		if (pipelines[i]->data->filteredColorFrames != false) {
-		//			// TODO ONLY COLOR
-		//		}
-		//	}
-
-		//	break;
-		//}
-
-		//case RenderState::ONLY_DEPTH:
-		//{
-		//	for (int i = 0; i < pipelines.size() && i < 4; ++i)
-		//	{
-		//		if (pipelines[i]->data->filteredDepthFrames != false) {
-		//			// TODO ONLY DEPTH
-		//		}
-		//	}
-
-		//	break;
-		//}
-		//}
-
+		
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
 		glfwSwapBuffers(window);
@@ -461,12 +390,16 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			state.renderState = RenderState::MULTI_POINTCLOUD;
 			break;
 		}
+		case GLFW_KEY_N: {
+			state.renderState = RenderState::CALIBRATED_POINTCLOUD;
+			break;
+		}
 		case GLFW_KEY_W: {
-			camera.ProcessKeyboard(FORWARD, deltaTime);
+			camera.ProcessKeyboard(UP, deltaTime);
 			break;
 		}
 		case GLFW_KEY_S: {
-			camera.ProcessKeyboard(BACKWARD, deltaTime);
+			camera.ProcessKeyboard(DOWN, deltaTime);
 			break;
 		}
 		case GLFW_KEY_A: {
@@ -511,8 +444,29 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 		lastX = xpos;
 		lastY = ypos;
 
-		camera.ProcessMouseMovement(-xoffset, -yoffset);
+		processMouse(xoffset, yoffset);
+		//camera.ProcessMouseMovement(-xoffset, -yoffset);
 	}
+}
+
+void processMouse(float xoffset, float yoffset, GLboolean constrainPitch ) {
+	xoffset *= MouseSensitivity;
+	yoffset *= MouseSensitivity;
+
+	Yaw += xoffset;
+	Pitch += yoffset;
+
+	// Make sure that when pitch is out of bounds, screen doesn't get flipped
+	if (constrainPitch)
+	{
+		if (Pitch > 89.0f)
+			Pitch = 89.0f;
+		if (Pitch < -89.0f)
+			Pitch = -89.0f;
+	}
+	model = glm::mat4(1.0f);
+	model = glm::rotate(model, glm::radians(Pitch), glm::vec3(1.0f, 0.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(Yaw), glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
 void mouse_button_callback(GLFWwindow*, int button, int action, int mods)
