@@ -72,7 +72,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void processInput(GLFWwindow* window);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -80,7 +79,8 @@ const unsigned int TOP_BAR_HEIGHT = 0;
 const unsigned int SCR_HEIGHT = 600;
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+//Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(0.0f, 0.0f, 1.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -89,7 +89,7 @@ bool firstMouse = true;
 float deltaTime = 0.0f;	// time between current frame and last frame
 float lastFrame = 0.0f;
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::ONLY_COLOR);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::MULTI_POINTCLOUD);
 
 int main(int argc, char* argv[]) try {
 	
@@ -265,6 +265,10 @@ int main(int argc, char* argv[]) try {
 		
 		//processInput(window);
 
+		glm::mat4 model = glm::mat4(1.0f);
+		glm::mat4 view = camera.GetViewMatrix();
+		glm::mat4 projection = glm::mat4(1.0f);
+
 		vc::rendering::startFrame(window);
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
@@ -275,14 +279,14 @@ int main(int argc, char* argv[]) try {
 			{
 				//std::cout << i << ": x=" << x << " - y=" << y << std::endl;
 				if (state.renderState == RenderState::ONLY_COLOR && pipelines[i]->data->filteredColorFrames) {
-					pipelines[i]->rendering->renderOnlyColor(pipelines[i]->data->filteredColorFrames, x, y, aspect);
+					pipelines[i]->rendering->renderTexture(pipelines[i]->data->filteredColorFrames, x, y, aspect);
 				}
 				else if (state.renderState == RenderState::ONLY_DEPTH && pipelines[i]->data->colorizedDepthFrames) {
-					pipelines[i]->rendering->renderOnlyColor(pipelines[i]->data->colorizedDepthFrames, x, y, aspect);
+					pipelines[i]->rendering->renderTexture(pipelines[i]->data->colorizedDepthFrames, x, y, aspect);
 				}
 			}
 			else if (state.renderState == RenderState::MULTI_POINTCLOUD && pipelines[i]->data->points) {
-				pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, width, height, x, y);
+				pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y);
 			}
 		}
 		
@@ -444,12 +448,28 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			state.renderState = RenderState::ONLY_COLOR;
 			break;
 		}
-		case GLFW_KEY_D: {
+		case GLFW_KEY_V: {
 			state.renderState = RenderState::ONLY_DEPTH;
 			break;
 		}
-		case GLFW_KEY_P: {
+		case GLFW_KEY_B: {
 			state.renderState = RenderState::MULTI_POINTCLOUD;
+			break;
+		}
+		case GLFW_KEY_W: {
+			camera.ProcessKeyboard(FORWARD, deltaTime);
+			break;
+		}
+		case GLFW_KEY_S: {
+			camera.ProcessKeyboard(BACKWARD, deltaTime);
+			break;
+		}
+		case GLFW_KEY_A: {
+			camera.ProcessKeyboard(LEFT, deltaTime);
+			break;
+		}
+		case GLFW_KEY_D: {
+			camera.ProcessKeyboard(RIGHT, deltaTime);
 			break;
 		}
 		}
@@ -472,27 +492,27 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 // -------------------------------------------------------
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
-	if (firstMouse)
-	{
-		lastX = xpos;
-		lastY = ypos;
-		firstMouse = false;
-	}
+	//if (firstMouse)
+	//{
+	//	lastX = xpos;
+	//	lastY = ypos;
+	//	firstMouse = false;
+	//}
 
-	float xoffset = xpos - lastX;
-	float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+	//float xoffset = xpos - lastX;
+	//float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
 
-	lastX = xpos;
-	lastY = ypos;
+	//lastX = xpos;
+	//lastY = ypos;
 
-	camera.ProcessMouseMovement(xoffset, yoffset);
+	//camera.ProcessMouseMovement(xoffset, yoffset);
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-	camera.ProcessMouseScroll(yoffset);
+	//camera.ProcessMouseScroll(yoffset);
 }
 
 #pragma endregion

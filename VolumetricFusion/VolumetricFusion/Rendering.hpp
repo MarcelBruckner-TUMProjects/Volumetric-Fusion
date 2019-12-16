@@ -30,10 +30,10 @@
 
 namespace vc::rendering {
     const float COLOR_vertices[] = {
-         0.0f, 1.0f,  1.0f, 1.0f, // top right
-        0.0f, 0.f,  1.0f, 0.0f, // bottom right
-        -1.f, 0.f,  0.0f, 0.0f, // bottom left
-        -1.f, 1.f,  0.0f, 1.0f  // top left 
+         0.0f, 1.0f,  1.0f, 0.0f, // top right
+        0.0f, 0.f,  1.0f, 1.0f, // bottom right
+        -1.f, 0.f,  0.0f, 1.0f, // bottom left
+        -1.f, 1.f,  0.0f, 0.0f  // top left 
     };
     const unsigned int COLOR_indices[] = {  // note that we start from 0!
         0, 1, 3,   // first triangle
@@ -42,18 +42,19 @@ namespace vc::rendering {
 
     class Rendering {
     private:
-        unsigned int VBOs[2], VAOs[2], EBOs[2], textures[2];
-        vc::rendering::Shader* COLOR_shader;
-        vc::rendering::Shader* VERTICES_shader;
+        unsigned int VBOs[3], VAOs[2], EBOs[1], textures[2];
+        vc::rendering::Shader* TEXTURE_shader;
+        vc::rendering::Shader* POINTCLOUD_shader;
 
     public:
         Rendering() {
-            COLOR_shader = new vc::rendering::Shader("shader/only_color.vs", "shader/only_color.fs");
-            VERTICES_shader = new vc::rendering::Shader("shader/only_color.vs", "shader/only_color.fs");
+            TEXTURE_shader = new vc::rendering::Shader("shader/texture.vs", "shader/texture.fs");
+            POINTCLOUD_shader = new vc::rendering::Shader("shader/pointcloud.vs", "shader/pointcloud.fs");
 
             glGenVertexArrays(2, VAOs);
-            glGenBuffers(2, VBOs);
-            glGenBuffers(2, EBOs);
+            glGenBuffers(3, VBOs);
+            glGenBuffers(1, EBOs);
+            glGenBuffers(2, textures);
             initializeVerticesBuffer();
             initializeTextureBuffer();
         }
@@ -74,7 +75,6 @@ namespace vc::rendering {
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
             glEnableVertexAttribArray(1);
 
-            glGenTextures(2, textures);
             glBindTexture(GL_TEXTURE_2D, textures[0]); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
             // set the texture wrapping parameters
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
@@ -86,21 +86,9 @@ namespace vc::rendering {
 
         void initializeVerticesBuffer() {
             glBindVertexArray(VAOs[1]);
-
             glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(COLOR_vertices), COLOR_vertices, GL_STATIC_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER, VBOs[2]);
 
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBOs[1]);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(COLOR_indices), COLOR_indices, GL_STATIC_DRAW);
-
-            // position attribute
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-            glEnableVertexAttribArray(0);
-            // color attribute
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-            glEnableVertexAttribArray(1);
-
-            glGenTextures(2, textures);
             glBindTexture(GL_TEXTURE_2D, textures[1]); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
             // set the texture wrapping parameters
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
@@ -110,18 +98,38 @@ namespace vc::rendering {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         }
 
-        void renderPointcloud(rs2::points points,  const int viewport_width, const int viewport_height, const int pos_x, const int pos_y) {
-            const rs2::vertex* data = points.get_vertices();
+        void renderPointcloud(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection, 
+            const int viewport_width, const int viewport_height, const int pos_x, const int pos_y) {
+            const rs2::vertex* vertices = points.get_vertices();
             const rs2::texture_coordinate* texCoords = points.get_texture_coordinates();
+            const int num_vertices = points.size();
 
-            std::stringstream ss;
-            for (int i = 0; i < 20; i++) {
-                ss << data[i] << ", ";
-            }
-            std::cout << ss.str() << std::endl;
+            glBindVertexArray(VAOs[1]);
+            glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
+            glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(rs2::vertex), vertices, GL_STATIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(rs2::vertex), (void*)0);
+            glEnableVertexAttribArray(0);
+            int i = sizeof(rs2::vertex);
+            glBindBuffer(GL_ARRAY_BUFFER, VBOs[2]);
+            glBufferData(GL_ARRAY_BUFFER, num_vertices, texCoords, GL_STREAM_DRAW);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(rs2::texture_coordinate), 0);
+            glEnableVertexAttribArray(1);
+
+            const int width = texture.as<rs2::video_frame>().get_width();
+            const int height = texture.as<rs2::video_frame>().get_height();
+            glBindTexture(GL_TEXTURE_2D, textures[0]);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture.get_data());
+
+            POINTCLOUD_shader->use();
+            POINTCLOUD_shader->setMat4("model", model);
+            POINTCLOUD_shader->setMat4("view", view);
+            POINTCLOUD_shader->setMat4("projection", projection);
+            //glBindVertexArray(VAOs[1]);
+            glDrawArrays(GL_POINTS, 0, num_vertices);
+            glBindVertexArray(0);
         }
 
-        void renderOnlyColor(rs2::frame color_image, const float pos_x, const float pos_y, const float aspect) {
+        void renderTexture(rs2::frame color_image, const float pos_x, const float pos_y, const float aspect) {
             const int width = color_image.as<rs2::video_frame>().get_width();
             const int height = color_image.as<rs2::video_frame>().get_height();
             glBindTexture(GL_TEXTURE_2D, textures[0]);
@@ -140,9 +148,9 @@ namespace vc::rendering {
                 y_aspect = aspect / image_aspect;
             }
 
-            COLOR_shader->use();
-            COLOR_shader->setVec2("offset", pos_x, pos_y);
-            COLOR_shader->setVec2("aspect", x_aspect, y_aspect );
+            TEXTURE_shader->use();
+            TEXTURE_shader->setVec2("offset", pos_x, -pos_y);
+            TEXTURE_shader->setVec2("aspect", x_aspect, y_aspect );
             glBindVertexArray(VAOs[0]);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
             glBindVertexArray(0);
@@ -156,7 +164,8 @@ namespace vc::rendering {
         glfwMakeContextCurrent(window);
         // render
         // ------
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        //glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
 }

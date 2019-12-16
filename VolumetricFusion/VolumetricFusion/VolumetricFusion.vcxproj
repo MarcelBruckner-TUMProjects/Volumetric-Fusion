@@ -26,6 +26,10 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="readme.md" />
+    <None Include="shader\pointcloud.fs" />
+    <None Include="shader\pointcloud.vs" />
+    <None Include="shader\texture.fs" />
+    <None Include="shader\texture.vs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\third-party\glfw-imgui\src\glfw-imgui.vcxproj">
