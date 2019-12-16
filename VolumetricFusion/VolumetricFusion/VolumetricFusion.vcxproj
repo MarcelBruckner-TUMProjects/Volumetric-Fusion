@@ -26,6 +26,8 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="readme.md" />
+    <None Include="shader\coordinate.fs" />
+    <None Include="shader\coordinate.vs" />
     <None Include="shader\pointcloud.fs" />
     <None Include="shader\pointcloud.vs" />
     <None Include="shader\texture.fs" />

@@ -26,6 +26,12 @@
     <None Include="shader\texture.vs">
       <Filter>Shader</Filter>
     </None>
+    <None Include="shader\coordinate.fs">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\coordinate.vs">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">

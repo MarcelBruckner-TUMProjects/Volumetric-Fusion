@@ -128,7 +128,7 @@ namespace vc::processing {
 								tmp.val[0], tmp.val[1], tmp.val[2], 0,
 								tmp.val[3], tmp.val[4], tmp.val[5], 0,
 								tmp.val[6], tmp.val[7], tmp.val[8], 0,
-								0,0,0,1 });
+								0, 0, 0, 1 });
 
 							hasMarkersDetected = true;
 
