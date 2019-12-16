@@ -31,6 +31,13 @@
 namespace vc::rendering {
     void setViewport(const int viewport_width, const int viewport_height, const int pos_x, const int pos_y);
 
+    const glm::vec3 DEBUG_COLORS[4] = {
+        glm::vec3(1.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 1.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 1.0f),
+        glm::vec3(1.0f, 1.0f, 1.0f)
+    };
+
     const float COLOR_vertices[] = {
          1.0f,  1.0f,  1.0f, 0.0f, // top right
          1.0f, -1.0f,  1.0f, 1.0f, // bottom right
@@ -42,23 +49,51 @@ namespace vc::rendering {
         1, 2, 3    // second triangle
     };
 
+    const float COORDINATE_SYSTEM[] = {
+        0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.05f, 0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.05f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+        0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+        0.05f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+    };
+
     class Rendering {
     private:
+        unsigned int COORDINATE_SYSTEM_VBO, COORDINATE_SYSTEM_VAO;
         unsigned int VBOs[3], VAOs[2], EBOs[1], textures[2];
         vc::rendering::Shader* TEXTURE_shader;
         vc::rendering::Shader* POINTCLOUD_shader;
+        vc::rendering::Shader* COORDINATE_SYSTEM_shader;
 
     public:
         Rendering() {
             TEXTURE_shader = new vc::rendering::Shader("shader/texture.vs", "shader/texture.fs");
             POINTCLOUD_shader = new vc::rendering::Shader("shader/pointcloud.vs", "shader/pointcloud.fs");
+            COORDINATE_SYSTEM_shader = new vc::rendering::Shader("shader/coordinate.vs", "shader/coordinate.fs");
 
             glGenVertexArrays(2, VAOs);
+            glGenVertexArrays(1, &COORDINATE_SYSTEM_VAO);
             glGenBuffers(3, VBOs);
+            glGenBuffers(1, &COORDINATE_SYSTEM_VBO);
             glGenBuffers(1, EBOs);
             glGenBuffers(2, textures);
             initializeVerticesBuffer();
             initializeTextureBuffer();
+            initializeCoordinateSystemBuffers();
+        }
+
+        void initializeCoordinateSystemBuffers() {
+            glBindVertexArray(COORDINATE_SYSTEM_VAO);
+            glBindBuffer(GL_ARRAY_BUFFER, COORDINATE_SYSTEM_VBO);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(COORDINATE_SYSTEM), COORDINATE_SYSTEM, GL_STATIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+            glEnableVertexAttribArray(1);
         }
 
         void initializeTextureBuffer() {
@@ -101,13 +136,16 @@ namespace vc::rendering {
         }
 
         void renderAllPointclouds(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection,
-            const int viewport_width, const int viewport_height, glm::mat4 relativeTransformation) {
-            renderPointcloud(points, texture, model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation);
+            const int viewport_width, const int viewport_height, glm::mat4 relativeTransformation, const int i = 0) {
+            renderPointcloud(points, texture, model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, i);
         }
 
         void renderPointcloud(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection, 
-            const int viewport_width, const int viewport_height, const int pos_x = -1, const int pos_y = -1, glm::mat4 relativeTransformation = glm::mat4(1.0f)) {
+            const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), const int i = 0) {
             setViewport(viewport_width, viewport_height, pos_x, pos_y);
+
+            renderCoordinateSystem(model, view, projection);
+            //return;
 
             const rs2::vertex* vertices = points.get_vertices();
             const rs2::texture_coordinate* texCoords = points.get_texture_coordinates();
@@ -132,6 +170,8 @@ namespace vc::rendering {
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(rs2::texture_coordinate), (void*)0);
             glEnableVertexAttribArray(1);
 
+            auto color = DEBUG_COLORS[i];
+            POINTCLOUD_shader->setColor("color", color.r, color.g, color.b, 1);
             POINTCLOUD_shader->setMat4("relativeTransformation", relativeTransformation);
             POINTCLOUD_shader->setMat4("model", model);
             POINTCLOUD_shader->setMat4("view", view);
@@ -170,6 +210,18 @@ namespace vc::rendering {
 
            /* glBindBuffer(GL_ARRAY_BUFFER, COLOR_VBO);
             glBufferData(GL_ARRAY_BUFFER, vertices.size(), vertices.data(), GL_STREAM_DRAW);*/
+        }
+
+        void renderCoordinateSystem(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
+            glEnable(GL_DEPTH_TEST);
+            COORDINATE_SYSTEM_shader->use();
+            COORDINATE_SYSTEM_shader->setMat4("model", model);
+            COORDINATE_SYSTEM_shader->setMat4("view", view);
+            COORDINATE_SYSTEM_shader->setMat4("projection", projection);
+            glBindVertexArray(COORDINATE_SYSTEM_VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 9);
+            glBindVertexArray(0);
+            glDisable(GL_DEPTH_TEST);
         }
     };
     
