@@ -32,7 +32,7 @@
 #include "Enums.hpp"
 using namespace vc::enums;
 
-#include "ImGuiHelpers.hpp"
+//#include "ImGuiHelpers.hpp"
 #include "processing.hpp"
 
 #include "Eigen/Dense"
@@ -54,7 +54,7 @@ using namespace vc::enums;
 #include <glm/gtc/type_ptr.hpp>
 #include "camera.hpp"
 #include "shader.hpp"
-#include <io.h>
+//#include <io.h>
 
 #pragma endregion
 
@@ -102,9 +102,13 @@ int main(int argc, char* argv[]) try {
 	// glfw: initialize and configure
 	// ------------------------------
 	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+
+
 	
 
 	// glfw window creation
