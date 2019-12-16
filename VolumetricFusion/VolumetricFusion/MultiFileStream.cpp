@@ -35,7 +35,6 @@ using namespace vc::enums;
 //#include "ImGuiHelpers.hpp"
 #include "processing.hpp"
 
-#include "Eigen/Dense"
 #include "Settings.hpp"
 #include "Data.hpp"
 #include "CaptureDevice.hpp"
@@ -193,8 +192,8 @@ int main(int argc, char* argv[]) try {
 	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
 
 	// Calculated relative transformations between cameras per frame
-	std::map<int, Eigen::MatrixXd> relativeTransformations = {
-		{0, Eigen::MatrixXd::Identity(4,4)}
+	std::map<int, glm::mat4> relativeTransformations = {
+		{0, glm::mat4(1.0f)}
 	};
 
 	// Camera calibration thread
@@ -222,29 +221,29 @@ int main(int argc, char* argv[]) try {
 						continue;
 					}
 
-					Eigen::Matrix4d baseToMarkerTranslation = pipelines[i == 0 ? 1 : 0]->processing->translation;
-					Eigen::Matrix4d baseToMarkerRotation = pipelines[i == 0 ? 1 : 0]->processing->rotation;
+					glm::mat4 baseToMarkerTranslation = pipelines[i == 0 ? 1 : 0]->processing->translation;
+					glm::mat4 baseToMarkerRotation = pipelines[i == 0 ? 1 : 0]->processing->rotation;
 
                     //Eigen::Matrix4d markerToRelativeTranslation = pipelines[i]->processing->translation.inverse();
                     //Eigen::Matrix4d markerToRelativeRotation = pipelines[i]->processing->rotation.inverse();
-                    Eigen::Matrix4d markerToRelativeTranslation = pipelines[i]->processing->translation;
-                    Eigen::Matrix4d markerToRelativeRotation = pipelines[i]->processing->rotation;
+					glm::mat4 markerToRelativeTranslation = pipelines[i]->processing->translation;
+					glm::mat4 markerToRelativeRotation = pipelines[i]->processing->rotation;
 
 					//Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
-					Eigen::Matrix4d relativeTransformation = (
+					glm::mat4 relativeTransformation = (
 						//markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation
-						(markerToRelativeTranslation * markerToRelativeRotation).inverse() * baseToMarkerTranslation * baseToMarkerRotation
+						glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerTranslation * baseToMarkerRotation
 					);
 
 					relativeTransformations[i] = relativeTransformation;
 
-				/*	std::stringstream ss;
+					std::stringstream ss;
 					ss << "************************************************************************************" << std::endl;
 					ss << "Devices " << i << ", " << i << std::endl << std::endl;
 					ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << markerToRelativeTranslation << std::endl << std::endl;
 					ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << markerToRelativeRotation << std::endl << std::endl;
 					ss << "Combined: " << std::endl << relativeTransformation << std::endl;
-					std::cout << ss.str();*/
+					std::cout << ss.str();
 				}
 			}
 		}
@@ -272,11 +271,8 @@ int main(int argc, char* argv[]) try {
 
 		const float aspect = 1.0f * width / height;
 		
-		//processInput(window);
-
-		//model = glm::mat4(1.0f);
+		// -------------------------------------------------------------------------------
 		glm::mat4 view = camera.GetViewMatrix();
-		// pass projection matrix to shader (note that in this case it could change every frame)
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
 		vc::rendering::startFrame(window);
@@ -287,7 +283,6 @@ int main(int argc, char* argv[]) try {
 			int y = floor(i / 2);
 			if(state.renderState == RenderState::ONLY_COLOR || state.renderState == RenderState::ONLY_DEPTH)
 			{
-				//std::cout << i << ": x=" << x << " - y=" << y << std::endl;
 				if (state.renderState == RenderState::ONLY_COLOR && pipelines[i]->data->filteredColorFrames) {
 					pipelines[i]->rendering->renderTexture(pipelines[i]->data->filteredColorFrames, x, y, aspect, width, height);
 				}
@@ -300,7 +295,7 @@ int main(int argc, char* argv[]) try {
 					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y);
 				}
 				else {
-					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height);
+					pipelines[i]->rendering->renderAllPointclouds(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, relativeTransformations[i]);
 				}
 			}
 		}
