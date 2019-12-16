@@ -104,6 +104,7 @@ namespace vc::rendering {
             const rs2::texture_coordinate* texCoords = points.get_texture_coordinates();
             const int num_vertices = points.size();
 
+            POINTCLOUD_shader->use();
 
             const int width = texture.as<rs2::video_frame>().get_width();
             const int height = texture.as<rs2::video_frame>().get_height();
@@ -113,7 +114,7 @@ namespace vc::rendering {
             glBindVertexArray(VAOs[1]);
             
             glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
-            glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(rs2::vertex), vertices, GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(rs2::vertex), vertices, GL_STREAM_DRAW);
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(rs2::vertex), (void*)0);
             glEnableVertexAttribArray(0);
 
@@ -122,12 +123,10 @@ namespace vc::rendering {
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(rs2::texture_coordinate), (void*)0);
             glEnableVertexAttribArray(1);
 
-
-            POINTCLOUD_shader->use();
             POINTCLOUD_shader->setMat4("model", model);
             POINTCLOUD_shader->setMat4("view", view);
             POINTCLOUD_shader->setMat4("projection", projection);
-            //glBindVertexArray(VAOs[1]);
+
             glDrawArrays(GL_POINTS, 0, num_vertices);
             glBindVertexArray(0);
         }

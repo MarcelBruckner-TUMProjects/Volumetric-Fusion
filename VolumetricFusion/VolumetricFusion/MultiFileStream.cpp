@@ -102,14 +102,10 @@ int main(int argc, char* argv[]) try {
 	// glfw: initialize and configure
 	// ------------------------------
 	glfwInit();
-
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-
-
-	
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
 	// glfw window creation
 	// --------------------
@@ -275,7 +271,8 @@ int main(int argc, char* argv[]) try {
 
 		glm::mat4 model = glm::mat4(1.0f);
 		glm::mat4 view = camera.GetViewMatrix();
-		glm::mat4 projection = glm::mat4(1.0f);
+		// pass projection matrix to shader (note that in this case it could change every frame)
+		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
 		vc::rendering::startFrame(window);
 
@@ -293,7 +290,7 @@ int main(int argc, char* argv[]) try {
 					pipelines[i]->rendering->renderTexture(pipelines[i]->data->colorizedDepthFrames, x, y, aspect);
 				}
 			}
-			else if (state.renderState == RenderState::MULTI_POINTCLOUD && pipelines[i]->data->points) {
+			else if (state.renderState == RenderState::MULTI_POINTCLOUD && pipelines[i]->data->points && pipelines[i]->data->filteredColorFrames) {
 				pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y);
 			}
 		}
