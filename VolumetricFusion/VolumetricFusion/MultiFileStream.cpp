@@ -54,6 +54,7 @@ using namespace vc::enums;
 #include "camera.hpp"
 #include "shader.hpp"
 //#include <io.h>
+#include <glm/gtx/string_cast.hpp>
 
 #pragma endregion
 
@@ -232,18 +233,20 @@ int main(int argc, char* argv[]) try {
 					//Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
 					glm::mat4 relativeTransformation = (
 						//markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation
-						glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerTranslation * baseToMarkerRotation
+						//glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerTranslation * baseToMarkerRotation
+						glm::inverse(baseToMarkerTranslation * baseToMarkerRotation) * markerToRelativeTranslation * markerToRelativeRotation
 					);
 
 					relativeTransformations[i] = relativeTransformation;
 
-					std::stringstream ss;
-					ss << "************************************************************************************" << std::endl;
-					ss << "Devices " << i << ", " << i << std::endl << std::endl;
-					ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << markerToRelativeTranslation << std::endl << std::endl;
-					ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << markerToRelativeRotation << std::endl << std::endl;
-					ss << "Combined: " << std::endl << relativeTransformation << std::endl;
-					std::cout << ss.str();
+					//std::stringstream ss;
+					//ss << "************************************************************************************" << std::endl;
+					//ss << "Devices " << i << ", " << i << std::endl << std::endl;
+					//ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << markerToRelativeTranslation << std::endl << std::endl;
+					//ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << markerToRelativeRotation << std::endl << std::endl;
+					//ss << "Combined: " << std::endl << relativeTransformation << std::endl;
+					//std::cout << ss.str();
+					std::cout << glm::to_string(relativeTransformation) << std::endl << std::endl;
 				}
 			}
 		}

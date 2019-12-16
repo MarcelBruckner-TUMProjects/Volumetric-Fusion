@@ -296,11 +296,17 @@ void testVisualization() {
 				// Draw call.
 				glDrawArrays(GL_POINTS, 0, nPoints);
 				
-				Mat4f cameraPose2(-0.948254, -0.317345, -0.0102926, 0.252493
-					, 0.312217, -0.937847, 0.151534, 0.138665
-					, -0.0577416, 0.14048, 0.988398, -0.0946556
-					, 0, 0, 0, 1);
-				shaderPoints2.use(viewMatrix * cameraPose, viewProjMatrix * cameraPose, colorIntrinsicsProjection2, colorExtrinsics2, colorWidth2, colorHeight2);
+				//Mat4f cameraPose2(-0.948254, -0.317345, -0.0102926, 0.252493
+				//	, 0.312217, -0.937847, 0.151534, 0.138665
+				//	, -0.0577416, 0.14048, 0.988398, -0.0946556
+				//	, 0, 0, 0, 1);
+
+				Mat4f cameraPose2(-0.931374, 0.362238, -0.036413, 19.196568,
+					-0.141143, -0.267075, 0.953284, 44.103508,
+					0.335591, 0.893003, 0.299874, 35.351875,
+					0, 0, 0, 1);
+
+				shaderPoints2.use(viewMatrix * cameraPose2, viewProjMatrix * cameraPose2, colorIntrinsicsProjection2, colorExtrinsics2, colorWidth2, colorHeight2);
 
 				// Points
 				glBindBuffer(GL_ARRAY_BUFFER, pointsBuffer2);
