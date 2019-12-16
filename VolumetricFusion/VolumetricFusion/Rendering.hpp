@@ -29,11 +29,13 @@
 #include "shader.hpp"
 
 namespace vc::rendering {
+    void setViewport(const int viewport_width, const int viewport_height, const int pos_x, const int pos_y);
+
     const float COLOR_vertices[] = {
-         0.0f, 1.0f,  1.0f, 0.0f, // top right
-        0.0f, 0.f,  1.0f, 1.0f, // bottom right
-        -1.f, 0.f,  0.0f, 1.0f, // bottom left
-        -1.f, 1.f,  0.0f, 0.0f  // top left 
+         1.0f,  1.0f,  1.0f, 0.0f, // top right
+         1.0f, -1.0f,  1.0f, 1.0f, // bottom right
+        -1.0f, -1.0f,  0.0f, 1.0f, // bottom left
+        -1.0f,  1.0f,  0.0f, 0.0f  // top left 
     };
     const unsigned int COLOR_indices[] = {  // note that we start from 0!
         0, 1, 3,   // first triangle
@@ -99,7 +101,9 @@ namespace vc::rendering {
         }
 
         void renderPointcloud(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection, 
-            const int viewport_width, const int viewport_height, const int pos_x, const int pos_y) {
+            const int viewport_width, const int viewport_height, const int pos_x = -1, const int pos_y = -1) {
+            setViewport(viewport_width, viewport_height, pos_x, pos_y);
+
             const rs2::vertex* vertices = points.get_vertices();
             const rs2::texture_coordinate* texCoords = points.get_texture_coordinates();
             const int num_vertices = points.size();
@@ -131,7 +135,9 @@ namespace vc::rendering {
             glBindVertexArray(0);
         }
 
-        void renderTexture(rs2::frame color_image, const float pos_x, const float pos_y, const float aspect) {
+        void renderTexture(rs2::frame color_image, const float pos_x, const float pos_y, const float aspect, const int viewport_width, const int viewport_height) {
+            setViewport(viewport_width, viewport_height, pos_x, pos_y);
+
             const int width = color_image.as<rs2::video_frame>().get_width();
             const int height = color_image.as<rs2::video_frame>().get_height();
             glBindTexture(GL_TEXTURE_2D, textures[0]);
@@ -151,7 +157,6 @@ namespace vc::rendering {
             }
 
             TEXTURE_shader->use();
-            TEXTURE_shader->setVec2("offset", pos_x, -pos_y);
             TEXTURE_shader->setVec2("aspect", x_aspect, y_aspect );
             glBindVertexArray(VAOs[0]);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -161,7 +166,7 @@ namespace vc::rendering {
             glBufferData(GL_ARRAY_BUFFER, vertices.size(), vertices.data(), GL_STREAM_DRAW);*/
         }
     };
-
+    
     void startFrame(GLFWwindow* window) {
         glfwMakeContextCurrent(window);
         // render
@@ -169,6 +174,17 @@ namespace vc::rendering {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         //glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
+
+    void setViewport(const int viewport_width, const int viewport_height, const int pos_x, const int pos_y) {
+        if (pos_x < 0 || pos_y < 0) {
+            glViewport(0, 0, viewport_width, viewport_height);
+            return;
+        }
+        int width = viewport_width / 2;
+        int height = viewport_height / 2;
+
+        glViewport(width * pos_x, height - height * pos_y, width, height);
     }
 }
 
