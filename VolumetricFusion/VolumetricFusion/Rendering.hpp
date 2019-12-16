@@ -100,8 +100,13 @@ namespace vc::rendering {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         }
 
+        void renderAllPointclouds(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection,
+            const int viewport_width, const int viewport_height, glm::mat4 relativeTransformation) {
+            renderPointcloud(points, texture, model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation);
+        }
+
         void renderPointcloud(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection, 
-            const int viewport_width, const int viewport_height, const int pos_x = -1, const int pos_y = -1) {
+            const int viewport_width, const int viewport_height, const int pos_x = -1, const int pos_y = -1, glm::mat4 relativeTransformation = glm::mat4(1.0f)) {
             setViewport(viewport_width, viewport_height, pos_x, pos_y);
 
             const rs2::vertex* vertices = points.get_vertices();
@@ -127,6 +132,7 @@ namespace vc::rendering {
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(rs2::texture_coordinate), (void*)0);
             glEnableVertexAttribArray(1);
 
+            POINTCLOUD_shader->setMat4("relativeTransformation", relativeTransformation);
             POINTCLOUD_shader->setMat4("model", model);
             POINTCLOUD_shader->setMat4("view", view);
             POINTCLOUD_shader->setMat4("projection", projection);

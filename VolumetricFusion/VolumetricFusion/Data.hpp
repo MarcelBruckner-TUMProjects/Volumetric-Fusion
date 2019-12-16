@@ -68,10 +68,7 @@ namespace vc::data {
 		rs2::pointcloud pointclouds;
 		rs2::frame colorizedDepthFrames;
 		rs2::points points;
-
-		Eigen::MatrixXd vertices;
-		//Eigen::Map<Eigen::MatrixXf> *vertices;
-
+		
 		Camera camera;
 		vc::processing::Processing* processing;
 

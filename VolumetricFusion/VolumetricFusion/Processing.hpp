@@ -10,9 +10,11 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
-#include "Eigen/Dense";
 
 #include "Data.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 
 namespace vc::data {
@@ -90,8 +92,8 @@ namespace vc::processing {
 		// buffer <frame_id, value>
 		bool hasMarkersDetected = false;
 		std::vector<int> charucoIdBuffers;
-		Eigen::Matrix4d rotation;
-		Eigen::Matrix4d translation;
+		glm::mat4 rotation = glm::mat4(1.0f);
+		glm::mat4 translation = glm::mat4(1.0f);
 		void startCharucoProcessing(vc::data::Camera& camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
@@ -118,20 +120,15 @@ namespace vc::processing {
 							cv::aruco::drawAxis(image, camera.cameraMatrices, camera.distCoeffs, r, t, 0.1);
 
 							charucoIdBuffers = charucoIds;
-							Eigen::Matrix4d tmpTranslation;
-							tmpTranslation.setIdentity();
-							tmpTranslation.block<3, 1>(0, 3) << t[0], t[1], t[2];
-							translation = tmpTranslation;
+							translation = glm::translate(translation, glm::vec3(t[0], t[1], t[2]));
 
 							cv::Matx33d tmp;
 							cv::Rodrigues(r, tmp);
-							Eigen::Matrix4d tmpRotation;
-							tmpRotation.setIdentity();
-							tmpRotation.block<3, 3>(0, 0) <<
-								tmp.val[0], tmp.val[1], tmp.val[2],
-								tmp.val[3], tmp.val[4], tmp.val[5],
-								tmp.val[6], tmp.val[7], tmp.val[8];
-							rotation = tmpRotation;
+							rotation = glm::make_mat4(new double[16]{
+								tmp.val[0], tmp.val[1], tmp.val[2], 0,
+								tmp.val[3], tmp.val[4], tmp.val[5], 0,
+								tmp.val[6], tmp.val[7], tmp.val[8], 0,
+								0,0,0,1 });
 
 							hasMarkersDetected = true;
 
