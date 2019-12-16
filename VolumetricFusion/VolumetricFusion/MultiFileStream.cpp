@@ -233,13 +233,13 @@ int main(int argc, char* argv[]) try {
 
 					relativeTransformations[i] = relativeTransformation;
 
-				/*	std::stringstream ss;
+					std::stringstream ss;
 					ss << "************************************************************************************" << std::endl;
 					ss << "Devices " << i << ", " << i << std::endl << std::endl;
 					ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << markerToRelativeTranslation << std::endl << std::endl;
 					ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << markerToRelativeRotation << std::endl << std::endl;
 					ss << "Combined: " << std::endl << relativeTransformation << std::endl;
-					std::cout << ss.str();*/
+					std::cout << ss.str();
 				}
 			}
 		}

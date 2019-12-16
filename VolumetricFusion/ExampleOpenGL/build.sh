@@ -1,0 +1,1 @@
+cmake.exe -G "Visual Studio 15 2017 Win64" -B./build -H. -DVCPKG_TARGET_TRIPLET=x64-windows -DCMAKE_TOOLCHAIN_FILE="C:\Workspace\vcpkg\scripts\buildsystems\vcpkg.cmake"
