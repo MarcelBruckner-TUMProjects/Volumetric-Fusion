@@ -104,21 +104,24 @@ namespace vc::rendering {
             const rs2::texture_coordinate* texCoords = points.get_texture_coordinates();
             const int num_vertices = points.size();
 
-            glBindVertexArray(VAOs[1]);
-            glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
-            glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(rs2::vertex), vertices, GL_STATIC_DRAW);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(rs2::vertex), (void*)0);
-            glEnableVertexAttribArray(0);
-            int i = sizeof(rs2::vertex);
-            glBindBuffer(GL_ARRAY_BUFFER, VBOs[2]);
-            glBufferData(GL_ARRAY_BUFFER, num_vertices, texCoords, GL_STREAM_DRAW);
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(rs2::texture_coordinate), 0);
-            glEnableVertexAttribArray(1);
 
             const int width = texture.as<rs2::video_frame>().get_width();
             const int height = texture.as<rs2::video_frame>().get_height();
             glBindTexture(GL_TEXTURE_2D, textures[0]);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture.get_data());
+
+            glBindVertexArray(VAOs[1]);
+            
+            glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
+            glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(rs2::vertex), vertices, GL_STATIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(rs2::vertex), (void*)0);
+            glEnableVertexAttribArray(0);
+
+            glBindBuffer(GL_ARRAY_BUFFER, VBOs[2]);
+            glBufferData(GL_ARRAY_BUFFER, num_vertices, texCoords, GL_STREAM_DRAW);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(rs2::texture_coordinate), (void*)0);
+            glEnableVertexAttribArray(1);
+
 
             POINTCLOUD_shader->use();
             POINTCLOUD_shader->setMat4("model", model);
