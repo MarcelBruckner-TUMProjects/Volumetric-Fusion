@@ -216,7 +216,7 @@ int main(int argc, char* argv[]) try {
 
 			for (int i = 0; i < pipelines.size(); i++) {
 				{
-					if (!pipelines[i]->processing->hasMarkersDetected || relativeTransformations.count(i) != 0) {
+					if (!pipelines[i]->processing->hasMarkersDetected/* || relativeTransformations.count(i) != 0*/) {
 						continue;
 					}
 
@@ -464,7 +464,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 		}
 
 		float xoffset = xpos - lastX;
-		float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+		float yoffset = ypos - lastY; // reversed since y-coordinates go from bottom to top
+		//float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
 
 		lastX = xpos;
 		lastY = ypos;

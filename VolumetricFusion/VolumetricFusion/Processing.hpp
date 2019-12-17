@@ -95,6 +95,7 @@ namespace vc::processing {
 		std::vector<int> charucoIdBuffers;
 		glm::mat4 rotation = glm::mat4(1.0f);
 		glm::mat4 translation = glm::mat4(1.0f);
+
 		void startCharucoProcessing(vc::data::Camera& camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
@@ -119,7 +120,8 @@ namespace vc::processing {
 						// if charuco pose is valid
 						if (valid) {
 							cv::aruco::drawAxis(image, camera.cameraMatrices, camera.distCoeffs, r, t, 0.1);
-
+							rotation = glm::mat4(1.0f);
+							translation = glm::mat4(1.0f);
 							charucoIdBuffers = charucoIds;
 							translation = glm::translate(translation, glm::vec3(t[0], t[1], t[2]));
 							//r[1] = -r[1];
