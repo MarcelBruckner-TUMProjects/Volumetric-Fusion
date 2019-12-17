@@ -75,9 +75,9 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processMouse(float xoffset, float yoffset, GLboolean constrainPitch = true);
 
 // settings
-const unsigned int SCR_WIDTH = 800;
+const unsigned int SCR_WIDTH = 800 * 2;
 const unsigned int TOP_BAR_HEIGHT = 0;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_HEIGHT = 600 * 2 ;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
@@ -224,7 +224,8 @@ int main(int argc, char* argv[]) try {
 					glm::mat4 baseToMarkerRotation = pipelines[0]->processing->rotation;
 
 					if (i == 0) {
-						relativeTransformations[i] = /*glm::mat4(1.0f);*/ glm::inverse(baseToMarkerTranslation);
+						relativeTransformations[i] = glm::inverse(baseToMarkerTranslation);
+						//relativeTransformations[i] = glm::mat4(1.0f); 
 						continue;
 					}
 
@@ -241,7 +242,8 @@ int main(int argc, char* argv[]) try {
 
 						//baseToMarkerTranslation * (baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
 						//baseToMarkerTranslation * glm::inverse((baseToMarkerRotation) * glm::inverse(markerToRelativeRotation)) * glm::inverse(markerToRelativeTranslation)
-						/*baseToMarkerTranslation **/ glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
+						/*baseToMarkerTranslation **/ glm::inverse(baseToMarkerRotation)* (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
+						//baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
 						//baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
 
 						//glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerTranslation * baseToMarkerRotation
@@ -304,7 +306,7 @@ int main(int argc, char* argv[]) try {
 		// -------------------------------------------------------------------------------
 		glm::mat4 view = camera.GetViewMatrix();
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-
+		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
 		vc::rendering::startFrame(window);
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
