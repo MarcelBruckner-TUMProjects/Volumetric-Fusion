@@ -39,19 +39,19 @@ enum class VisualizationMode {
 void testVisualization() {
 	// Global settings.
 	//std::string meshPath = "../data/mesh.ply";
-	std::string depthIntrinsicsPath = "../data/depthIntrinsics_2.mat";
-	std::string depthExtrinsicsPath = "../data/depthExtrinsics_2.mat";
-	std::string colorIntrinsicsPath = "../data/colorIntrinsics_2.mat";
-	std::string colorExtrinsicsPath = "../data/colorExtrinsics_2.mat";
-	std::string colorImagePath = "../data/color000000_2.png";
-	std::string depthImagePath = "../data/depth000000_2.png";
+	std::string depthIntrinsicsPath = "../data/depthIntrinsics_4.mat";
+	std::string depthExtrinsicsPath = "../data/depthExtrinsics_4.mat";
+	std::string colorIntrinsicsPath = "../data/colorIntrinsics_4.mat";
+	std::string colorExtrinsicsPath = "../data/colorExtrinsics_4.mat";
+	std::string colorImagePath = "../data/color000000_4.png";
+	std::string depthImagePath = "../data/depth000000_4.png";
 
-	std::string depthIntrinsicsPath2 = "../data/depthIntrinsics_3.mat";
-	std::string depthExtrinsicsPath2 = "../data/depthExtrinsics_3.mat";
-	std::string colorIntrinsicsPath2 = "../data/colorIntrinsics_3.mat";
-	std::string colorExtrinsicsPath2 = "../data/colorExtrinsics_3.mat";
-	std::string colorImagePath2 = "../data/color000000_3.png";
-	std::string depthImagePath2 = "../data/depth000000_3.png";
+	std::string depthIntrinsicsPath2 = "../data/depthIntrinsics_5.mat";
+	std::string depthExtrinsicsPath2 = "../data/depthExtrinsics_5.mat";
+	std::string colorIntrinsicsPath2 = "../data/colorIntrinsics_5.mat";
+	std::string colorExtrinsicsPath2 = "../data/colorExtrinsics_5.mat";
+	std::string colorImagePath2 = "../data/color000000_5.png";
+	std::string depthImagePath2 = "../data/depth000000_5.png";
 
 	float depthMin = 0.2f;
 	float depthMax = 8.0f;
@@ -276,9 +276,14 @@ void testVisualization() {
 		else if (visualizationMode == VisualizationMode::POINTCLOUD) {
 			{
 
-
 				// Render points.
 				Mat4f cameraPose = Mat4f::identity();
+
+				Mat4f cameraPose1(0.84991388, -0.26177695, 0.45729556, 2.18669759,
+					0.27087871, 0.96146821, 0.0469426, -4.09601347,
+					-0.45196363, 0.08397447, 0.88807498, 18.49981854,
+					0, 0, 0, 1);
+
 				shaderPoints.use(viewMatrix * cameraPose, viewProjMatrix * cameraPose, colorIntrinsicsProjection, colorExtrinsics, colorWidth, colorHeight);
 
 				// Points
@@ -301,12 +306,17 @@ void testVisualization() {
 				//	, -0.0577416, 0.14048, 0.988398, -0.0946556
 				//	, 0, 0, 0, 1);
 
-				Mat4f cameraPose2(-0.931374, 0.362238, -0.036413, 19.196568,
-					-0.141143, -0.267075, 0.953284, 44.103508,
-					0.335591, 0.893003, 0.299874, 35.351875,
-					0, 0, 0, 1);
+				//Mat4f cameraPose2(-0.931374, 0.362238, -0.036413, 19.196568,
+				//	-0.141143, -0.267075, 0.953284, 44.103508,
+				//	0.335591, 0.893003, 0.299874, 35.351875,
+				//	0, 0, 0, 1);
 
-				shaderPoints2.use(viewMatrix * cameraPose2, viewProjMatrix * cameraPose2, colorIntrinsicsProjection2, colorExtrinsics2, colorWidth2, colorHeight2);
+				Mat4f cameraPose2(0.89017749, -0.43662759, 0.13015521, 4.05189313,
+					0.42247246, 0.89798885, 0.12301644, 2.59794436,
+					-0.17059031, -0.05451947, 0.98383259, -15.57232251,
+					0.0, 0.0, 0.0, 1.0);
+
+				shaderPoints2.use(viewMatrix * cameraPose, viewProjMatrix * cameraPose, colorIntrinsicsProjection2, colorExtrinsics2, colorWidth2, colorHeight2);
 
 				// Points
 				glBindBuffer(GL_ARRAY_BUFFER, pointsBuffer2);
