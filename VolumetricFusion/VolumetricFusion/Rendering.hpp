@@ -170,8 +170,9 @@ namespace vc::rendering {
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(rs2::texture_coordinate), (void*)0);
             glEnableVertexAttribArray(1);
 
-            auto color = DEBUG_COLORS[i];
-            POINTCLOUD_shader->setColor("color", color.r, color.g, color.b, 1);
+            //auto color = DEBUG_COLORS[i];
+            //POINTCLOUD_shader->setColor("color", color.r, color.g, color.b, 1);
+            POINTCLOUD_shader->setColor("color", 1, 1, 1, 1);
             POINTCLOUD_shader->setMat4("relativeTransformation", relativeTransformation);
             POINTCLOUD_shader->setMat4("model", model);
             POINTCLOUD_shader->setMat4("view", view);
