@@ -7,9 +7,7 @@
     <ClCompile Include="std_image.cpp">
       <Filter>Header Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\..\..\Program Files\OpenGL\glad\src\glad.c">
-      <Filter>Header Files</Filter>
-    </ClCompile>
+    <ClCompile Include="glad\src\glad.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.md" />
