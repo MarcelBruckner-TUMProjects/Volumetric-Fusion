@@ -19,7 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\..\..\Program Files\OpenGL\glad\src\glad.c" />
+    <ClCompile Include="glad\src\glad.c" />
     <ClCompile Include="MultiFileStream.cpp" />
     <ClCompile Include="std_image.cpp" />
   </ItemGroup>
@@ -113,8 +113,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\Program Files\OpenGL\glad\include;C:\Program Files\OpenGL\glm-stable;C:\dev\eigen;C:\dev\glfw-3.3\include;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\include;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party\glfw-imgui\include;$(OPENCV_DIR)\..\..\..\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(OPENCV_DIR)\lib;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\lib\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Program Files\OpenGL\glad\include;C:\Program Files\OpenGL\glm-stable;C:\dev\eigen;C:\dev\glfw-3.3\include;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\include;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party\glfw-imgui\include;$(OPENCV_DIR)\..\..\..\include;glad\include;C:\dev\glm-0.9.9.6;$(IncludePath)</IncludePath>
+    <LibraryPath>$(OPENCV_DIR)\lib;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\lib\x64;C:\dev\opencv\build\lib\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
