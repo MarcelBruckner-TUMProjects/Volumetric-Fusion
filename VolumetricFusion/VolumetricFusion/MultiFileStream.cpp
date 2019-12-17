@@ -193,7 +193,7 @@ int main(int argc, char* argv[]) try {
 
 	// Calculated relative transformations between cameras per frame
 	std::map<int, glm::mat4> relativeTransformations = {
-		{0, glm::mat4(1.0f)}
+		//{0, glm::mat4(1.0f)}
 	};
 
 	// Camera calibration thread
@@ -214,20 +214,35 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
-			for (int i = 1; i < pipelines.size(); i++) {
+			for (int i = 0; i < pipelines.size(); i++) {
 				{
 					if (!pipelines[i]->processing->hasMarkersDetected || relativeTransformations.count(i) != 0) {
 						continue;
 					}
 
-					glm::mat4 baseToMarkerTranslation = pipelines[i == 0 ? 1 : 0]->processing->translation;
-					glm::mat4 baseToMarkerRotation = pipelines[i == 0 ? 1 : 0]->processing->rotation;
+					glm::mat4 baseToMarkerTranslation = pipelines[0]->processing->translation;
+					glm::mat4 baseToMarkerRotation = pipelines[0]->processing->rotation;
+
+					if (i == 0) {
+						relativeTransformations[i] = /*glm::mat4(1.0f);*/ glm::inverse(baseToMarkerTranslation);
+						continue;
+					}
 
 					glm::mat4 markerToRelativeTranslation = pipelines[i]->processing->translation;
 					glm::mat4 markerToRelativeRotation = pipelines[i]->processing->rotation;
 
 					glm::mat4 relativeTransformation = (
-						glm::mat4(1.0f)
+						//glm::mat4(1.0f)
+
+						//baseToMarkerTranslation * (markerToRelativeRotation) * (baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation)
+						//baseToMarkerTranslation * glm::inverse(markerToRelativeRotation) * (baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation)
+						//baseToMarkerTranslation * (markerToRelativeRotation) * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation)
+						//baseToMarkerTranslation * glm::inverse(markerToRelativeRotation) * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation) 
+
+						//baseToMarkerTranslation * (baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
+						//baseToMarkerTranslation * glm::inverse((baseToMarkerRotation) * glm::inverse(markerToRelativeRotation)) * glm::inverse(markerToRelativeTranslation)
+						/*baseToMarkerTranslation **/ glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
+						//baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
 
 						//glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerTranslation * baseToMarkerRotation
 						//glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerRotation * baseToMarkerTranslation

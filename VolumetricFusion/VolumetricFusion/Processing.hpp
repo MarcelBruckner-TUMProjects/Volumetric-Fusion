@@ -16,7 +16,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-
+#define _USE_MATH_DEFINES
+#include <math.h>
 namespace vc::data {
 	class Data;
 }
@@ -121,14 +122,21 @@ namespace vc::processing {
 
 							charucoIdBuffers = charucoIds;
 							translation = glm::translate(translation, glm::vec3(t[0], t[1], t[2]));
-
+							//r[1] = -r[1];
 							cv::Matx33d tmp;
 							cv::Rodrigues(r, tmp);
-							rotation = glm::make_mat4(new double[16]{
+							rotation = glm::mat4(
 								tmp.val[0], tmp.val[1], tmp.val[2], 0,
 								tmp.val[3], tmp.val[4], tmp.val[5], 0,
 								tmp.val[6], tmp.val[7], tmp.val[8], 0,
-								0, 0, 0, 1 });
+								0, 0, 0, 1
+							);
+							/*rotation = glm::mat4(
+								tmp.val[0], tmp.val[3], tmp.val[6], 0,
+								tmp.val[1], tmp.val[4], tmp.val[7], 0,
+								tmp.val[2], tmp.val[5], tmp.val[8], 0,
+								0, 0, 0, 1
+							);*/
 
 							hasMarkersDetected = true;
 
