@@ -151,6 +151,21 @@ namespace vc::rendering {
             const rs2::texture_coordinate* texCoords = points.get_texture_coordinates();
             const int num_vertices = points.size();
 
+            //int num_not_zero_texCoords = 0;
+            //std::stringstream ss;
+            //for (int i = 0; i < num_vertices; i++)
+            ////for (int i = num_vertices; i > 0; i--)
+            //{
+            //    rs2::texture_coordinate coord = texCoords[i];
+            //    if (coord.u > 0 || coord.v > 0) {
+            //        ss << coord.u << ", " << coord.v << "-";
+            //        num_not_zero_texCoords++;
+            //    }
+            //    //ss << coord.u << ", " << coord.v << "-";
+            //}
+            //std::cout << ss.str() << std::endl;
+            //std::cout << std::endl << std::endl << std::endl << std::endl << std::endl << std::endl;
+
             POINTCLOUD_shader->use();
 
             const int width = texture.as<rs2::video_frame>().get_width();
@@ -166,7 +181,7 @@ namespace vc::rendering {
             glEnableVertexAttribArray(0);
 
             glBindBuffer(GL_ARRAY_BUFFER, VBOs[2]);
-            glBufferData(GL_ARRAY_BUFFER, num_vertices, texCoords, GL_STREAM_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(rs2::texture_coordinate), texCoords, GL_STREAM_DRAW);
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(rs2::texture_coordinate), (void*)0);
             glEnableVertexAttribArray(1);
 

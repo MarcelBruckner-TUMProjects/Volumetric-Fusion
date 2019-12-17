@@ -12,4 +12,5 @@ void main()
     //texC.x *= -1;
     //texC.y *= -1;
     FragColor = texture(onlyColorTexture, texC) * color;
+    // FragColor = vec4(texC, 0.0, 1.0f);
 }
