@@ -216,7 +216,7 @@ int main(int argc, char* argv[]) try {
 
 			for (int i = 0; i < pipelines.size(); i++) {
 				{
-					if (!pipelines[i]->processing->hasMarkersDetected || relativeTransformations.count(i) != 0) {
+					if (!pipelines[i]->processing->hasMarkersDetected/* || relativeTransformations.count(i) != 0*/) {
 						continue;
 					}
 
