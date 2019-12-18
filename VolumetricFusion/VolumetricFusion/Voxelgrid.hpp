@@ -122,12 +122,13 @@ namespace vc::fusion {
 				float pt_base_y = origin.y + pt_grid_y * resolution;
 				float pt_base_z = origin.z + pt_grid_z * resolution;
 
+				// Same as hashFunc :)
 				int volume_idx = pt_grid_z * size.y * size.x + pt_grid_y * size.x + pt_grid_x;
 
-				if (volume_idx >= (size.x * size.y * size.z) * resolutionInv) {
+				/*if (volume_idx >= (size.x * size.y * size.z) * resolutionInv * resolutionInv * resolutionInv) {
 					std::cout << "ERROR: volume_idx out of range" << std::endl;
 					continue;
-				}
+				}*/
 				//float dist = fmin(1.0f, diff / trunc_margin);
 				float weight_old = weights[volume_idx];
 				float weight_new = weight_old + 1.0f;
