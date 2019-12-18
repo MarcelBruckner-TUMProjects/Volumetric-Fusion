@@ -73,7 +73,6 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow*, int button, int action, int mods);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void processMouse(float xoffset, float yoffset, GLboolean constrainPitch = true);
 
 // settings
 const unsigned int SCR_WIDTH = 800 * 2;
@@ -280,6 +279,39 @@ int main(int argc, char* argv[]) try {
 			}
 		}
 	});
+#pragma endregion
+
+
+#pragma region Fusion Thread
+	auto fusionThread = std::thread([&stopped, &calibrateCameras, &relativeTransformations]() {
+		const int maxIntegrations = 10;
+		int integrations = 0;
+		while (!stopped) {
+			if (calibrateCameras) {
+				continue;
+			}
+
+			// TODO: may integrate the same frames multiple times
+			vc::fusion::Voxelgrid voxelgrid;
+			for (int i = 0; i < pipelines.size(); i++) {
+				// Only integrate frames with a valid transformation
+				if (relativeTransformations.count(i) <= 0) {
+					continue;
+				}
+
+				const rs2::vertex* vertices = pipelines[i]->data->points.get_vertices();
+
+				auto pip = pipelines[i]->processing;
+				std::cout << "Integrating " << i << " - Frame: " << pip->frameId << std::endl;
+				voxelgrid.integrateFrame(pipelines[i]->data->points, relativeTransformations[i]);
+			}
+			integrations++;
+			if (integrations >= maxIntegrations) {
+				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
+				break;
+			}
+		}
+		});
 #pragma endregion
 
 #pragma region Main loop

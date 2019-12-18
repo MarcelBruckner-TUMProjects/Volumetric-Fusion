@@ -22,6 +22,8 @@ namespace vc::fusion {
 		glm::vec3 totalMin = glm::vec3((float)INT_MAX);
 		glm::vec3 totalMax = glm::vec3((float)INT_MIN);
 
+		std::map<int, std::vector<int>> integratedFramesPerPipeline;
+
 	public:
 		Voxelgrid(const float resolution = 0.1, const glm::vec3 size = glm::vec3(5.0f), const glm::vec3 origin = glm::vec3(0.0f)) {
 			this->resolution = resolution;
@@ -75,8 +77,8 @@ namespace vc::fusion {
 		};
 
 
-		void integrateFrame(const rs2::points points, glm::mat4 relativeTransformation) {
-
+		void integrateFrame(const rs2::points points, glm::mat4 relativeTransformation, const int pipelineId, const int frameId) {
+			integratedFramesPerPipeline[pipelineId].push_back(frameId);
 			const float* vertices_f = reinterpret_cast<const float*>(points.get_vertices());
 
 			// insert them into the voxel grid (point by point)
