@@ -1,20 +1,36 @@
 #version 430
-layout(local_size_x = 1, local_size_y = 1, local_size_y = 1) in;
-layout(rgba32f, binding = 0) uniform image3D img_output;
 
-void main() {
-    // base pixel colour for image
-    vec4 pixel = vec4(0.0, 0.0, 0.0, 1.0);
-    // get index in global work group i.e x,y position
-    ivec3 pixel_coords = ivec3(gl_GlobalInvocationID.xyz);
-  
-    ivec3 dims = imageSize(img_output); // fetch image dimensions
+// Compute Shader SSB Data Structure and Buffer Definition
 
-    float col_x = (float(pixel_coords.x) / dims.x);
-    float col_y = (float(pixel_coords.y) / dims.y);
-    float col_z = (float(pixel_coords.z) / dims.z);
-    pixel = vec4(col_x, col_y, col_z, 1.0);
-    
-    // output to a specific pixel in the image
-    imageStore(img_output, pixel_coords, pixel);
-}
+uniform float resolution;
+uniform float resolutionInv;
+uniform vec3 size;
+uniform vec3 sizeHalf;
+uniform vec3 origin;
+uniform mat4 relativeTransformation;
+
+shared vec3 totalMin;
+shared vec3 totalMax;
+
+struct VtxData {
+   vec3  vtx_pos;       // 4N [GOOD] -- Largest base alignment
+}; 
+
+struct TsdfData {
+   float tsdf_value;       // 4N [GOOD] -- Largest base alignment
+}; 
+
+struct WeightsData {
+   float weights_value;       // 4N [GOOD] -- Largest base alignment
+}; 
+
+layout (local_size_x = 1) in;
+layout (std140, binding = 0) buffer VertexBuffer {
+   VtxData verts [];
+};
+layout (std140, binding = 1) buffer TsdfBuffer {
+   TsdfData tsdfs [];
+};
+layout (std140, binding = 2) buffer WeightsBuffer {
+   WeightsData weights [];
+};

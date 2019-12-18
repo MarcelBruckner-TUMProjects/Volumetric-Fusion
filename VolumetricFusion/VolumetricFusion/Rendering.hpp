@@ -71,9 +71,9 @@ namespace vc::rendering {
 
     public:
         Rendering() {
-            TEXTURE_shader = new vc::rendering::Shader("shader/texture.vs", "shader/texture.fs");
-            POINTCLOUD_shader = new vc::rendering::Shader("shader/pointcloud.vs", "shader/pointcloud.fs");
-            COORDINATE_SYSTEM_shader = new vc::rendering::Shader("shader/coordinate.vs", "shader/coordinate.fs");
+            TEXTURE_shader = new vc::rendering::VertexFragmentShader("shader/texture.vs", "shader/texture.fs");
+            POINTCLOUD_shader = new vc::rendering::VertexFragmentShader("shader/pointcloud.vs", "shader/pointcloud.fs");
+            COORDINATE_SYSTEM_shader = new vc::rendering::VertexFragmentShader("shader/coordinate.vs", "shader/coordinate.fs");
 
             glGenVertexArrays(2, VAOs);
             glGenVertexArrays(1, &COORDINATE_SYSTEM_VAO);

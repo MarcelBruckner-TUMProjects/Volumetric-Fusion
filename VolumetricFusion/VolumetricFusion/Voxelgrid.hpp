@@ -15,6 +15,7 @@ namespace vc::fusion {
 		float resolution;
 		float resolutionInv;
 		glm::vec3 size;
+		glm::vec3 sizeHalf;
 		glm::vec3 origin;
 
 		std::vector<float> points;
@@ -35,6 +36,7 @@ namespace vc::fusion {
 			this->resolutionInv = 1.0f / resolution;
 			this->origin = origin;
 			this->size = size;
+			this->sizeHalf = size / 2.0f;
 
 			for (float i = -size.x / 2.0f; i <= size.x / 2.0f; i += resolution)
 			{
@@ -53,7 +55,7 @@ namespace vc::fusion {
 		}
 
 		void initializeOpenGL() {
-			shader = new vc::rendering::Shader("shader/voxelgrid.vs", "shader/voxelgrid.fs");
+			shader = new vc::rendering::VertexFragmentShader("shader/voxelgrid.vs", "shader/voxelgrid.fs");
 			glGenVertexArrays(1, &VAO);
 			glGenBuffers(1, &VBO);
 
@@ -108,8 +110,6 @@ namespace vc::fusion {
 			// insert them into the voxel grid (point by point)
 			// yes, it is fucking slow
 			
-			auto size_half = size / 2.0f;
-
 			for (int i = 0; i < points.size(); ++i) {
 				// apply transformation
 				auto index = i * 3;
@@ -117,9 +117,9 @@ namespace vc::fusion {
 				auto v = glm::vec4(vertex, 1.0);
 				auto transformedVertex = relativeTransformation * v;
 
-				int pt_grid_x = roundf(transformedVertex.x * resolutionInv + size_half.x); //% voxel_size; // to cm
-				int pt_grid_y = roundf(transformedVertex.y * resolutionInv + size_half.y);
-				int pt_grid_z = roundf(transformedVertex.z * resolutionInv + size_half.z);
+				int pt_grid_x = roundf(transformedVertex.x * resolutionInv + sizeHalf.x); //% voxel_size; // to cm
+				int pt_grid_y = roundf(transformedVertex.y * resolutionInv + sizeHalf.y);
+				int pt_grid_z = roundf(transformedVertex.z * resolutionInv + sizeHalf.z);
 
 				// Convert voxel center from grid coordinates to base frame camera coordinates
 				float pt_base_x = origin.x + pt_grid_x * resolution;

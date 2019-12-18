@@ -171,6 +171,47 @@ int main()
     ComputeShader computeShader = ComputeShader("compute_shader.comp");
 
     GLfloat* computedData = new GLfloat[tex_d * tex_h * tex_w * sizeof(GLfloat)];
+    GLfloat* data = new GLfloat [tex_d * tex_h * tex_w * sizeof(GLfloat)];
+
+    struct Vertex {
+        GLfloat pos[4];
+    } *verts;
+
+    verts = new Vertex[10];
+    for (int i = 0; i < 10; i++)
+    {
+        verts[i] = Vertex{ 0,1,2,3 };
+    }
+
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 48, (void*)0); // Vertex Attrib. 0
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 48, (void*)16); // Vertex Attrib. 1
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 48, (void*)32); // Vertex Attrib. 2
+
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, vbo); // Buffer Binding 1
+
+    for (int i = 0; i < tex_w; i++)
+    {
+        for (int j = 0; j < tex_h; j++)
+        {
+            for (int k = 0; k < tex_d; k++)
+            {
+                data[k * tex_h * tex_w + j * tex_w + i] = k * tex_h * tex_w + j * tex_w + i;
+            }
+        }
+    }
+
+    GLuint ssbo;
+    glGenBuffers(1, &ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(data), data, GL_STATIC_DRAW); //sizeof(data) only works for statically sized C/C++ arrays.
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); // unbind
 
     // render loop
     // -----------
@@ -201,7 +242,7 @@ int main()
             ss << computedData[i] << ", ";
         }
             
-        std::cout << ss.str() << std::endl;
+        //std::cout << ss.str() << std::endl;
 
         // render
         // ------

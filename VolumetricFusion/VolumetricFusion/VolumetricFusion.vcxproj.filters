@@ -38,6 +38,9 @@
     <None Include="shader\voxelgrid.vs">
       <Filter>Shader</Filter>
     </None>
+    <None Include="shader\compute_shader.comp">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">
@@ -81,9 +84,6 @@
     <ClInclude Include="camera.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="shader.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="stb_image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -91,6 +91,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MarchingCubes.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeShader.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Shader.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

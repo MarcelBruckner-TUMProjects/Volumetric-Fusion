@@ -26,6 +26,7 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="readme.md" />
+    <None Include="shader\compute_shader.comp" />
     <None Include="shader\coordinate.fs" />
     <None Include="shader\coordinate.vs" />
     <None Include="shader\pointcloud.fs" />
@@ -43,6 +44,7 @@
   <ItemGroup>
     <ClInclude Include="camera.hpp" />
     <ClInclude Include="CaptureDevice.hpp" />
+    <ClInclude Include="ComputeShader.hpp" />
     <ClInclude Include="Data.hpp" />
     <ClInclude Include="Enums.hpp" />
     <ClInclude Include="FileAccess.hpp" />
@@ -51,7 +53,7 @@
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />
-    <ClInclude Include="shader.hpp" />
+    <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Voxelgrid.hpp" />
   </ItemGroup>
