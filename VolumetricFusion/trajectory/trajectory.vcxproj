@@ -33,7 +33,6 @@
   <ItemGroup>
     <ClInclude Include="..\..\third-party\lz4\lz4.h" />
     <ClInclude Include="..\t265.h" />
-    <ClInclude Include="..\example.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{C492F5C1-C615-3197-99C2-7278DFB18326}</ProjectGuid>

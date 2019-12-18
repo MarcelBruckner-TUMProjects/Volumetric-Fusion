@@ -10,20 +10,21 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
-#include "Data.hpp"
-#include "Processing.hpp"
+#include "data.hpp"
+#include "processing.hpp"
+#include "Rendering.hpp"
 
 namespace vc::capture {
-
 	/// <summary>
 	/// Base class for capturing devices
 	/// </summary>
 	class CaptureDevice {
 	public:
 		rs2::config cfg;
+		std::shared_ptr < vc::rendering::Rendering> rendering;
 		std::shared_ptr < vc::processing::Processing> processing;
+		std::shared_ptr < vc::data::Data> data;
 
-		std::shared_ptr < vc::data::Data >data;
 		std::shared_ptr<rs2::pipeline > pipeline;
 
 		std::shared_ptr < std::atomic_bool> stopped;
@@ -54,6 +55,7 @@ namespace vc::capture {
 		}
 
 		CaptureDevice(CaptureDevice& other) {
+			this->rendering = other.rendering;
 			this->data = other.data;
 			this->processing = other.processing;
 			this->pipeline = other.pipeline;
@@ -66,6 +68,7 @@ namespace vc::capture {
 		}
 
 		CaptureDevice(rs2::context context) {
+			this->rendering = std::make_shared<vc::rendering::Rendering>();
 			this->data = std::make_shared<vc::data::Data>();
 			this->processing = std::make_shared<vc::processing::Processing>();
 			this->pipeline = std::make_shared<rs2::pipeline>(context);
@@ -120,36 +123,6 @@ namespace vc::capture {
 					data->points = data->pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
 					data->colorizedDepthFrames = data->colorizer.process(depthFrame);		// Colorize the depth frame with a color map
 					data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud
-
-					//auto startTime = std::chrono::steady_clock::now();
-
-					//auto pointCount = data->points.size();
-					//auto vertices = data->points.get_vertices();
-					
-					//float* fs = const_cast<float*>(reinterpret_cast<const float*>(vertices));
-
-					//new (&this->data->vertices) Eigen::Map<Eigen::MatrixXf>(fs, 3, pointCount);
-					
-					//Eigen::Map<Eigen::MatrixXf> eigenVertices(fs, 3, pointCount);
-					//this->data->vertices = Eigen::MatrixXd::Ones(4, pointCount);
-					//this->data->vertices.block(0, 0, 3, pointCount) << eigenVertices.cast<double>();
-
-					//this->data->vertices = Eigen::Map<Eigen::MatrixXf>(fs, 3, pointCount);
-
-					/*data->vertices = Eigen::MatrixXd(4, pointCount);
-					pointCount = pointCount - (pointCount % 5);
-					// 64 KB cache lines, (4+4+4) * 5 = 60;
-					for (int i = 0; i < pointCount; i+= 5) {
-						data->vertices.block(0, i, 4, 5) <<
-							vertices[i + 0].x, vertices[i + 0].y, vertices[i + 0].z, 1,
-							vertices[i + 1].x, vertices[i + 1].y, vertices[i + 1].z, 1,
-							vertices[i + 2].x, vertices[i + 2].y, vertices[i + 2].z, 1,
-							vertices[i + 3].x, vertices[i + 3].y, vertices[i + 3].z, 1,
-							vertices[i + 4].x, vertices[i + 4].y, vertices[i + 4].z, 1;
-					}*/
-
-					//auto endTime = std::chrono::steady_clock::now();
-					//std::cout << "Elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() << " ms" << std::endl;
 				}
 				catch (const std::exception & e) {
 					std::stringstream stream;
