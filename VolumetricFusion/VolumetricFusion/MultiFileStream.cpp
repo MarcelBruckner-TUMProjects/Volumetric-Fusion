@@ -53,6 +53,7 @@ using namespace vc::enums;
 #include <glm/gtc/type_ptr.hpp>
 #include "camera.hpp"
 #include "shader.hpp"
+#include <VolumetricFusion\Voxelgrid.hpp>
 //#include <io.h>
 
 #pragma endregion
@@ -87,7 +88,6 @@ bool firstMouse = true;
 float MouseSensitivity = 0.1;
 float Yaw = 0;
 float Pitch = 0;
-glm::mat4 model = glm::mat4(1.0f);
 
 // timing
 float deltaTime = 0.0f;	// time between current frame and last frame
@@ -100,6 +100,9 @@ vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderSta
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
+
+vc::fusion::Voxelgrid* voxelgrid;
+bool renderVoxelgrid = true;
 
 int main(int argc, char* argv[]) try {
 	
@@ -140,6 +143,8 @@ int main(int argc, char* argv[]) try {
 		std::cout << "Failed to initialize GLAD" << std::endl;
 		return -1;
 	}
+
+	voxelgrid = new vc::fusion::Voxelgrid();
 
 	//ImGui_ImplGlfw_Init(window, false);
 	
@@ -299,6 +304,8 @@ int main(int argc, char* argv[]) try {
 		const float aspect = 1.0f * width / height;
 		
 		// -------------------------------------------------------------------------------
+
+		glm::mat4 model = glm::mat4(1.0f);
 		glm::mat4 view = camera.GetViewMatrix();
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -320,13 +327,18 @@ int main(int argc, char* argv[]) try {
 			else if ((state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) && pipelines[i]->data->points && pipelines[i]->data->filteredColorFrames) {
 				if (state.renderState == RenderState::MULTI_POINTCLOUD) {
 					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y);
+					if (renderVoxelgrid) {
+						voxelgrid->render(model, view, projection);
+					}
 				}
 				else {
 					pipelines[i]->rendering->renderAllPointclouds(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, relativeTransformations[i], i);
 				}
 			}
 		}
-		
+		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+			voxelgrid->render(model, view, projection);
+		}
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
 		glfwSwapBuffers(window);
@@ -417,11 +429,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			break;
 		}
 		case GLFW_KEY_W: {
-			camera.ProcessKeyboard(UP, deltaTime);
+			camera.ProcessKeyboard(FORWARD, deltaTime);
 			break;
 		}
 		case GLFW_KEY_S: {
-			camera.ProcessKeyboard(DOWN, deltaTime);
+			camera.ProcessKeyboard(BACKWARD, deltaTime);
 			break;
 		}
 		case GLFW_KEY_A: {
@@ -437,6 +449,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			for (auto pipe : pipelines) {
 				pipe->processing->visualize = visualizeCharucoResults;
 			}
+			break;
+		}
+		case GLFW_KEY_G: {
+			renderVoxelgrid = !renderVoxelgrid;
 			break;
 		}
 		}
@@ -474,30 +490,30 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 		lastX = xpos;
 		lastY = ypos;
 
-		processMouse(xoffset, yoffset);
-		//camera.ProcessMouseMovement(-xoffset, -yoffset);
+		//processMouse(xoffset, yoffset);
+		camera.ProcessMouseMovement(xoffset, yoffset);
 	}
 }
-
-void processMouse(float xoffset, float yoffset, GLboolean constrainPitch ) {
-	xoffset *= MouseSensitivity;
-	yoffset *= MouseSensitivity;
-
-	Yaw += xoffset;
-	Pitch += yoffset;
-
-	// Make sure that when pitch is out of bounds, screen doesn't get flipped
-	if (constrainPitch)
-	{
-		if (Pitch > 89.0f)
-			Pitch = 89.0f;
-		if (Pitch < -89.0f)
-			Pitch = -89.0f;
-	}
-	model = glm::mat4(1.0f);
-	model = glm::rotate(model, glm::radians(Pitch), glm::vec3(1.0f, 0.0f, 0.0f));
-	model = glm::rotate(model, glm::radians(Yaw), glm::vec3(0.0f, 1.0f, 0.0f));
-}
+//
+//void processMouse(float xoffset, float yoffset, GLboolean constrainPitch ) {
+//	xoffset *= MouseSensitivity;
+//	yoffset *= MouseSensitivity;
+//
+//	Yaw += xoffset;
+//	Pitch += yoffset;
+//
+//	// Make sure that when pitch is out of bounds, screen doesn't get flipped
+//	if (constrainPitch)
+//	{
+//		if (Pitch > 89.0f)
+//			Pitch = 89.0f;
+//		if (Pitch < -89.0f)
+//			Pitch = -89.0f;
+//	}
+//	model = glm::mat4(1.0f);
+//	model = glm::rotate(model, glm::radians(Pitch), glm::vec3(1.0f, 0.0f, 0.0f));
+//	model = glm::rotate(model, glm::radians(Yaw), glm::vec3(0.0f, 1.0f, 0.0f));
+//}
 
 void mouse_button_callback(GLFWwindow*, int button, int action, int mods)
 {
