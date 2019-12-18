@@ -302,11 +302,6 @@ int main(int argc, char* argv[]) try {
 				auto pip = pipelines[i]->processing;
 				voxelgrid->integrateFrame(pipelines[i]->data->points, relativeTransformations[i], i, pip->frameId);
 			}
-			integrations++;
-			if (integrations >= maxIntegrations) {
-				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
-				break;
-			}
 		}
 		});
 #pragma endregion

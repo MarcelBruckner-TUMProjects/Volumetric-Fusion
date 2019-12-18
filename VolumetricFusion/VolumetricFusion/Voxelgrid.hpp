@@ -1,9 +1,13 @@
+#ifndef _VOXELGRID_HEADER_
+#define _VOXELGRID_HEADER_
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <vector>
 #include <VolumetricFusion\shader.hpp>
 #include <unordered_map>
+
 
 namespace vc::fusion {
 	class Voxelgrid {
@@ -94,7 +98,7 @@ namespace vc::fusion {
 			}
 			else {
 				if (std::find(integratedFramesPerPipeline[pipelineId].begin(), integratedFramesPerPipeline[pipelineId].end(), frameId) != integratedFramesPerPipeline[pipelineId].end()) {
-					std::cout << "Already integrated." << std::endl;
+					std::cout << "Already integrated." << std::endl << std::endl;
 					return;
 				}
 			}
@@ -153,3 +157,5 @@ namespace vc::fusion {
 		}
 	};
 }
+
+#endif
