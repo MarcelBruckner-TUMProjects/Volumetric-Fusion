@@ -44,6 +44,7 @@
     <ClInclude Include="Data.hpp" />
     <ClInclude Include="Enums.hpp" />
     <ClInclude Include="FileAccess.hpp" />
+    <ClInclude Include="Fusion.hpp" />
     <ClInclude Include="ImGuiHelpers.hpp" />
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />

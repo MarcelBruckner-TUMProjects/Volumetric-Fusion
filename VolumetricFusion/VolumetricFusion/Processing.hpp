@@ -92,12 +92,16 @@ namespace vc::processing {
 		// Pose estimation buffers
 		// buffer <frame_id, value>
 		bool hasMarkersDetected = false;
+		int lastFrameId = -1;
 		std::vector<int> charucoIdBuffers;
 		glm::mat4 rotation = glm::mat4(1.0f);
 		glm::mat4 translation = glm::mat4(1.0f);
 
 		void startCharucoProcessing(vc::data::Camera& camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
+				
+				lastFrameId = frameId;
+
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
 				/*cv::Ptr<cv::aruco::DetectorParameters> params;

@@ -79,5 +79,6 @@
     <ClInclude Include="stb_image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Fusion.hpp" />
   </ItemGroup>
 </Project>

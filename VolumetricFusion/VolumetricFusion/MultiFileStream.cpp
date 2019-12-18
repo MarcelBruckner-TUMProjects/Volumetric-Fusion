@@ -39,6 +39,7 @@ using namespace vc::enums;
 #include "Data.hpp"
 #include "CaptureDevice.hpp"
 #include "Rendering.hpp"
+#include "Fusion.hpp"
 #if APPLE
 #include "FileAccess.hpp"
 #include <glut.h>
@@ -138,6 +139,20 @@ int main(int argc, char* argv[]) try {
 		return -1;
 	}
 
+	glad_set_post_callback([](const char* name, void* funcptr, int len_args, ...) {
+		GLenum error_code;
+
+		(void)funcptr;
+		(void)len_args;
+
+		error_code = glad_glGetError();
+
+		if (error_code != GL_NO_ERROR) {
+			// shut this up for a while
+			//fprintf(stderr, "ERROR %d in %s\n", error_code, name);
+		}
+	});
+
 	//ImGui_ImplGlfw_Init(window, false);
 	
 	//vc::rendering::Rendering rendering(app, viewOrientation);
@@ -196,9 +211,15 @@ int main(int argc, char* argv[]) try {
 		//{0, glm::mat4(1.0f)}
 	};
 
-	// Camera calibration thread
-	std::thread calibrationThread;
+	// Program state (mostly for recordings)
+	struct {
+		std::vector<int> highestFrameIds = { -1, -1, -1, -1 };
+		bool allMarkersDetected = false;
+		bool allPipelinesEnteredLooped = false;
+	} programState;
+
 	std::atomic_bool calibrateCameras = true;
+	std::atomic_bool fuseFrames = true;
 
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i]->startPipeline();
@@ -208,16 +229,24 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Camera Calibration Thread
 
-	calibrationThread = std::thread([&pipelines, &stopped, &calibrateCameras, &relativeTransformations]() {
+	auto calibrationThread = std::thread([&pipelines, &stopped, &calibrateCameras, &fuseFrames, &programState, &relativeTransformations]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
 				continue;
 			}
 
+			int markersDetected = 0;
+			int pipelinesEnteredLoop = 0;
 			for (int i = 0; i < pipelines.size(); i++) {
 				{
 					if (!pipelines[i]->processing->hasMarkersDetected/* || relativeTransformations.count(i) != 0*/) {
 						continue;
+					}
+					markersDetected++;
+
+					programState.highestFrameIds[i] = MAX(pipelines[i]->processing->lastFrameId, programState.highestFrameIds[i]);
+					if (programState.highestFrameIds[i] > pipelines[i]->processing->lastFrameId) {
+						pipelinesEnteredLoop++;
 					}
 
 					glm::mat4 baseToMarkerTranslation = pipelines[0]->processing->translation;
@@ -277,6 +306,41 @@ int main(int argc, char* argv[]) try {
 					//ss << "Combined: " << std::endl << relativeTransformation << std::endl;
 					//std::cout << ss.str();
 				}
+			}
+			programState.allMarkersDetected = markersDetected == pipelines.size();
+			programState.allPipelinesEnteredLooped = pipelinesEnteredLoop == pipelines.size();
+
+			if (programState.allMarkersDetected) {
+				calibrateCameras.store(false);
+				// start fusion thread logic
+				fuseFrames.store(true);
+			}
+		}
+	});
+#pragma endregion
+
+#pragma region Fusion Thread
+	auto fusionThread = std::thread([&pipelines, &stopped, &calibrateCameras, &fuseFrames, &programState, &relativeTransformations]() {
+		const int maxIntegrations = 10;
+		int integrations = 0;
+		while (!stopped) {
+			if (calibrateCameras || !fuseFrames || programState.allPipelinesEnteredLooped) {
+				continue;
+			}
+
+			// TODO: may integrate the same frames multiple times
+			vc::fusion::Fusion fus;
+			for (int i = 0; i < pipelines.size(); i++) {
+				const rs2::vertex* vertices = pipelines[i]->data->points.get_vertices();
+
+				auto pip = pipelines[i]->processing;
+				std::cout << "Fusing " << i << ": " << pip->lastFrameId << "/" << programState.highestFrameIds[i] << std::endl;
+				fus.integrateFrame(pipelines[i]->data->points, relativeTransformations[i]);
+			}
+			integrations++;
+			if (integrations >= maxIntegrations) {
+				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
+				break;
 			}
 		}
 	});
@@ -347,6 +411,7 @@ int main(int argc, char* argv[]) try {
 		pipelines[i]->thread->join();
 	}
 	calibrationThread.join();
+	fusionThread.join();
 #pragma endregion
 	glfwTerminate();
 	//std::exit(EXIT_SUCCESS);

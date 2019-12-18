@@ -43,6 +43,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>C:\Program Files\OpenGL\glad\include;C:\Program Files\OpenGL\glm-stable;C:\dev\eigen;C:\dev\glfw-3.3\include;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\include;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party\glfw-imgui\include;$(OPENCV_DIR)\..\..\..\include;glad\include;C:\dev\glm-0.9.9.6;$(IncludePath)</IncludePath>
+    <LibraryPath>$(OPENCV_DIR)\lib;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\lib\x64;C:\dev\opencv\build\lib\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -53,7 +55,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;opencv_core420d.lib;opencv_imgproc420d.lib;opencv_imgcodecs420d.lib;opencv_highgui420d.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <CudaCompile>
