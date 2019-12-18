@@ -9,6 +9,7 @@ namespace vc::fusion {
 	class Voxelgrid {
 	private:
 		float resolution;
+		float resolutionInv;
 		glm::vec3 size;
 		glm::vec3 origin;
 
@@ -27,6 +28,7 @@ namespace vc::fusion {
 	public:
 		Voxelgrid(const float resolution = 0.1, const glm::vec3 size = glm::vec3(5.0f), const glm::vec3 origin = glm::vec3(0.0f)) {
 			this->resolution = resolution;
+			this->resolutionInv = 1.0f / resolution;
 			this->origin = origin;
 			this->size = size;
 
@@ -111,9 +113,9 @@ namespace vc::fusion {
 				auto v = glm::vec4(vertex, 1.0);
 				auto transformedVertex = relativeTransformation * v;
 
-				int pt_grid_x = roundf(transformedVertex.x * 100 + size_half.x); //% voxel_size; // to cm
-				int pt_grid_y = roundf(transformedVertex.y * 100 + size_half.y);
-				int pt_grid_z = roundf(transformedVertex.z * 100 + size_half.z);
+				int pt_grid_x = roundf(transformedVertex.x * resolutionInv + size_half.x); //% voxel_size; // to cm
+				int pt_grid_y = roundf(transformedVertex.y * resolutionInv + size_half.y);
+				int pt_grid_z = roundf(transformedVertex.z * resolutionInv + size_half.z);
 
 				// Convert voxel center from grid coordinates to base frame camera coordinates
 				float pt_base_x = origin.x + pt_grid_x * resolution;
@@ -122,7 +124,7 @@ namespace vc::fusion {
 
 				int volume_idx = pt_grid_z * size.y * size.x + pt_grid_y * size.x + pt_grid_x;
 
-				if (volume_idx >= size.x * size.y * size.z) {
+				if (volume_idx >= (size.x * size.y * size.z) * resolutionInv) {
 					std::cout << "ERROR: volume_idx out of range" << std::endl;
 					continue;
 				}

@@ -383,6 +383,7 @@ int main(int argc, char* argv[]) try {
 		pipelines[i]->thread->join();
 	}
 	calibrationThread.join();
+	fusionThread.join();
 #pragma endregion
 	glfwTerminate();
 	//std::exit(EXIT_SUCCESS);
