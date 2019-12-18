@@ -287,12 +287,10 @@ int main(int argc, char* argv[]) try {
 		const int maxIntegrations = 10;
 		int integrations = 0;
 		while (!stopped) {
-			if (calibrateCameras) {
-				continue;
-			}
+			//if (calibrateCameras) {
+			//	continue;
+			//}
 
-			// TODO: may integrate the same frames multiple times
-			vc::fusion::Voxelgrid voxelgrid;
 			for (int i = 0; i < pipelines.size(); i++) {
 				// Only integrate frames with a valid transformation
 				if (relativeTransformations.count(i) <= 0) {
@@ -302,8 +300,7 @@ int main(int argc, char* argv[]) try {
 				const rs2::vertex* vertices = pipelines[i]->data->points.get_vertices();
 
 				auto pip = pipelines[i]->processing;
-				std::cout << "Integrating " << i << " - Frame: " << pip->frameId << std::endl;
-				voxelgrid.integrateFrame(pipelines[i]->data->points, relativeTransformations[i]);
+				voxelgrid->integrateFrame(pipelines[i]->data->points, relativeTransformations[i], i, pip->frameId);
 			}
 			integrations++;
 			if (integrations >= maxIntegrations) {

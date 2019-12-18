@@ -29,7 +29,7 @@ namespace vc::fusion {
 			this->resolution = resolution;
 			this->origin = origin;
 			this->size = size;
-			
+
 			for (float i = -size.x / 2.0f; i <= size.x / 2.0f; i += resolution)
 			{
 				for (float j = -size.y / 2.0f; j <= size.y / 2.0f; j += resolution)
@@ -77,7 +77,25 @@ namespace vc::fusion {
 		};
 
 
+		void reset() {
+			tsdf.clear();
+			weights.clear();
+			totalMin = glm::vec3((float)INT_MAX);
+			totalMax = glm::vec3((float)INT_MIN);
+		}
+
 		void integrateFrame(const rs2::points points, glm::mat4 relativeTransformation, const int pipelineId, const int frameId) {
+			std::cout << "Integrating " << pipelineId << " - Frame: " << frameId << std::endl;
+			
+			if (integratedFramesPerPipeline.count(pipelineId) <= 0) {
+				integratedFramesPerPipeline[pipelineId] = std::vector<int>();
+			}
+			else {
+				if (std::find(integratedFramesPerPipeline[pipelineId].begin(), integratedFramesPerPipeline[pipelineId].end(), frameId) != integratedFramesPerPipeline[pipelineId].end()) {
+					std::cout << "Already integrated." << std::endl;
+					return;
+				}
+			}
 			integratedFramesPerPipeline[pipelineId].push_back(frameId);
 			const float* vertices_f = reinterpret_cast<const float*>(points.get_vertices());
 
