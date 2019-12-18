@@ -87,9 +87,6 @@
     <CudaCompile Include="demo.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="utils.hpp" />
-  </ItemGroup>
-  <ItemGroup>
     <Text Include="data\camera-intrinsics.txt" />
     <Text Include="data\rgbd-frames\frame-000150.pose.txt" />
     <Text Include="data\rgbd-frames\frame-000151.pose.txt" />
@@ -243,6 +240,9 @@
     <Image Include="data\rgbd-frames\frame-000198.depth.png" />
     <Image Include="data\rgbd-frames\frame-000199.color.png" />
     <Image Include="data\rgbd-frames\frame-000199.depth.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="utils.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

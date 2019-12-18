@@ -53,13 +53,9 @@ using namespace vc::enums;
 #include <glm/gtc/type_ptr.hpp>
 #include "camera.hpp"
 #include "shader.hpp"
-#include <glm/gtx/string_cast.hpp>
 //#include <io.h>
 
 #pragma endregion
-
-#include "fusion.cuh"
-
 
 template<typename T, typename V>
 std::vector<T> extractKeys(std::map<T, V> const& input_map);
@@ -186,21 +182,6 @@ int main(int argc, char* argv[]) try {
 		streamNames.emplace_back("");
 	}
 
-	glm::mat3 instrinsics = glm::mat3(1.0f);
-
-	for (int i = 0; i < pipelines.size(); i++) {
-		if (i == 0) {
-			
-			instrinsics = glm::mat3(
-				pipelines[i]->data->camera.intrinsics.fx, 0, pipelines[i]->data->camera.intrinsics.ppx,
-				0, pipelines[i]->data->camera.intrinsics.fy, pipelines[i]->data->camera.intrinsics.ppy,
-				0, 0, 1
-			);
-		}
-	}
-
-	//std::cout << glm::to_string(instrinsics) << std::endl;
-
 	// Create a thread for getting frames from the device and process them
 	// to prevent UI thread from blocking due to long computations.
 	std::atomic_bool stopped(false);
@@ -261,9 +242,10 @@ int main(int argc, char* argv[]) try {
 
 						//baseToMarkerTranslation * (baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
 						//baseToMarkerTranslation * glm::inverse((baseToMarkerRotation) * glm::inverse(markerToRelativeRotation)) * glm::inverse(markerToRelativeTranslation)
-						/*baseToMarkerTranslation **/ glm::inverse(baseToMarkerRotation)* (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
-						//baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
+						/*baseToMarkerTranslation **/ //glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
 						//baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
+
+						(baseToMarkerTranslation * baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation * markerToRelativeRotation)
 
 						//glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerTranslation * baseToMarkerRotation
 						//glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerRotation * baseToMarkerTranslation
@@ -348,8 +330,6 @@ int main(int argc, char* argv[]) try {
 				else {
 					pipelines[i]->rendering->renderAllPointclouds(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, relativeTransformations[i], i);
 				}
-				
-				tsdf_fusion(pipelines[i]->data->points, width, height, relativeTransformations[i]);
 			}
 		}
 		
