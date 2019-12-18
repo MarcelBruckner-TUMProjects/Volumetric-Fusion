@@ -47,6 +47,7 @@
     <ClInclude Include="Enums.hpp" />
     <ClInclude Include="FileAccess.hpp" />
     <ClInclude Include="ImGuiHelpers.hpp" />
+    <ClInclude Include="MarchingCubes.hpp" />
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />

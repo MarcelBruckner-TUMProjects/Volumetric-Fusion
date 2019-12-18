@@ -90,5 +90,8 @@
     <ClInclude Include="Voxelgrid.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MarchingCubes.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
