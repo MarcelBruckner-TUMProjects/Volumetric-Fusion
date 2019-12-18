@@ -326,7 +326,7 @@ int main(int argc, char* argv[]) try {
 			}
 			else if ((state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) && pipelines[i]->data->points && pipelines[i]->data->filteredColorFrames) {
 				if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y);
+					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y, relativeTransformations[i]);
 					if (renderVoxelgrid) {
 						voxelgrid->render(model, view, projection);
 					}
