@@ -73,6 +73,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow*, int button, int action, int mods);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void processInput(GLFWwindow* window);
 
 // settings
 const unsigned int SCR_WIDTH = 800 * 2;
@@ -328,6 +329,7 @@ int main(int argc, char* argv[]) try {
 		const float aspect = 1.0f * width / height;
 		
 		// -------------------------------------------------------------------------------
+		processInput(window);
 
 		glm::mat4 model = glm::mat4(1.0f);
 		glm::mat4 view = camera.GetViewMatrix();
@@ -422,6 +424,28 @@ std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
 	return c;
 }
 
+bool isKeyPressed(GLFWwindow* window, int key) {
+	return glfwGetKey(window, key) == GLFW_PRESS;
+}
+
+// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
+// ---------------------------------------------------------------------------------------------------------
+void processInput(GLFWwindow* window)
+{
+	if (isKeyPressed(window, GLFW_KEY_W)) {
+		camera.ProcessKeyboard(FORWARD, deltaTime);
+	}
+	if (isKeyPressed(window, GLFW_KEY_S)) {
+		camera.ProcessKeyboard(BACKWARD, deltaTime);
+	}
+	if (isKeyPressed(window, GLFW_KEY_A)) {
+		camera.ProcessKeyboard(LEFT, deltaTime);
+	}
+	if (isKeyPressed(window, GLFW_KEY_D)) {
+		camera.ProcessKeyboard(RIGHT, deltaTime);
+	}
+}
+
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	if (action == GLFW_PRESS || action == GLFW_REPEAT) {
 		switch (key) {
@@ -451,22 +475,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_4: {
 			state.renderState = RenderState::CALIBRATED_POINTCLOUD;
-			break;
-		}
-		case GLFW_KEY_W: {
-			camera.ProcessKeyboard(FORWARD, deltaTime);
-			break;
-		}
-		case GLFW_KEY_S: {
-			camera.ProcessKeyboard(BACKWARD, deltaTime);
-			break;
-		}
-		case GLFW_KEY_A: {
-			camera.ProcessKeyboard(LEFT, deltaTime);
-			break;
-		}
-		case GLFW_KEY_D: {
-			camera.ProcessKeyboard(RIGHT, deltaTime);
 			break;
 		}
 		case GLFW_KEY_V: {
