@@ -97,6 +97,9 @@ float lastFrame = 0.0f;
 bool mouseButtonDown[4] = { false, false, false, false };
 
 vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
+std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
+
+bool visualizeCharucoResults = false;
 
 int main(int argc, char* argv[]) try {
 	
@@ -144,7 +147,6 @@ int main(int argc, char* argv[]) try {
 
 	rs2::context ctx; // Create librealsense context for managing devices
 	//std::vector<vc::data::Data> datas;
-	std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 	std::vector<std::string> streamNames;
 
 	if (state.captureState == CaptureState::RECORDING || state.captureState == CaptureState::STREAMING) {
@@ -208,7 +210,7 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Camera Calibration Thread
 
-	calibrationThread = std::thread([&pipelines, &stopped, &calibrateCameras, &relativeTransformations]() {
+	calibrationThread = std::thread([&stopped, &calibrateCameras, &relativeTransformations]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
 				continue;
@@ -268,14 +270,6 @@ int main(int argc, char* argv[]) try {
 					);
 
 					relativeTransformations[i] = relativeTransformation;
-
-					//std::stringstream ss;
-					//ss << "************************************************************************************" << std::endl;
-					//ss << "Devices " << i << ", " << i << std::endl << std::endl;
-					//ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << markerToRelativeTranslation << std::endl << std::endl;
-					//ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << markerToRelativeRotation << std::endl << std::endl;
-					//ss << "Combined: " << std::endl << relativeTransformation << std::endl;
-					//std::cout << ss.str();
 				}
 			}
 		}
@@ -397,27 +391,27 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			glfwSetWindowShouldClose(window, true);
 			break;
 		}
-		case GLFW_KEY_1: {
+		case GLFW_KEY_8: {
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 			break;
 		}
-		case GLFW_KEY_2: {
+		case GLFW_KEY_9: {
 			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 			break;
 		}
-		case GLFW_KEY_C: {
+		case GLFW_KEY_1: {
 			state.renderState = RenderState::ONLY_COLOR;
 			break;
 		}
-		case GLFW_KEY_V: {
+		case GLFW_KEY_2: {
 			state.renderState = RenderState::ONLY_DEPTH;
 			break;
 		}
-		case GLFW_KEY_B: {
+		case GLFW_KEY_3: {
 			state.renderState = RenderState::MULTI_POINTCLOUD;
 			break;
 		}
-		case GLFW_KEY_N: {
+		case GLFW_KEY_4: {
 			state.renderState = RenderState::CALIBRATED_POINTCLOUD;
 			break;
 		}
@@ -435,6 +429,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_D: {
 			camera.ProcessKeyboard(RIGHT, deltaTime);
+			break;
+		}
+		case GLFW_KEY_V: {
+			visualizeCharucoResults = !visualizeCharucoResults;
+			for (auto pipe : pipelines) {
+				pipe->processing->visualize = visualizeCharucoResults;
+			}
 			break;
 		}
 		}
