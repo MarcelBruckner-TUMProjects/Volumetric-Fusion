@@ -170,6 +170,8 @@ int main()
 
     ComputeShader computeShader = ComputeShader("compute_shader.comp");
 
+    GLfloat* computedData = new GLfloat[tex_d * tex_h * tex_w * sizeof(GLfloat)];
+
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -190,6 +192,16 @@ int main()
 
         // make sure writing to image has finished before read
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+        glBindTexture(GL_TEXTURE_3D, tex_output);
+        glGetTexImage(GL_TEXTURE_3D, 0, GL_RGBA, GL_FLOAT, computedData);
+
+        std::stringstream ss;
+        for (int i = 0; i < 30; i++) {
+            ss << computedData[i] << ", ";
+        }
+            
+        std::cout << ss.str() << std::endl;
 
         // render
         // ------
