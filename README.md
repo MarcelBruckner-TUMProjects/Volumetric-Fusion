@@ -27,6 +27,7 @@ A multi-view RGB-D Capture Setup is built using 4 [Intel® RealSense™ Depth Ca
 - [RealSense Multiple Camera WhitePaper](https://www.intel.com/content/dam/support/us/en/documents/emerging-technologies/intel-realsense-technology/RealSense_Multiple_Camera_WhitePaper.pdf)
 - [Volumetric Capture](https://github.com/VCL3D/VolumetricCapture)
 - [Voxel grid TSDF](https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&ved=2ahUKEwjW972elb_mAhWEs3EKHWG9BuMQFjAAegQIBRAK&url=https%3A%2F%2Fvision.in.tum.de%2F_media%2Fteaching%2Fss2015%2Fgpucourse_ss2015%2Fkinectfusion.pdf&usg=AOvVaw0IM23fQBT9kj6x-c594nz2)
+- [OpenGL Compute Shader](http://antongerdelan.net/opengl/compute.html)
 
 ## Github Repos
 - [tsdf Fusion](https://github.com/andyzeng/tsdf-fusion)
