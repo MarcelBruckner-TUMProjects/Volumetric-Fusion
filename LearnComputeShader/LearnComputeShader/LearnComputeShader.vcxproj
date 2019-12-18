@@ -150,7 +150,7 @@
     <ClInclude Include="shader.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="compute_shader.comp" />
+    <None Include="tsdf.comp" />
     <None Include="shader.fs" />
     <None Include="shader.vs" />
   </ItemGroup>

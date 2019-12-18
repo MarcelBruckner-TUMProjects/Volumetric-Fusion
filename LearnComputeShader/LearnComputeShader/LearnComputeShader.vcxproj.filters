@@ -43,7 +43,7 @@
     <None Include="shader.vs">
       <Filter>Shader</Filter>
     </None>
-    <None Include="compute_shader.comp">
+    <None Include="tsdf.comp">
       <Filter>Shader</Filter>
     </None>
   </ItemGroup>

@@ -168,7 +168,7 @@ int main()
     glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
     printf("max local work group invocations %i\n", work_grp_inv);
 
-    ComputeShader computeShader = ComputeShader("compute_shader.comp");
+    ComputeShader computeShader = ComputeShader("tsdf.comp");
 
     GLfloat* computedData = new GLfloat[tex_d * tex_h * tex_w * sizeof(GLfloat)];
     GLfloat* data = new GLfloat [tex_d * tex_h * tex_w * sizeof(GLfloat)];
@@ -193,7 +193,7 @@ int main()
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 48, (void*)16); // Vertex Attrib. 1
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 48, (void*)32); // Vertex Attrib. 2
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, vbo); // Buffer Binding 1
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, vbo); // Buffer Binding 1
 
     for (int i = 0; i < tex_w; i++)
     {
