@@ -145,6 +145,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Camera.hpp" />
     <ClInclude Include="ComputeShader.hpp" />
     <ClInclude Include="shader.hpp" />
   </ItemGroup>

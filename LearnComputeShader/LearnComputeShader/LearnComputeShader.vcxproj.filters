@@ -18,10 +18,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="glad.c">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="glad.c">
+    <ClCompile Include="main.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
@@ -30,6 +30,9 @@
       <Filter>Quelldateien</Filter>
     </ClInclude>
     <ClInclude Include="ComputeShader.hpp">
+      <Filter>Quelldateien</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.hpp">
       <Filter>Quelldateien</Filter>
     </ClInclude>
   </ItemGroup>
