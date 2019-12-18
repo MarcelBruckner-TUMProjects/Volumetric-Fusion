@@ -99,7 +99,7 @@ bool mouseButtonDown[4] = { false, false, false, false };
 vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
-bool visualizeCharucoResults = false;
+bool visualizeCharucoResults = true;
 
 int main(int argc, char* argv[]) try {
 	
@@ -206,6 +206,7 @@ int main(int argc, char* argv[]) try {
 		pipelines[i]->startPipeline();
 		pipelines[i]->resumeThread();
 		pipelines[i]->calibrate(calibrateCameras);
+		pipelines[i]->processing->visualize = visualizeCharucoResults;
 	}
 
 #pragma region Camera Calibration Thread
