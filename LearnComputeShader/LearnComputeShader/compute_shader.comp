@@ -13,15 +13,15 @@ shared vec3 totalMin;
 shared vec3 totalMax;
 
 struct VtxData {
-   vec3  vtx_pos;       // 4N [GOOD] -- Largest base alignment
+   vec3  vtx_pos;     
 }; 
 
 struct TsdfData {
-   float tsdf_value;       // 4N [GOOD] -- Largest base alignment
+   float tsdf_value;      
 }; 
 
 struct WeightsData {
-   float weights_value;       // 4N [GOOD] -- Largest base alignment
+   float weights_value;      
 }; 
 
 layout (local_size_x = 1) in;
@@ -34,3 +34,33 @@ layout (std140, binding = 1) buffer TsdfBuffer {
 layout (std140, binding = 2) buffer WeightsBuffer {
    WeightsData weights [];
 };
+
+void main(){
+    uint index = gl_LocalInvocationIndex;
+    vec4 v = vec4(verts[index].vtx_pos, 1.0f);
+    v *= relativeTransformation;
+
+    vec3 pt_grid = v.xyz * resolutionInv + sizeHalf;
+    // TODO discuss floor or round
+    pt_grid.x = floor(pt_grid.x);
+    pt_grid.y = floor(pt_grid.y);
+    pt_grid.z = floor(pt_grid.z);
+
+    vec3 pt_base = origin + pt_grid * resolution;
+    
+    // TODO discuss floor or round
+    uint idx = uint(floor(pt_grid.z * size.y * size.x + pt_grid.y * size.x + pt_grid.x));
+
+    float weight_old = weights[idx].weights_value;
+    float weight_new = weight_old + 1.0f;
+    weights[idx].weights_value = weight_new;
+    
+    tsdfs[idx].tsdf_value = (tsdfs[idx].tsdf_value * weight_old) / weight_new;
+
+    totalMin.x = min(totalMin[0], v.x);
+	totalMax.x = max(totalMax[0], v.x);
+	totalMin.y = min(totalMin[1], v.y);
+	totalMax.y = max(totalMax[1], v.y);
+	totalMin.z = min(totalMin[2], v.z);
+	totalMax.z = max(totalMax[2], v.z);
+}

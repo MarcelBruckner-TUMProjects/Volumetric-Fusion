@@ -105,21 +105,25 @@ namespace vc::fusion {
 				}
 			}
 			integratedFramesPerPipeline[pipelineId].push_back(frameId);
-			const float* vertices_f = reinterpret_cast<const float*>(points.get_vertices());
+			const rs2::vertex* vertices = points.get_vertices();
 
 			// insert them into the voxel grid (point by point)
 			// yes, it is fucking slow
 			
 			for (int i = 0; i < points.size(); ++i) {
 				// apply transformation
-				auto index = i * 3;
-				glm::vec3 vertex = glm::make_vec3(vertices_f + index);
-				auto v = glm::vec4(vertex, 1.0);
+				auto index = i;
+				glm::vec4 v = glm::vec4(vertices[i].x, vertices[i].y, vertices[i].z, 1.0f);
 				auto transformedVertex = relativeTransformation * v;
 
 				int pt_grid_x = roundf(transformedVertex.x * resolutionInv + sizeHalf.x); //% voxel_size; // to cm
 				int pt_grid_y = roundf(transformedVertex.y * resolutionInv + sizeHalf.y);
 				int pt_grid_z = roundf(transformedVertex.z * resolutionInv + sizeHalf.z);
+
+				// TODO Needs discussion
+				//int pt_grid_x = roundf((transformedVertex.x + sizeHalf.x) * resolutionInv); //% voxel_size; // to cm
+				//int pt_grid_y = roundf((transformedVertex.y + sizeHalf.y) * resolutionInv);
+				//int pt_grid_z = roundf((transformedVertex.z + sizeHalf.z) * resolutionInv);
 
 				// Convert voxel center from grid coordinates to base frame camera coordinates
 				float pt_base_x = origin.x + pt_grid_x * resolution;

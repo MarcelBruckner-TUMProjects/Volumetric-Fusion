@@ -196,6 +196,19 @@ namespace vc::rendering {
 			checkCompileErrors(ID, "COMPUTE PROGRAM");
 			// delete the shaders as they're linked into our program now and no longer necessery
 			glDeleteShader(computeShader);
+
+			int work_grp_size[3];
+
+			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size[0]);
+			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &work_grp_size[1]);
+			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &work_grp_size[2]);
+
+			printf("max local (in one shader) work group sizes x:%i y:%i z:%i\n",
+				work_grp_size[0], work_grp_size[1], work_grp_size[2]);
+
+			int work_grp_inv;
+			glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
+			printf("max local work group invocations %i\n", work_grp_inv);
 		}
 	};
 }
