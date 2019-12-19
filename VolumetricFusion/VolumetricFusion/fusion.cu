@@ -1,5 +1,6 @@
 //#include "fusion.cuh"
 
+
 #include "fusion.cuh"
 #include "utils.hpp"
 #include < stdio.h >
@@ -82,7 +83,7 @@ void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, std::map<int, glm::
 	cout << pts[2].size() << endl;
 	cout << pts[3].size() << endl;
 
-	float* pts3 = new float[(float)total_size * 3];
+	float* pts3 = new float[total_size * 3];
 
 	for (int i = 0; i < pts.size(); i++) {
 
@@ -96,17 +97,16 @@ void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, std::map<int, glm::
 			glm::vec4 res = relativeTransformations[i] * glm::vec4(verts[j].x, verts[j].y, verts[j].z, 1.0f);
 
 			if (i == 0) {
-				pts3[j * 3 + 0] = res[0];
-				pts3[j * 3 + 1] = res[1];
-				pts3[j * 3 + 2] = res[2];
+				pts3[j * 3 + 0] = res.x;
+				pts3[j * 3 + 1] = res.y;
+				pts3[j * 3 + 2] = res.z;
 			}
 			else {
-				pts3[pts[i - 1].size() + j * 3 + 0] = res[0];
-				pts3[pts[i - 1].size() + j * 3 + 1] = res[1];
-				pts3[pts[i - 1].size() + j * 3 + 2] = res[2];
+				pts3[pts[i - 1].size() + j * 3 + 0] = res.x;
+				pts3[pts[i - 1].size() + j * 3 + 1] = res.y;
+				pts3[pts[i - 1].size() + j * 3 + 2] = res.z;
 			}
 
-			cout << res[0] << " " << " " << res[1] << " " << res[2] << endl;
 		}
 	}
 
