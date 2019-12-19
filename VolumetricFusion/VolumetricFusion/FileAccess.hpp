@@ -11,7 +11,7 @@ namespace vc::file_access {
 		return (stat(name.c_str(), &buffer) == 0);
 	}
 
-	bool isDirectory(std::string path, bool createIfNot=false) {
+	bool isDirectory(std::string path, bool createIfNot = false) {
 		bool isDir = exists(path) && std::filesystem::is_directory(path);
 
 		if (!isDir && createIfNot) {
@@ -40,12 +40,12 @@ namespace vc::file_access {
 		}
 	}
 
-	std::vector<std::string> listFilesInFolder(std::string folder, std::string filterExtension = std::string(".bag"), bool createIfNot = false, bool sorted=true) {
+	std::vector<std::string> listFilesInFolder(std::string folder, std::string filterExtension = std::string(".bag"), bool createIfNot = false, bool sorted = true) {
 		std::vector<std::string> filenames;
 		auto callback = [&folder, &filenames](const auto& entry) {
-            auto path = entry.path();
-            filenames.push_back(folder + path.filename().string());
-        };
+			auto path = entry.path();
+			filenames.push_back(folder + path.filename().string());
+		};
 		iterateFilesInFolder(folder, callback, createIfNot);
 
 		std::vector<std::string> filtered;
@@ -56,17 +56,17 @@ namespace vc::file_access {
 		}
 		return filtered;
 	}
-	   
+
 	void resetDirectory(std::string path, bool createIfNot = false) {
 		if (!isDirectory(path, createIfNot)) {
 			return;
 		}
-	    auto callback = [&](const auto& entry) {
-	        fs::remove(entry.path());
-	    };
+		auto callback = [&](const auto& entry) {
+			fs::remove(entry.path());
+		};
 		iterateFilesInFolder(path, callback, true);
 	}
-	
+
 	bool saveCvExtrinsics(const std::string& filename, cv::Size imageSize, float aspectRatio, int flags,
 		const cv::Mat& cameraMatrix, const cv::Mat& distCoeffs, double totalAvgErr) {
 		cv::FileStorage fs(filename, cv::FileStorage::WRITE);

@@ -36,6 +36,7 @@ namespace vc::capture {
 		void startPipeline() {
 			this->pipeline->start(this->cfg);
 			this->data->setIntrinsics(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
+			//std::cout << this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics().fx << std::endl;
 		}
 
 		void pauseThread() {

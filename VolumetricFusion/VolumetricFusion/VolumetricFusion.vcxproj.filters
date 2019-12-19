@@ -81,10 +81,10 @@
     <ClInclude Include="stb_image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\tsdf-fusion\utils.hpp">
+    <ClInclude Include="fusion.cuh">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="fusion.cuh">
+    <ClInclude Include="utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

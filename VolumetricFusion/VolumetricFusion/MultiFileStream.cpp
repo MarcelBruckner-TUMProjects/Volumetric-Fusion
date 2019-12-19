@@ -186,19 +186,6 @@ int main(int argc, char* argv[]) try {
 		streamNames.emplace_back("");
 	}
 
-	glm::mat3 instrinsics = glm::mat3(1.0f);
-
-	for (int i = 0; i < pipelines.size(); i++) {
-		if (i == 0) {
-			
-			instrinsics = glm::mat3(
-				pipelines[i]->data->camera.intrinsics.fx, 0, pipelines[i]->data->camera.intrinsics.ppx,
-				0, pipelines[i]->data->camera.intrinsics.fy, pipelines[i]->data->camera.intrinsics.ppy,
-				0, 0, 1
-			);
-		}
-	}
-
 	//std::cout << glm::to_string(instrinsics) << std::endl;
 
 	// Create a thread for getting frames from the device and process them
@@ -225,6 +212,18 @@ int main(int argc, char* argv[]) try {
 		pipelines[i]->calibrate(calibrateCameras);
 	}
 
+	glm::mat3 instrinsics = glm::mat3(1.0f);
+
+	for (int i = 0; i < pipelines.size(); i++) {
+		if (i == 0) {
+			instrinsics = glm::mat3(
+				pipelines[i]->data->camera.intrinsics.fx, 0, pipelines[i]->data->camera.intrinsics.ppx,
+				0, pipelines[i]->data->camera.intrinsics.fy, pipelines[i]->data->camera.intrinsics.ppy,
+				0, 0, 1
+			);
+		}
+	}
+
 #pragma region Camera Calibration Thread
 
 	calibrationThread = std::thread([&pipelines, &stopped, &calibrateCameras, &relativeTransformations]() {
@@ -244,7 +243,7 @@ int main(int argc, char* argv[]) try {
 
 					if (i == 0) {
 						relativeTransformations[i] = glm::inverse(baseToMarkerTranslation);
-						//relativeTransformations[i] = glm::mat4(1.0f); 
+						//relativeTransformations[i] = glm::mat4(1.0f);
 						continue;
 					}
 
@@ -328,6 +327,8 @@ int main(int argc, char* argv[]) try {
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
 		vc::rendering::startFrame(window);
 
+		std::vector<rs2::points> pts;
+
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
 			int x = i % 2;
@@ -349,9 +350,17 @@ int main(int argc, char* argv[]) try {
 					pipelines[i]->rendering->renderAllPointclouds(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, relativeTransformations[i], i);
 				}
 				
-				tsdf_fusion(pipelines[i]->data->points, width, height, relativeTransformations[i]);
+				//pts.emplace_back(pipelines[i]->data->points);
+				//pts.push_back(pipelines[i]->data->points);
+				//std::cout << pipelines[i]->data->points << std::endl;
+
 			}
+
 		}
+
+		//std::cout << pts.size() << std::endl;
+		//relativeTransformations[0]
+		tsdf_fusion(width, height, instrinsics, relativeTransformations[0], pts);
 		
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------

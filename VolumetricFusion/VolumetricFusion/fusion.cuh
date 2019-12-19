@@ -14,7 +14,7 @@
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-//#include "utils.hpp"
+
 
 #include <librealsense2/rs.hpp>
 
@@ -24,6 +24,6 @@ void Integrate(float* cam_K, float* cam2base, float* depth_im,
 	float voxel_grid_origin_x, float voxel_grid_origin_y, float voxel_grid_origin_z, float voxel_size, float trunc_margin,
 	float* voxel_grid_TSDF, float* voxel_grid_weight);
 
-void tsdf_fusion(const rs2::points points, int pos_x, int pos_y, glm::mat4 relativeTransformation);
+void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, glm::mat4 base2World, std::vector<rs2::points> pts);
 
 #endif
