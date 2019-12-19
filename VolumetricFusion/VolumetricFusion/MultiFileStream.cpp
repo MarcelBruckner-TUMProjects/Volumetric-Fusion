@@ -96,13 +96,13 @@ float lastFrame = 0.0f;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::VOXELGRID);
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
 
+bool renderVoxelgrid = false;
 vc::fusion::Voxelgrid* voxelgrid;
-bool renderVoxelgrid = true;
 
 int main(int argc, char* argv[]) try {
 	
@@ -143,6 +143,20 @@ int main(int argc, char* argv[]) try {
 		std::cout << "Failed to initialize GLAD" << std::endl;
 		return -1;
 	}
+
+	glad_set_post_callback([](const char* name, void* funcptr, int len_args, ...) {
+		GLenum error_code;
+
+		(void)funcptr;
+		(void)len_args;
+
+		error_code = glad_glGetError();
+
+		if (error_code != GL_NO_ERROR) {
+			// shut this up for a while
+			//fprintf(stderr, "ERROR %d in %s\n", error_code, name);
+		}
+	});
 
 	voxelgrid = new vc::fusion::Voxelgrid();
 
@@ -203,9 +217,18 @@ int main(int argc, char* argv[]) try {
 		//{0, glm::mat4(1.0f)}
 	};
 
-	// Camera calibration thread
 	std::thread calibrationThread;
+	std::thread fusionThread;
+
+	// Program state (mostly for recordings)
+	struct {
+		std::vector<int> highestFrameIds = { -1, -1, -1, -1 };
+		bool allMarkersDetected = false;
+		bool allPipelinesEnteredLooped = false;
+	} programState;
+
 	std::atomic_bool calibrateCameras = true;
+	std::atomic_bool fuseFrames = false;
 
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i]->startPipeline();
@@ -216,16 +239,24 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Camera Calibration Thread
 
-	calibrationThread = std::thread([&stopped, &calibrateCameras, &relativeTransformations]() {
+	calibrationThread = std::thread([&stopped, &calibrateCameras, &fuseFrames, &programState, &relativeTransformations]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
 				continue;
 			}
 
+			int markersDetected = 0;
+			int pipelinesEnteredLoop = 0;
 			for (int i = 0; i < pipelines.size(); i++) {
 				{
 					if (!pipelines[i]->processing->hasMarkersDetected/* || relativeTransformations.count(i) != 0*/) {
 						continue;
+					}
+					markersDetected++;
+
+					programState.highestFrameIds[i] = MAX(pipelines[i]->processing->frameId, programState.highestFrameIds[i]);
+					if (programState.highestFrameIds[i] > pipelines[i]->processing->frameId) {
+						pipelinesEnteredLoop++;
 					}
 
 					glm::mat4 baseToMarkerTranslation = pipelines[0]->processing->translation;
@@ -278,19 +309,28 @@ int main(int argc, char* argv[]) try {
 					relativeTransformations[i] = relativeTransformation;
 				}
 			}
+			programState.allMarkersDetected = markersDetected == pipelines.size();
+			programState.allPipelinesEnteredLooped = pipelinesEnteredLoop == pipelines.size();
+
+			if (programState.allMarkersDetected) {
+				calibrateCameras.store(false);
+				// start fusion thread logic
+				fuseFrames.store(true);
+			}
 		}
 	});
 #pragma endregion
 
 
+
 #pragma region Fusion Thread
-	auto fusionThread = std::thread([&stopped, &calibrateCameras, &relativeTransformations]() {
+	fusionThread = std::thread([&stopped, &calibrateCameras, &fuseFrames, &programState, &relativeTransformations]() {
 		const int maxIntegrations = 10;
 		int integrations = 0;
 		while (!stopped) {
-			//if (calibrateCameras) {
-			//	continue;
-			//}
+			if (calibrateCameras || !fuseFrames) {
+				continue;
+			}
 
 			for (int i = 0; i < pipelines.size(); i++) {
 				// Only integrate frames with a valid transformation
@@ -302,6 +342,13 @@ int main(int argc, char* argv[]) try {
 
 				auto pip = pipelines[i]->processing;
 				voxelgrid->integrateFrame(pipelines[i]->data->points, relativeTransformations[i], i, pip->frameId);
+			}
+
+			integrations++;
+			if (integrations >= maxIntegrations) {
+				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
+				fuseFrames.store(false);
+				break;
 			}
 		}
 		});
@@ -353,17 +400,20 @@ int main(int argc, char* argv[]) try {
 			else if ((state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) && pipelines[i]->data->points && pipelines[i]->data->filteredColorFrames) {
 				if (state.renderState == RenderState::MULTI_POINTCLOUD) {
 					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y, relativeTransformations[i]);
-					if (renderVoxelgrid) {
+					/*if (renderVoxelgrid) {
 						voxelgrid->render(model, view, projection);
-					}
+					}*/
 				}
 				else {
 					pipelines[i]->rendering->renderAllPointclouds(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, relativeTransformations[i], i);
 				}
 			}
 		}
-		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-			voxelgrid->render(model, view, projection);
+		if (state.renderState == RenderState::VOXELGRID) {
+			voxelgrid->renderField(model, view, projection);
+			if (renderVoxelgrid) {
+				voxelgrid->renderGrid(model, view, projection);
+			}
 		}
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
@@ -475,6 +525,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_4: {
 			state.renderState = RenderState::CALIBRATED_POINTCLOUD;
+			break;
+		}
+		case GLFW_KEY_5: {
+			state.renderState = RenderState::VOXELGRID;
 			break;
 		}
 		case GLFW_KEY_V: {

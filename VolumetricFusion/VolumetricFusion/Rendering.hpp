@@ -239,6 +239,7 @@ namespace vc::rendering {
             glBindVertexArray(0);
             glDisable(GL_DEPTH_TEST);
         }
+
     };
     
     void startFrame(GLFWwindow* window) {

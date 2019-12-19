@@ -102,7 +102,9 @@ namespace vc::processing {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
-				
+
+				this->frameId = frameId;
+
 				std::vector<int> ids;
 				std::vector<std::vector<cv::Point2f>> corners;
 				cv::aruco::detectMarkers(image, dictionary, corners, ids);
@@ -141,7 +143,6 @@ namespace vc::processing {
 								0, 0, 0, 1
 							);
 
-							this->frameId = frameId;
 							hasMarkersDetected = true;
 						}
 					}

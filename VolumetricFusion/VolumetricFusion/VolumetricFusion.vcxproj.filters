@@ -7,9 +7,7 @@
     <ClCompile Include="std_image.cpp">
       <Filter>Header Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\..\..\Program Files\OpenGL\glad\src\glad.c">
-      <Filter>Header Files</Filter>
-    </ClCompile>
+    <ClCompile Include="glad\src\glad.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.md" />
@@ -38,6 +36,10 @@
     <None Include="shader\voxelgrid.vs">
       <Filter>Shader</Filter>
     </None>
+    <None Include="shader\voxelgrid_cube.fs" />
+    <None Include="shader\voxelgrid_cube.vs" />
+    <None Include="shader\voxelgrid_trippy.fs" />
+    <None Include="shader\voxelgrid_trippy.vs" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">
@@ -93,5 +95,7 @@
     <ClInclude Include="MarchingCubes.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="glad\include\glad\glad.h" />
+    <ClInclude Include="glad\include\KHR\khrplatform.h" />
   </ItemGroup>
 </Project>
