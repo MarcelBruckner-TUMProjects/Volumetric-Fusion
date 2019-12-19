@@ -2,12 +2,13 @@
 
 #include "fusion.cuh"
 #include "utils.hpp"
+#include < stdio.h >
 
 using namespace std;
 
 // CUDA kernel function to integrate a TSDF voxel volume given depth images
 __global__
-void Integrate(float* cam_K, float* cam2base, float* depth_im,
+void Integrate(float* cam_K, float* cam2base, float* gpu_pts,
 	int im_height, int im_width, int voxel_grid_dim_x, int voxel_grid_dim_y, int voxel_grid_dim_z,
 	float voxel_grid_origin_x, float voxel_grid_origin_y, float voxel_grid_origin_z, float voxel_size, float trunc_margin,
 	float* voxel_grid_TSDF, float* voxel_grid_weight) {
@@ -39,29 +40,31 @@ void Integrate(float* cam_K, float* cam2base, float* depth_im,
 		if (pt_pix_x < 0 || pt_pix_x >= im_width || pt_pix_y < 0 || pt_pix_y >= im_height)
 			continue;
 
-		float depth_val = depth_im[pt_pix_y * im_width + pt_pix_x];
+		//float depth_val = depth_im[pt_pix_y * im_width + pt_pix_x];
 
-		if (depth_val <= 0 || depth_val > 6)
-			continue;
+		//printf("%d %d", pt_pix_y, pt_pix_x);
 
-		float diff = depth_val - pt_cam_z;
+		//if (depth_val <= 0 || depth_val > 6)
+		//	continue;
 
-		if (diff <= -trunc_margin)
-			continue;
+		//float diff = depth_val - pt_cam_z;
 
-		// Integrate
-		const int volume_idx = pt_grid_z * voxel_grid_dim_y * voxel_grid_dim_x + pt_grid_y * voxel_grid_dim_x + pt_grid_x;
-		float dist = fmin(1.0f, diff / trunc_margin);
-		float weight_old = voxel_grid_weight[volume_idx];
-		float weight_new = weight_old + 1.0f;
-		voxel_grid_weight[volume_idx] = weight_new;
-		voxel_grid_TSDF[volume_idx] = (voxel_grid_TSDF[volume_idx] * weight_old + dist) / weight_new;
+		//if (diff <= -trunc_margin)
+		//	continue;
+
+		//// Integrate
+		//const int volume_idx = pt_grid_z * voxel_grid_dim_y * voxel_grid_dim_x + pt_grid_y * voxel_grid_dim_x + pt_grid_x;
+		//float dist = fmin(1.0f, diff / trunc_margin);
+		//float weight_old = voxel_grid_weight[volume_idx];
+		//float weight_new = weight_old + 1.0f;
+		//voxel_grid_weight[volume_idx] = weight_new;
+		//voxel_grid_TSDF[volume_idx] = (voxel_grid_TSDF[volume_idx] * weight_old + dist) / weight_new;
 	}
 }
 
 // Loads a binary file with depth data and generates a TSDF voxel volume (5m x 5m x 5m at 1cm resolution)
 // Volume is aligned with respect to the camera coordinates of the first frame (a.k.a. base frame)
-void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, glm::mat4 base2World, std::vector<rs2::points> pts) {
+void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, std::map<int, glm::mat4> relativeTransformations, std::vector<rs2::points> pts) {
 	
 	//cout << vertices.size() << endl;
 
@@ -90,18 +93,20 @@ void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, glm::mat4 base2Worl
 
 		for (size_t j = 0; j < pts[i].size(); j++) {
 
-			//if(i == 3)
-			//	cout << i << " " << j << endl;
+			glm::vec4 res = relativeTransformations[i] * glm::vec4(verts[j].x, verts[j].y, verts[j].z, 1.0f);
+
 			if (i == 0) {
-				pts3[j * 3 + 0] = verts[j].x;
-				pts3[j * 3 + 1] = verts[j].y;
-				pts3[j * 3 + 2] = verts[j].z;
+				pts3[j * 3 + 0] = res[0];
+				pts3[j * 3 + 1] = res[1];
+				pts3[j * 3 + 2] = res[2];
 			}
 			else {
-				pts3[pts[i - 1].size() + j * 3 + 0] = verts[j].x;
-				pts3[pts[i - 1].size() + j * 3 + 1] = verts[j].y;
-				pts3[pts[i - 1].size() + j * 3 + 2] = verts[j].z;
+				pts3[pts[i - 1].size() + j * 3 + 0] = res[0];
+				pts3[pts[i - 1].size() + j * 3 + 1] = res[1];
+				pts3[pts[i - 1].size() + j * 3 + 2] = res[2];
 			}
+
+			cout << res[0] << " " << " " << res[1] << " " << res[2] << endl;
 		}
 	}
 
@@ -134,7 +139,7 @@ void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, glm::mat4 base2Worl
 	for (int i = 0; i < 9; i++)
 		cam_K[i] = pSource[i];
 
-	const float* pSource2 = (const float*)glm::value_ptr(base2World);
+	const float* pSource2 = (const float*)glm::value_ptr(relativeTransformations[0]);
 
 	for (int i = 0; i < 16; i++)
 		base2world[i] = pSource2[i];
@@ -161,7 +166,7 @@ void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, glm::mat4 base2Worl
 	checkCUDA(__LINE__, cudaGetLastError());
 	float* gpu_cam_K;
 	float* gpu_cam2base;
-	std::vector<rs2::points>* gpu_pts;
+	float* gpu_pts;
 	cudaMalloc(&gpu_cam_K, 3 * 3 * sizeof(float));
 	cudaMemcpy(gpu_cam_K, cam_K, 3 * 3 * sizeof(float), cudaMemcpyHostToDevice);
 	cudaMalloc(&gpu_cam2base, 4 * 4 * sizeof(float));
@@ -172,11 +177,9 @@ void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, glm::mat4 base2Worl
 	//first_frame_idx + 
 	for (int frame_idx = first_frame_idx; frame_idx < (int)num_frames; ++frame_idx) {
 
-
 		//depth_im
 		//cam2world
 		
-
 		// Compute relative camera pose (camera-to-base frame)
 		//multiply_matrix(base2world_inv, cam2world, cam2base);
 		
@@ -184,13 +187,10 @@ void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, glm::mat4 base2Worl
 			cam2base[i] = base2world[i];
 
 		cudaMemcpy(gpu_cam2base, cam2base, 4 * 4 * sizeof(float), cudaMemcpyHostToDevice);
-		//cudaMemcpy(gpu_depth_im, depth_im, im_height * im_width * sizeof(float), cudaMemcpyHostToDevice);
-		cudaMemcpy(gpu_pts, pts3, total_size * sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(gpu_pts, pts3, total_size * 3 * sizeof(float), cudaMemcpyHostToDevice);
 		checkCUDA(__LINE__, cudaGetLastError());
 
-	//	std::cout << "Fusing: " << depth_im_file << std::endl;
-
-		//Integrate <<<voxel_grid_dim_z, voxel_grid_dim_y>>> (gpu_cam_K, gpu_cam2base, gpu_depth_im,
+		//Integrate <<<voxel_grid_dim_z, voxel_grid_dim_y>>> (gpu_cam_K, gpu_cam2base, gpu_pts,
 		//	im_height, im_width, voxel_grid_dim_x, voxel_grid_dim_y, voxel_grid_dim_z,
 		//	voxel_grid_origin_x, voxel_grid_origin_y, voxel_grid_origin_z, voxel_size, trunc_margin,
 		//	gpu_voxel_grid_TSDF, gpu_voxel_grid_weight);

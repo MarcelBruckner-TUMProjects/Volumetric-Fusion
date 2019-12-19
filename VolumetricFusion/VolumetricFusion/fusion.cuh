@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <string>
 
+#include<map>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -24,6 +26,6 @@ void Integrate(float* cam_K, float* cam2base, float* depth_im,
 	float voxel_grid_origin_x, float voxel_grid_origin_y, float voxel_grid_origin_z, float voxel_size, float trunc_margin,
 	float* voxel_grid_TSDF, float* voxel_grid_weight);
 
-void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, glm::mat4 base2World, std::vector<rs2::points> pts);
+void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, std::map<int, glm::mat4> relativeTransformations, std::vector<rs2::points> pts);
 
 #endif

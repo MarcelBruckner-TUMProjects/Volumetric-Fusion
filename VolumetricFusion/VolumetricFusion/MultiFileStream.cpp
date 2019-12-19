@@ -364,7 +364,7 @@ int main(int argc, char* argv[]) try {
 		//relativeTransformations[0]
 		
 		if (run_once) {
-			tsdf_fusion(width, height, instrinsics, relativeTransformations[0], pts);
+			tsdf_fusion(width, height, instrinsics, relativeTransformations, pts);
 			run_once = false;
 		}
 
