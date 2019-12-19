@@ -103,6 +103,7 @@ bool visualizeCharucoResults = true;
 
 vc::fusion::Voxelgrid* voxelgrid;
 bool renderVoxelgrid = true;
+std::atomic_bool calibrateCameras = true;
 
 int main(int argc, char* argv[]) try {
 	
@@ -205,7 +206,6 @@ int main(int argc, char* argv[]) try {
 
 	// Camera calibration thread
 	std::thread calibrationThread;
-	std::atomic_bool calibrateCameras = true;
 
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i]->startPipeline();
@@ -216,7 +216,7 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Camera Calibration Thread
 
-	calibrationThread = std::thread([&stopped, &calibrateCameras, &relativeTransformations]() {
+	calibrationThread = std::thread([&stopped, &relativeTransformations]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
 				continue;
@@ -284,7 +284,7 @@ int main(int argc, char* argv[]) try {
 
 
 #pragma region Fusion Thread
-	auto fusionThread = std::thread([&stopped, &calibrateCameras, &relativeTransformations]() {
+	auto fusionThread = std::thread([&stopped, &relativeTransformations]() {
 		const int maxIntegrations = 10;
 		int integrations = 0;
 		while (!stopped) {
@@ -486,6 +486,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_G: {
 			renderVoxelgrid = !renderVoxelgrid;
+			break;
+		}
+		case GLFW_KEY_C: {
+			calibrateCameras.store(!calibrateCameras);
+			for (int i = 0; i < pipelines.size(); i++) {
+				pipelines[i]->calibrate(calibrateCameras);
+			}
 			break;
 		}
 		}

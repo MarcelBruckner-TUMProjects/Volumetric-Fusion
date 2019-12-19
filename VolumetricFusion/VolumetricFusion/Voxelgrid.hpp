@@ -91,6 +91,7 @@ namespace vc::fusion {
 			return hash;
 		};
 
+		// TODO Wrong currently - just a fast mockup
 		glm::vec3 hashFuncInv(int hash) {
 			int x = hash % (int)sizeNormalized.x;
 			float y = (int)(hash / sizeNormalized.x) % (int)sizeNormalized.y;
@@ -130,7 +131,7 @@ namespace vc::fusion {
 
 			// insert them into the voxel grid (point by point)
 			// yes, it is fucking slow
-			
+			std::stringstream ss;
 			for (int i = 0; i < points.size(); ++i) {
 				// apply transformation
 				auto index = i;
@@ -150,9 +151,10 @@ namespace vc::fusion {
 				//float pt_base_z = origin.z + pt_grid_z * resolution;
 
 				int volume_idx = hashFunc(pt_grid);
+				//glm::vec3 fromHash = hashFuncInv(volume_idx);
 
 				if (volume_idx >= num_gridPoints || volume_idx < 0) {
-					std::cout << "ERROR: (" << v.x << ", " << v.y << ", " << v.z << ")" << " not in grid!" << std::endl;
+					ss << "ERROR: (" << v.x << ", " << v.y << ", " << v.z << ")" << " not in grid!" << std::endl;
 					continue;
 				}
 				//float dist = fmin(1.0f, diff / trunc_margin);
@@ -171,6 +173,8 @@ namespace vc::fusion {
 
 				//std::cout << "(" << transformedVertex.x << "," << transformedVertex.y << "," << transformedVertex.z << ")" << std::endl;
 			}
+
+			std::cout << ss.str() << std::endl;
 
 			std::cout << std::fixed << "Min: (" << totalMin.x << "," << totalMin.y << "," << totalMin.z << ")" << std::endl;
 			std::cout << std::fixed << "Max: (" << totalMax.x << "," << totalMax.y << "," << totalMax.z << ")" << std::endl;
