@@ -65,6 +65,47 @@ void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, glm::mat4 base2Worl
 	
 	//cout << vertices.size() << endl;
 
+	int total_size = 0;
+
+	for (int i = 0; i < pts.size(); i++) {
+		total_size += pts[i].size();
+	}
+	
+	cout << total_size << endl;
+	cout << pts.size() << endl;
+
+	cout << pts[0].size() << endl;
+	cout << pts[1].size() << endl;
+	cout << pts[2].size() << endl;
+	cout << pts[3].size() << endl;
+
+	float* pts3 = new float[(float)total_size * 3];
+
+	for (int i = 0; i < pts.size(); i++) {
+
+		if (pts[i].size() == 0)
+			continue;
+		
+		const auto verts = pts[i].get_vertices();
+
+		for (size_t j = 0; j < pts[i].size(); j++) {
+
+			//if(i == 3)
+			//	cout << i << " " << j << endl;
+			if (i == 0) {
+				pts3[j * 3 + 0] = verts[j].x;
+				pts3[j * 3 + 1] = verts[j].y;
+				pts3[j * 3 + 2] = verts[j].z;
+			}
+			else {
+				pts3[pts[i - 1].size() + j * 3 + 0] = verts[j].x;
+				pts3[pts[i - 1].size() + j * 3 + 1] = verts[j].y;
+				pts3[pts[i - 1].size() + j * 3 + 2] = verts[j].z;
+			}
+		}
+	}
+
+
 	// Location of folder containing RGB-D frames and camera pose files
 	int base_frame_idx = 0;
 	int first_frame_idx = 0;
@@ -102,71 +143,69 @@ void tsdf_fusion(int pos_x, int pos_y, glm::mat3 intrinsics, glm::mat4 base2Worl
 	float base2world_inv[16] = { 0 };
 	invert_matrix(base2world, base2world_inv);
 
-	//// Initialize voxel grid
-	//float* voxel_grid_TSDF = new float[voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z];
-	//float* voxel_grid_weight = new float[voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z];
-	//for (int i = 0; i < voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z; ++i)
-	//	voxel_grid_TSDF[i] = 1.0f;
-	//memset(voxel_grid_weight, 0, sizeof(float) * voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z);
+	// Initialize voxel grid
+	float* voxel_grid_TSDF = new float[voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z];
+	float* voxel_grid_weight = new float[voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z];
+	for (int i = 0; i < voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z; ++i)
+		voxel_grid_TSDF[i] = 1.0f;
+	memset(voxel_grid_weight, 0, sizeof(float) * voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z);
 
-	//// Load variables to GPU memory
-	//float* gpu_voxel_grid_TSDF;
-	//float* gpu_voxel_grid_weight;
-	//cudaMalloc(&gpu_voxel_grid_TSDF, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float));
-	//cudaMalloc(&gpu_voxel_grid_weight, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float));
-	//checkCUDA(__LINE__, cudaGetLastError());
-	//cudaMemcpy(gpu_voxel_grid_TSDF, voxel_grid_TSDF, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float), cudaMemcpyHostToDevice);
-	//cudaMemcpy(gpu_voxel_grid_weight, voxel_grid_weight, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float), cudaMemcpyHostToDevice);
-	//checkCUDA(__LINE__, cudaGetLastError());
-	//float* gpu_cam_K;
-	//float* gpu_cam2base;
-	//float* gpu_depth_im;
-	//cudaMalloc(&gpu_cam_K, 3 * 3 * sizeof(float));
-	//cudaMemcpy(gpu_cam_K, cam_K, 3 * 3 * sizeof(float), cudaMemcpyHostToDevice);
-	//cudaMalloc(&gpu_cam2base, 4 * 4 * sizeof(float));
-	//cudaMalloc(&gpu_depth_im, im_height * im_width * sizeof(float));
-	//checkCUDA(__LINE__, cudaGetLastError());
+	// Load variables to GPU memory
+	float* gpu_voxel_grid_TSDF;
+	float* gpu_voxel_grid_weight;
+	cudaMalloc(&gpu_voxel_grid_TSDF, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float));
+	cudaMalloc(&gpu_voxel_grid_weight, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float));
+	checkCUDA(__LINE__, cudaGetLastError());
+	cudaMemcpy(gpu_voxel_grid_TSDF, voxel_grid_TSDF, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMemcpy(gpu_voxel_grid_weight, voxel_grid_weight, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float), cudaMemcpyHostToDevice);
+	checkCUDA(__LINE__, cudaGetLastError());
+	float* gpu_cam_K;
+	float* gpu_cam2base;
+	std::vector<rs2::points>* gpu_pts;
+	cudaMalloc(&gpu_cam_K, 3 * 3 * sizeof(float));
+	cudaMemcpy(gpu_cam_K, cam_K, 3 * 3 * sizeof(float), cudaMemcpyHostToDevice);
+	cudaMalloc(&gpu_cam2base, 4 * 4 * sizeof(float));
+	cudaMalloc(&gpu_pts, total_size * sizeof(float));
+	checkCUDA(__LINE__, cudaGetLastError());
 
-	//// Loop through each depth frame and integrate TSDF voxel grid
-	////first_frame_idx + 
-	//for (int frame_idx = first_frame_idx; frame_idx < (int)num_frames; ++frame_idx) {
-
-	//	std::ostringstream curr_frame_prefix;
-	//	curr_frame_prefix << std::setw(6) << std::setfill('0') << frame_idx;
+	// Loop through each depth frame and integrate TSDF voxel grid
+	//first_frame_idx + 
+	for (int frame_idx = first_frame_idx; frame_idx < (int)num_frames; ++frame_idx) {
 
 
-	//	//depth_im
-	//	//cam2world
-	//	
+		//depth_im
+		//cam2world
+		
 
-	//	// Compute relative camera pose (camera-to-base frame)
-	//	//multiply_matrix(base2world_inv, cam2world, cam2base);
-	//	
-	//	for(int i = 0; i < 16; i++)
-	//		cam2base[i] = base2world[i];
+		// Compute relative camera pose (camera-to-base frame)
+		//multiply_matrix(base2world_inv, cam2world, cam2base);
+		
+		for(int i = 0; i < 16; i++)
+			cam2base[i] = base2world[i];
 
-	//	cudaMemcpy(gpu_cam2base, cam2base, 4 * 4 * sizeof(float), cudaMemcpyHostToDevice);
-	//	cudaMemcpy(gpu_depth_im, depth_im, im_height * im_width * sizeof(float), cudaMemcpyHostToDevice);
-	//	checkCUDA(__LINE__, cudaGetLastError());
+		cudaMemcpy(gpu_cam2base, cam2base, 4 * 4 * sizeof(float), cudaMemcpyHostToDevice);
+		//cudaMemcpy(gpu_depth_im, depth_im, im_height * im_width * sizeof(float), cudaMemcpyHostToDevice);
+		cudaMemcpy(gpu_pts, pts3, total_size * sizeof(float), cudaMemcpyHostToDevice);
+		checkCUDA(__LINE__, cudaGetLastError());
 
-	////	std::cout << "Fusing: " << depth_im_file << std::endl;
+	//	std::cout << "Fusing: " << depth_im_file << std::endl;
 
-	//	//Integrate <<<voxel_grid_dim_z, voxel_grid_dim_y>>> (gpu_cam_K, gpu_cam2base, gpu_depth_im,
-	//	//	im_height, im_width, voxel_grid_dim_x, voxel_grid_dim_y, voxel_grid_dim_z,
-	//	//	voxel_grid_origin_x, voxel_grid_origin_y, voxel_grid_origin_z, voxel_size, trunc_margin,
-	//	//	gpu_voxel_grid_TSDF, gpu_voxel_grid_weight);
-	//}
+		//Integrate <<<voxel_grid_dim_z, voxel_grid_dim_y>>> (gpu_cam_K, gpu_cam2base, gpu_depth_im,
+		//	im_height, im_width, voxel_grid_dim_x, voxel_grid_dim_y, voxel_grid_dim_z,
+		//	voxel_grid_origin_x, voxel_grid_origin_y, voxel_grid_origin_z, voxel_size, trunc_margin,
+		//	gpu_voxel_grid_TSDF, gpu_voxel_grid_weight);
+	}
 
-	//// Load TSDF voxel grid from GPU to CPU memory
-	//cudaMemcpy(voxel_grid_TSDF, gpu_voxel_grid_TSDF, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float), cudaMemcpyDeviceToHost);
-	//cudaMemcpy(voxel_grid_weight, gpu_voxel_grid_weight, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float), cudaMemcpyDeviceToHost);
-	//checkCUDA(__LINE__, cudaGetLastError());
+	// Load TSDF voxel grid from GPU to CPU memory
+	cudaMemcpy(voxel_grid_TSDF, gpu_voxel_grid_TSDF, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float), cudaMemcpyDeviceToHost);
+	cudaMemcpy(voxel_grid_weight, gpu_voxel_grid_weight, voxel_grid_dim_x * voxel_grid_dim_y * voxel_grid_dim_z * sizeof(float), cudaMemcpyDeviceToHost);
+	checkCUDA(__LINE__, cudaGetLastError());
 
-	//// Compute surface points from TSDF voxel grid and save to point cloud .ply file
-	//std::cout << "Saving surface point cloud (tsdf.ply)..." << std::endl;
-	//SaveVoxelGrid2SurfacePointCloud("tsdf.ply", voxel_grid_dim_x, voxel_grid_dim_y, voxel_grid_dim_z,
-	//	voxel_size, voxel_grid_origin_x, voxel_grid_origin_y, voxel_grid_origin_z,
-	//	voxel_grid_TSDF, voxel_grid_weight, 0.2f, 0.0f);
+	// Compute surface points from TSDF voxel grid and save to point cloud .ply file
+	std::cout << "Saving surface point cloud (tsdf.ply)..." << std::endl;
+	SaveVoxelGrid2SurfacePointCloud("tsdf.ply", voxel_grid_dim_x, voxel_grid_dim_y, voxel_grid_dim_z,
+		voxel_size, voxel_grid_origin_x, voxel_grid_origin_y, voxel_grid_origin_z,
+		voxel_grid_TSDF, voxel_grid_weight, 0.2f, 0.0f);
 
 	//// Save TSDF voxel grid and its parameters to disk as binary file (float array)
 	//std::cout << "Saving TSDF voxel grid values to disk (tsdf.bin)..." << std::endl;

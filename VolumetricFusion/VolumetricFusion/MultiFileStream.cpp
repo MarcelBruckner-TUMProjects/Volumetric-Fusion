@@ -104,6 +104,8 @@ vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderSta
 
 int main(int argc, char* argv[]) try {
 	
+	bool run_once = true;
+
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "allCameras/";
 
@@ -325,43 +327,47 @@ int main(int argc, char* argv[]) try {
 		glm::mat4 view = camera.GetViewMatrix();
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
-		vc::rendering::startFrame(window);
+		//vc::rendering::startFrame(window);
 
 		std::vector<rs2::points> pts;
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
 			int x = i % 2;
-			int y = floor(i / 2);
-			if(state.renderState == RenderState::ONLY_COLOR || state.renderState == RenderState::ONLY_DEPTH)
-			{
-				if (state.renderState == RenderState::ONLY_COLOR && pipelines[i]->data->filteredColorFrames) {
-					pipelines[i]->rendering->renderTexture(pipelines[i]->data->filteredColorFrames, x, y, aspect, width, height);
-				}
-				else if (state.renderState == RenderState::ONLY_DEPTH && pipelines[i]->data->colorizedDepthFrames) {
-					pipelines[i]->rendering->renderTexture(pipelines[i]->data->colorizedDepthFrames, x, y, aspect, width, height);
-				}
-			}
-			else if ((state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) && pipelines[i]->data->points && pipelines[i]->data->filteredColorFrames) {
-				if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y);
-				}
-				else {
-					pipelines[i]->rendering->renderAllPointclouds(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, relativeTransformations[i], i);
-				}
-				
-				//pts.emplace_back(pipelines[i]->data->points);
-				//pts.push_back(pipelines[i]->data->points);
-				//std::cout << pipelines[i]->data->points << std::endl;
+			//int y = floor(i / 2);
+			//if(state.renderState == RenderState::ONLY_COLOR || state.renderState == RenderState::ONLY_DEPTH)
+			//{
+			//	if (state.renderState == RenderState::ONLY_COLOR && pipelines[i]->data->filteredColorFrames) {
+			//		pipelines[i]->rendering->renderTexture(pipelines[i]->data->filteredColorFrames, x, y, aspect, width, height);
+			//	}
+			//	else if (state.renderState == RenderState::ONLY_DEPTH && pipelines[i]->data->colorizedDepthFrames) {
+			//		pipelines[i]->rendering->renderTexture(pipelines[i]->data->colorizedDepthFrames, x, y, aspect, width, height);
+			//	}
+			//}
+			//else if ((state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) && pipelines[i]->data->points && pipelines[i]->data->filteredColorFrames) {
+			//	if (state.renderState == RenderState::MULTI_POINTCLOUD) {
+			//		pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y);
+			//	}
+			//	else {
+			//		pipelines[i]->rendering->renderAllPointclouds(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, relativeTransformations[i], i);
+			//	}
+			//	
+			//pts.emplace_back(pipelines[i]->data->points);
+			pts.push_back(pipelines[i]->data->points);
+			//	//std::cout << pipelines[i]->data->points << std::endl;
 
-			}
+			//}
 
 		}
 
 		//std::cout << pts.size() << std::endl;
 		//relativeTransformations[0]
-		tsdf_fusion(width, height, instrinsics, relativeTransformations[0], pts);
 		
+		if (run_once) {
+			tsdf_fusion(width, height, instrinsics, relativeTransformations[0], pts);
+			run_once = false;
+		}
+
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
 		glfwSwapBuffers(window);
