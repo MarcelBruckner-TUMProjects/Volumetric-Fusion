@@ -2,6 +2,10 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include "stb_image.h"
+
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 // Include short list of convenience functions for rendering
 
@@ -20,7 +24,7 @@
 #include <filesystem>
 
 
-#include <imgui.h>
+#include "imgui.h"
 #include "imgui_impl_glfw.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -28,10 +32,9 @@
 #include "Enums.hpp"
 using namespace vc::enums;
 
-#include "ImGuiHelpers.hpp"
-#include "Processing.hpp"
-#include "MultiFileStream.h"
-#include "Eigen/Dense"
+//#include "ImGuiHelpers.hpp"
+#include "processing.hpp"
+
 #include "Settings.hpp"
 #include "Data.hpp"
 #include "CaptureDevice.hpp"
@@ -43,6 +46,14 @@ using namespace vc::enums;
 #include "VolumetricFusion/FileAccess.hpp"
 #endif
 #include <signal.h>
+
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include "camera.hpp"
+#include "shader.hpp"
+//#include <io.h>
 
 #pragma endregion
 
@@ -56,36 +67,86 @@ void my_function_to_handle_aborts(int signalNumber) {
 	std::cout << "Something aborted" << std::endl;
 }
 
+void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+void mouse_button_callback(GLFWwindow*, int button, int action, int mods);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void processMouse(float xoffset, float yoffset, GLboolean constrainPitch = true);
+
+// settings
+const unsigned int SCR_WIDTH = 800 * 2;
+const unsigned int TOP_BAR_HEIGHT = 0;
+const unsigned int SCR_HEIGHT = 600 * 2 ;
+
+// camera
+Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
+float lastX = SCR_WIDTH / 2.0f;
+float lastY = SCR_HEIGHT / 2.0f;
+bool firstMouse = true;
+float MouseSensitivity = 0.1;
+float Yaw = 0;
+float Pitch = 0;
+glm::mat4 model = glm::mat4(1.0f);
+
+// timing
+float deltaTime = 0.0f;	// time between current frame and last frame
+float lastFrame = 0.0f;
+
+// mouse
+bool mouseButtonDown[4] = { false, false, false, false };
+
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
+std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
+
+bool visualizeCharucoResults = true;
+
 int main(int argc, char* argv[]) try {
-
-	signal(SIGABRT, &my_function_to_handle_aborts);
-
+	
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "allCameras/";
-	vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::MULTI_POINTCLOUD);
 
-	// Create a simple OpenGL window for rendering:
-	window app(1280, 960, "VolumetricFusion - MultiStreamViewer");
+	// glfw: initialize and configure
+	// ------------------------------
+	glfwInit();
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
-	ImGui_ImplGlfw_Init(app, false);
+	// glfw window creation
+	// --------------------
+	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Volumetric Capture", NULL, NULL);
+	if (window == NULL)
+	{
+		std::cout << "Failed to create GLFW window" << std::endl;
+		glfwTerminate();
+		return -1;
+	}
+	glfwMakeContextCurrent(window);
+	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	glfwSetCursorPosCallback(window, mouse_callback);
+	glfwSetMouseButtonCallback(window, mouse_button_callback);
+	glfwSetScrollCallback(window, scroll_callback);
+	glfwSetKeyCallback(window, key_callback);
+	
+	// tell GLFW to capture our mouse
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-	// Construct an object to manage view state
-	glfw_state viewOrientation;
-	// Let the user control and manipulate the scenery orientation
-	register_glfw_callbacks(app, viewOrientation);
+	// glad: load all OpenGL function pointers
+	// ---------------------------------------
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	{
+		std::cout << "Failed to initialize GLAD" << std::endl;
+		return -1;
+	}
 
-	viewOrientation.yaw = -2.6;
-	viewOrientation.pitch = 0.8;
-	viewOrientation.last_x = 738.7;
-	viewOrientation.last_y = 1015.8;
-	viewOrientation.offset_x = 2.0;
-	viewOrientation.offset_y = -2.0;
-
+	//ImGui_ImplGlfw_Init(window, false);
+	
 	//vc::rendering::Rendering rendering(app, viewOrientation);
 
 	rs2::context ctx; // Create librealsense context for managing devices
 	//std::vector<vc::data::Data> datas;
-	std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 	std::vector<std::string> streamNames;
 
 	if (state.captureState == CaptureState::RECORDING || state.captureState == CaptureState::STREAMING) {
@@ -133,8 +194,8 @@ int main(int argc, char* argv[]) try {
 	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
 
 	// Calculated relative transformations between cameras per frame
-	std::map<int, Eigen::MatrixXd> relativeTransformations = {
-		{0, Eigen::MatrixXd::Identity(4,4)}
+	std::map<int, glm::mat4> relativeTransformations = {
+		//{0, glm::mat4(1.0f)}
 	};
 
 	// Camera calibration thread
@@ -145,46 +206,71 @@ int main(int argc, char* argv[]) try {
 		pipelines[i]->startPipeline();
 		pipelines[i]->resumeThread();
 		pipelines[i]->calibrate(calibrateCameras);
+		pipelines[i]->processing->visualize = visualizeCharucoResults;
 	}
 
 #pragma region Camera Calibration Thread
 
-	calibrationThread = std::thread([&pipelines, &stopped, &calibrateCameras, &relativeTransformations]() {
+	calibrationThread = std::thread([&stopped, &calibrateCameras, &relativeTransformations]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
 				continue;
 			}
 
-			for (int i = 1; i < pipelines.size(); i++) {
+			for (int i = 0; i < pipelines.size(); i++) {
 				{
-					//if (!pipelines[0]->processing->hasMarkersDetected || !pipelines[i]->processing->hasMarkersDetected) {
-					if (!pipelines[i]->processing->hasMarkersDetected) {
+					if (!pipelines[i]->processing->hasMarkersDetected/* || relativeTransformations.count(i) != 0*/) {
 						continue;
 					}
 
-					Eigen::Matrix4d baseToMarkerTranslation = pipelines[i == 0 ? 1 : 0]->processing->translation;
-					Eigen::Matrix4d baseToMarkerRotation = pipelines[i == 0 ? 1 : 0]->processing->rotation;
+					glm::mat4 baseToMarkerTranslation = pipelines[0]->processing->translation;
+					glm::mat4 baseToMarkerRotation = pipelines[0]->processing->rotation;
 
-                    //Eigen::Matrix4d markerToRelativeTranslation = pipelines[i]->processing->translation.inverse();
-                    //Eigen::Matrix4d markerToRelativeRotation = pipelines[i]->processing->rotation.inverse();
-                    Eigen::Matrix4d markerToRelativeTranslation = pipelines[i]->processing->translation;
-                    Eigen::Matrix4d markerToRelativeRotation = pipelines[i]->processing->rotation;
+					if (i == 0) {
+						relativeTransformations[i] = glm::inverse(baseToMarkerTranslation);
+						//relativeTransformations[i] = glm::mat4(1.0f); 
+						continue;
+					}
 
-					//Eigen::Matrix4d relativeTransformation = markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation;
-					Eigen::Matrix4d relativeTransformation = (
-						//markerToRelativeTranslation * markerToRelativeRotation * baseToMarkerRotation * baseToMarkerTranslation
-						(markerToRelativeTranslation * markerToRelativeRotation).inverse() * baseToMarkerTranslation * baseToMarkerRotation
+					glm::mat4 markerToRelativeTranslation = pipelines[i]->processing->translation;
+					glm::mat4 markerToRelativeRotation = pipelines[i]->processing->rotation;
+
+					glm::mat4 relativeTransformation = (
+						//glm::mat4(1.0f)
+
+						//baseToMarkerTranslation * (markerToRelativeRotation) * (baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation)
+						//baseToMarkerTranslation * glm::inverse(markerToRelativeRotation) * (baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation)
+						//baseToMarkerTranslation * (markerToRelativeRotation) * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation)
+						//baseToMarkerTranslation * glm::inverse(markerToRelativeRotation) * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation) 
+
+						//baseToMarkerTranslation * (baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
+						//baseToMarkerTranslation * glm::inverse((baseToMarkerRotation) * glm::inverse(markerToRelativeRotation)) * glm::inverse(markerToRelativeTranslation)
+						/*baseToMarkerTranslation **/ glm::inverse(baseToMarkerRotation)* (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
+						//baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
+						//baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
+
+						//glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerTranslation * baseToMarkerRotation
+						//glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerRotation * baseToMarkerTranslation
+						//glm::inverse(markerToRelativeRotation * markerToRelativeTranslation) * baseToMarkerTranslation * baseToMarkerRotation
+						//glm::inverse(markerToRelativeRotation * markerToRelativeTranslation) * baseToMarkerRotation * baseToMarkerTranslation
+
+						//baseToMarkerTranslation * baseToMarkerRotation * glm::inverse(markerToRelativeTranslation * markerToRelativeRotation)
+						//baseToMarkerRotation * baseToMarkerTranslation * glm::inverse(markerToRelativeTranslation * markerToRelativeRotation)
+						//baseToMarkerTranslation * baseToMarkerRotation * glm::inverse(markerToRelativeRotation * markerToRelativeTranslation)
+						//baseToMarkerRotation * baseToMarkerTranslation * glm::inverse(markerToRelativeRotation * markerToRelativeTranslation)
+
+						//markerToRelativeTranslation * markerToRelativeRotation* glm::inverse(baseToMarkerTranslation * baseToMarkerRotation) 
+						//markerToRelativeTranslation * markerToRelativeRotation* glm::inverse(baseToMarkerRotation * baseToMarkerTranslation) 
+						//markerToRelativeRotation * markerToRelativeTranslation* glm::inverse(baseToMarkerTranslation * baseToMarkerRotation) 
+						//markerToRelativeRotation * markerToRelativeTranslation* glm::inverse(baseToMarkerRotation * baseToMarkerTranslation) 
+
+						//glm::inverse(baseToMarkerTranslation * baseToMarkerRotation) * markerToRelativeTranslation * markerToRelativeRotation
+						//glm::inverse(baseToMarkerRotation * baseToMarkerTranslation) * markerToRelativeTranslation * markerToRelativeRotation
+						//glm::inverse(baseToMarkerTranslation * baseToMarkerRotation) * markerToRelativeRotation * markerToRelativeTranslation
+						//glm::inverse(baseToMarkerRotation * baseToMarkerTranslation) * markerToRelativeRotation * markerToRelativeTranslation
 					);
 
 					relativeTransformations[i] = relativeTransformation;
-
-				/*	std::stringstream ss;
-					ss << "************************************************************************************" << std::endl;
-					ss << "Devices " << i << ", " << i << std::endl << std::endl;
-					ss << "Translations: " << std::endl << baseToMarkerTranslation << std::endl << markerToRelativeTranslation << std::endl << std::endl;
-					ss << "Rotations: " << std::endl << baseToMarkerRotation << std::endl << markerToRelativeRotation << std::endl << std::endl;
-					ss << "Combined: " << std::endl << relativeTransformation << std::endl;
-					std::cout << ss.str();*/
 				}
 			}
 		}
@@ -193,198 +279,58 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Main loop
 
-	while (app)
+	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT - TOP_BAR_HEIGHT);
+	while (!glfwWindowShouldClose(window))
 	{
-		int topOffset = 70;
-		const float width = static_cast<float>(app.width());
-		const float height = static_cast<float>(app.height()) - (topOffset * 0.5f);
-		const int widthHalf = width / 2;
-		const int heightHalf = height / 2;
+		// per-frame time logic
+		// --------------------
+		float currentFrame = glfwGetTime();
+		deltaTime = currentFrame - lastFrame;
+		lastFrame = currentFrame;
 
+		int width, height;
+		glfwGetWindowSize(window, &width, &height);
+		
 		// Retina display (Mac OS) have double the pixel density
 		int w2, h2;
-		glfwGetFramebufferSize(app, &w2, &h2);
-		const bool isRetinaDisplay = w2 == app.width() * 2 && h2 == app.height() * 2;
+		glfwGetFramebufferSize(window, &w2, &h2);
+		const bool isRetinaDisplay = w2 == width * 2 && h2 == width * 2;
 
-		vc::imgui_helpers::initialize(app, w2, h2, streamNames, widthHalf, heightHalf, width, height);
-		vc::imgui_helpers::addSwitchViewButton(state.renderState, calibrateCameras);
-		if (vc::imgui_helpers::addPauseResumeToggle(paused)) {
-			for (int i = 0; i < pipelines.size(); i++)
-			{
-				pipelines[i]->paused->store(paused);
-			}
-		}
+		const float aspect = 1.0f * width / height;
+		
+		// -------------------------------------------------------------------------------
+		glm::mat4 view = camera.GetViewMatrix();
+		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
+		vc::rendering::startFrame(window);
 
-		// addSaveFramesButton(folderSettings.capturesFolder, pipelines, colorizedDepthFrames, points);
-		if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-			//addAlignPointCloudsButton(paused, points);
-		}
-
-		if (state.renderState != RenderState::ONLY_DEPTH) {
-			if (vc::imgui_helpers::addCalibrateToggle(calibrateCameras)) {
-				for (int i = 0; i < pipelines.size(); i++)
-				{
-					pipelines[i]->calibrateCameras->store(calibrateCameras);
-				}
-			}
-		}
-		if (state.renderState != RenderState::ONLY_COLOR) {
-			//addToggleDepthProcessingButton(depthProcessing);
-		}
-		vc::imgui_helpers::addGenerateCharucoDiamond(folderSettings.charucoFolder);
-		vc::imgui_helpers::addGenerateCharucoBoard(folderSettings.charucoFolder);
-		vc::imgui_helpers::finalize();
-
-		switch (state.renderState) {
-		case RenderState::COUNT:
-		case RenderState::MULTI_POINTCLOUD:
+		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
-			// Draw the pointclouds
-			for (int i = 0; i < pipelines.size() && i < 4; ++i)
+			int x = i % 2;
+			int y = floor(i / 2);
+			if(state.renderState == RenderState::ONLY_COLOR || state.renderState == RenderState::ONLY_DEPTH)
 			{
-				if (pipelines[i]->data->colorizedDepthFrames && pipelines[i]->data->points) {
-					viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
-					if (isRetinaDisplay) {
-						glViewport(width * (i % 2), height - (height * (i / 2)), width, height);
-					}
-					else {
-						glViewport(widthHalf * (i % 2), heightHalf - (heightHalf * (i / 2)), widthHalf, heightHalf);
-					}
-
-					if (pipelines[i]->data->filteredColorFrames) {
-						draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);
-					}
-					else {
-						draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
-					}
-
-					if (pipelines.size()) {
-						//draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
-					}
-
-					//relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
+				if (state.renderState == RenderState::ONLY_COLOR && pipelines[i]->data->filteredColorFrames) {
+					pipelines[i]->rendering->renderTexture(pipelines[i]->data->filteredColorFrames, x, y, aspect, width, height);
+				}
+				else if (state.renderState == RenderState::ONLY_DEPTH && pipelines[i]->data->colorizedDepthFrames) {
+					pipelines[i]->rendering->renderTexture(pipelines[i]->data->colorizedDepthFrames, x, y, aspect, width, height);
+				}
+			}
+			else if ((state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) && pipelines[i]->data->points && pipelines[i]->data->filteredColorFrames) {
+				if (state.renderState == RenderState::MULTI_POINTCLOUD) {
+					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y);
+				}
+				else {
+					pipelines[i]->rendering->renderAllPointclouds(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, relativeTransformations[i], i);
 				}
 			}
 		}
-		break;
-
-		case RenderState::CALIBRATED_POINTCLOUD:
-		{
-			if (!calibrateCameras)
-			if (isRetinaDisplay) {
-				glViewport(0, 0, width * 2, height * 2);
-			}
-			else {
-				glViewport(0, 0, width, height);
-			}
-
-			// Draw the pointclouds
-			int i = 0;
-			for (; i < pipelines.size() && i < 4; ++i)
-			{
-				auto data = pipelines[i]->data;
-				if (data->colorizedDepthFrames && data->points) {
-					//viewOrientation.tex.upload(pipelines[i]->data->colorizedDepthFrames);   //  and upload the texture to the view (without this the view will be B&W)
-
-
-					if (!relativeTransformations.count(i)) {
-						break;
-					}
-
-					auto count = relativeTransformations.count(i);
-					auto rt = relativeTransformations[i];
-					auto vs = data->vertices;
-					auto cols = data->vertices.cols();
-					auto rows = data->vertices.rows();
-					auto cols2 = relativeTransformations[i].cols();
-					auto rows2 = relativeTransformations[i].rows();
-                    continue;
-					//Eigen::MatrixXd transformedVertices = relativeTransformations[i].cwiseProduct(pipelines[i]->data->vertices).colwise().sum();
-					//auto transformedVertices = pipelines[i]->data->vertices.transpose().rowwise() * relativeTransformations[i];
-					// (AB)^T = (B^T A^T) => AB = AB^T^T = (B^T A^T)^T
-					//Eigen::MatrixXd transformedVertices(4, cols);
-					//= (pipelines[i]->data->vertices.transpose() * relativeTransformations[i].transpose()).transpose();
-					// HOW THE FUCK DOES THIS SYNTAX WORK ffs!"�$"$
-					/*for (int i = 0; i < cols; ++i) {
-						transformedVertices.col(i) = rt * vs.col(i);
-					}*/
-
-					if (data->filteredColorFrames) {
-						//draw_pointcloud_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, 0.2f);;
-						//draw_vertices_and_colors(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points, transformedVertices, pipelines[i]->data->filteredColorFrames, 0.2f);
-						vc::rendering::draw_vertices_and_colors(
-							widthHalf, heightHalf,
-							viewOrientation,
-							data->points,
-							data->filteredColorFrames,
-							relativeTransformations[i]
-						);
-					}
-					//else {
-					//	draw_pointcloud(widthHalf, heightHalf, viewOrientation, pipelines[i]->data->points);
-					//}
-					//rendering->test();
-
-					//if (pipelines.size()) {
-						//draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation);
-						//vc::rendering::draw_rectangle(widthHalf, heightHalf, 0, 0, 0, viewOrientation, relativeTransformations[i]);
-					//}
-
-					//relativeTransformations[std::make_tuple(i, j)][frame] = relativeTransformation;
-				}
-			}
-
-            vc::rendering::draw_all_vertices_and_colors(
-                    widthHalf, heightHalf,
-                    viewOrientation,
-                    pipelines,
-                    relativeTransformations
-            );
-		}
-		break;
-
-		case RenderState::ONLY_COLOR:
-		{
-			for (int i = 0; i < pipelines.size() && i < 4; ++i)
-			{
-				if (pipelines[i]->data->filteredColorFrames != false) {
-					rect r{
-						static_cast<float>(widthHalf * (i % 2)),
-							static_cast<float>(heightHalf - (heightHalf * (i / 2))),
-							static_cast<float>(widthHalf),
-							static_cast<float>(heightHalf)
-					};
-					if (isRetinaDisplay) {
-						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
-					}
-					pipelines[i]->data->tex.render(pipelines[i]->data->filteredColorFrames, r);
-				}
-			}
-
-			break;
-		}
-
-		case RenderState::ONLY_DEPTH:
-		{
-			for (int i = 0; i < pipelines.size() && i < 4; ++i)
-			{
-				if (pipelines[i]->data->filteredDepthFrames != false) {
-					rect r{
-						static_cast<float>(widthHalf * (i % 2)),
-						static_cast<float>(heightHalf - (heightHalf * (i / 2))),
-						static_cast<float>(widthHalf),
-						static_cast<float>(heightHalf)
-					};
-					if (isRetinaDisplay) {
-						r = rect{ width * (i % 2), height - (height * (i / 2)), width, height };
-					}
-					pipelines[i]->data->tex.render(pipelines[i]->data->colorizer.process(pipelines[i]->data->filteredDepthFrames), r);
-				}
-			}
-
-			break;
-		}
-		}
+		
+		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+		// -------------------------------------------------------------------------------
+		glfwSwapBuffers(window);
+		glfwPollEvents();
 	}
 #pragma endregion
 
@@ -397,7 +343,7 @@ int main(int argc, char* argv[]) try {
 	}
 	calibrationThread.join();
 #pragma endregion
-
+	glfwTerminate();
 	//std::exit(EXIT_SUCCESS);
 	return EXIT_SUCCESS;
 }
@@ -437,6 +383,135 @@ std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
 	}
 
 	return c;
+}
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+		switch (key) {
+		case GLFW_KEY_ESCAPE: {
+			glfwSetWindowShouldClose(window, true);
+			break;
+		}
+		case GLFW_KEY_8: {
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			break;
+		}
+		case GLFW_KEY_9: {
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			break;
+		}
+		case GLFW_KEY_1: {
+			state.renderState = RenderState::ONLY_COLOR;
+			break;
+		}
+		case GLFW_KEY_2: {
+			state.renderState = RenderState::ONLY_DEPTH;
+			break;
+		}
+		case GLFW_KEY_3: {
+			state.renderState = RenderState::MULTI_POINTCLOUD;
+			break;
+		}
+		case GLFW_KEY_4: {
+			state.renderState = RenderState::CALIBRATED_POINTCLOUD;
+			break;
+		}
+		case GLFW_KEY_W: {
+			camera.ProcessKeyboard(UP, deltaTime);
+			break;
+		}
+		case GLFW_KEY_S: {
+			camera.ProcessKeyboard(DOWN, deltaTime);
+			break;
+		}
+		case GLFW_KEY_A: {
+			camera.ProcessKeyboard(LEFT, deltaTime);
+			break;
+		}
+		case GLFW_KEY_D: {
+			camera.ProcessKeyboard(RIGHT, deltaTime);
+			break;
+		}
+		case GLFW_KEY_V: {
+			visualizeCharucoResults = !visualizeCharucoResults;
+			for (auto pipe : pipelines) {
+				pipe->processing->visualize = visualizeCharucoResults;
+			}
+			break;
+		}
+		}
+	}
+}
+
+
+// glfw: whenever the window size changed (by OS or user resize) this callback function executes
+// ---------------------------------------------------------------------------------------------
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+	// make sure the viewport matches the new window dimensions; note that width and 
+	// height will be significantly larger than specified on retina displays.
+	glfwMakeContextCurrent(window);
+	glViewport(0, 0, width, height - 50);
+}
+
+
+// glfw: whenever the mouse moves, this callback is called
+// -------------------------------------------------------
+void mouse_callback(GLFWwindow* window, double xpos, double ypos)
+{
+	if (mouseButtonDown[GLFW_MOUSE_BUTTON_1]) {
+		if (firstMouse)
+		{
+			lastX = xpos;
+			lastY = ypos;
+			firstMouse = false;
+		}
+
+		float xoffset = xpos - lastX;
+		float yoffset = ypos - lastY; // reversed since y-coordinates go from bottom to top
+		//float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+
+		lastX = xpos;
+		lastY = ypos;
+
+		processMouse(xoffset, yoffset);
+		//camera.ProcessMouseMovement(-xoffset, -yoffset);
+	}
+}
+
+void processMouse(float xoffset, float yoffset, GLboolean constrainPitch ) {
+	xoffset *= MouseSensitivity;
+	yoffset *= MouseSensitivity;
+
+	Yaw += xoffset;
+	Pitch += yoffset;
+
+	// Make sure that when pitch is out of bounds, screen doesn't get flipped
+	if (constrainPitch)
+	{
+		if (Pitch > 89.0f)
+			Pitch = 89.0f;
+		if (Pitch < -89.0f)
+			Pitch = -89.0f;
+	}
+	model = glm::mat4(1.0f);
+	model = glm::rotate(model, glm::radians(Pitch), glm::vec3(1.0f, 0.0f, 0.0f));
+	model = glm::rotate(model, glm::radians(Yaw), glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+void mouse_button_callback(GLFWwindow*, int button, int action, int mods)
+{
+	if (action == GLFW_PRESS) {
+		firstMouse = true;
+	}
+	mouseButtonDown[button] = action;
+}
+
+// glfw: whenever the mouse scroll wheel scrolls, this callback is called
+// ----------------------------------------------------------------------
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+	camera.ProcessMouseScroll(yoffset);
 }
 
 #pragma endregion

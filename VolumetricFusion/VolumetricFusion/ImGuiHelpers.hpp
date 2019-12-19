@@ -6,7 +6,6 @@
 #include "../example.hpp"
 #include "FileAccess.hpp"
 #else
-#include "example.hpp"
 #include "VolumetricFusion/FileAccess.hpp"
 #endif
 #include <opencv2/highgui/highgui.hpp>
@@ -15,12 +14,12 @@
 
 namespace vc::imgui_helpers {
 
-	void initialize(window& window_main, int& w2, int& h2, std::vector<std::string>& stream_names, const int& width_half, const int& height_half, const float& width, const float& height)
+	void initialize(const float& width, const float& height)
 	{
-		draw_text(10, 20, stream_names[0].c_str());
-		draw_text(width_half, 20, stream_names[1].c_str());
-		draw_text(10, height_half + 10, stream_names[2].c_str());
-		draw_text(width_half, height_half + 10, stream_names[3].c_str());
+		/*draw_text(10, 20, stream_names[0].c_str());
+		draw_text(width / 2.0f, 20, stream_names[1].c_str());
+		draw_text(10, height / 2.0f + 10, stream_names[2].c_str());
+		draw_text(width / 2.0f, height / 2.0f + 10, stream_names[3].c_str());*/
 
 		// Flags for displaying ImGui window
 		static const int flags = ImGuiWindowFlags_NoCollapse
