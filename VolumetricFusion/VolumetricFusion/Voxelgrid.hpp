@@ -139,19 +139,9 @@ namespace vc::fusion {
 				vert = relativeTransformation * vert;
 				glm::vec3 v = glm::vec3(vert.x, vert.y, vert.z);
 
-				//int pt_grid_x = roundf(transformedVertex.x * resolutionInv + sizeHalf.x); //% voxel_size; // to cm
-				//int pt_grid_y = roundf(transformedVertex.y * resolutionInv + sizeHalf.y);
-				//int pt_grid_z = roundf(transformedVertex.z * resolutionInv + sizeHalf.z);
-
 				glm::vec3 pt_grid = (v + sizeHalf) / resolution;
-
-				//// Convert voxel center from grid coordinates to base frame camera coordinates
-				//float pt_base_x = origin.x + pt_grid_x * resolution;
-				//float pt_base_y = origin.y + pt_grid_y * resolution;
-				//float pt_base_z = origin.z + pt_grid_z * resolution;
-
+				
 				int volume_idx = hashFunc(pt_grid);
-				//glm::vec3 fromHash = hashFuncInv(volume_idx);
 
 				if (volume_idx >= num_gridPoints || volume_idx < 0) {
 					ss << "ERROR: (" << v.x << ", " << v.y << ", " << v.z << ")" << " not in grid!" << std::endl;
@@ -162,7 +152,8 @@ namespace vc::fusion {
 				float weight_new = weight_old + 1.0f;
 				weights[volume_idx] = weight_new;
 				//voxel_grid_TSDF[volume_idx] = (voxel_grid_TSDF[volume_idx] * weight_old + dist) / weight_new;
-				tsdf[volume_idx] = (tsdf[volume_idx] * weight_old) / weight_new;
+				float dist = 0;
+				tsdf[volume_idx] = ((tsdf[volume_idx] * weight_old) + dist) / weight_new;
 
 				totalMin.x = MIN(totalMin.x, v.x);
 				totalMax.x = MAX(totalMax.x, v.x);
