@@ -301,7 +301,7 @@ int main(int argc, char* argv[]) try {
 				const rs2::vertex* vertices = pipelines[i]->data->points.get_vertices();
 
 				auto pip = pipelines[i]->processing;
-				voxelgrid->integrateFrame(pipelines[i]->data->points, relativeTransformations[i], i, pip->frameId);
+				voxelgrid->integrateFrameCPU(pipelines[i]->data->points, relativeTransformations[i], i, pip->frameId);
 			}
 		}
 		});
