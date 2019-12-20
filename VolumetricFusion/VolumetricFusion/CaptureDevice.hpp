@@ -29,16 +29,16 @@ namespace vc::capture {
 
 		std::shared_ptr<rs2::pipeline > pipeline;
 
-		bool isPipelineRunning;
-		bool paused;
-		bool calibrateCameras;
+		std::shared_ptr < std::atomic_bool> isPipelineRunning;
+		std::shared_ptr < std::atomic_bool> paused;
+		std::shared_ptr < std::atomic_bool> calibrateCameras;
 
 		std::shared_ptr < std::thread> thread;
 
 
 		void startPipeline() {
 			this->pipeline->start(this->cfg);
-			isPipelineRunning = true;
+			isPipelineRunning->store(true);
 			setCameras();
 			this->thread = std::make_shared<std::thread>(&vc::capture::CaptureDevice::captureThreadFunction, this);
 			resumeThread();
@@ -50,26 +50,26 @@ namespace vc::capture {
 			if (thread) {
 				thread->join();
 			}
-			if (isPipelineRunning) {
+			if (!isPipelineRunning) {
 				this->pipeline->stop();
 			}
-			isPipelineRunning= false;
+			isPipelineRunning->store(false);
 		}
 
 		void pauseThread() {
-			this->paused = true;
+			this->paused->store(true);
 		}
 
 		void resumeThread() {
-			this->paused= false;
+			this->paused->store(false);
 		}
 
 		void stopThread() {
-			this->isPipelineRunning= false;
+			this->isPipelineRunning->store(false);
 		}
 
 		void calibrate(bool calibrate) {
-			this->calibrateCameras = calibrate;
+			this->calibrateCameras->store(calibrate);
 		}
 
 		void renderColor(const float pos_x, const float pos_y, const float aspect, const int viewport_width, const int viewport_height) {
@@ -132,9 +132,9 @@ namespace vc::capture {
 			this->data = std::make_shared<vc::data::Data>();
 			this->processing = std::make_shared<vc::processing::Processing>();
 			this->pipeline = std::make_shared<rs2::pipeline>(context);
-			this->isPipelineRunning = false;
-			this->paused = true;
-			this->calibrateCameras = false;
+			this->isPipelineRunning = std::make_shared<std::atomic_bool>(false);
+			this->paused = std::make_shared<std::atomic_bool>(true);
+			this->calibrateCameras = std::make_shared<std::atomic_bool>(false);
 			//setCameras();
 
 		}
@@ -149,9 +149,9 @@ namespace vc::capture {
 			rs2::align alignToColor(RS2_STREAM_COLOR);
 			processing->startCharucoProcessing(*rgb_camera);
 
-			while (isPipelineRunning) //While application is running
+			while (isPipelineRunning->load()) //While application is running
 			{
-				while (paused) {
+				while (paused->load()) {
 					continue;
 				}
 
@@ -169,7 +169,7 @@ namespace vc::capture {
 
 					rs2::frame colorFrame = frameset.get_color_frame();
 
-					if (calibrateCameras) {
+					if (calibrateCameras->load()) {
 						// Send color frame for processing
 						processing->charucoProcessingBlocks->invoke(colorFrame);
 						// Wait for results

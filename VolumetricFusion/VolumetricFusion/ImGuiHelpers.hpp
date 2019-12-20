@@ -50,7 +50,7 @@ namespace vc::imgui_helpers {
 		return false;
 	}
 
-	bool addSwitchViewButton(RenderState &renderState, bool& calibrate)
+	bool addSwitchViewButton(RenderState &renderState, std::atomic_bool& calibrate)
 	{
 	    const auto callback = [&]() {
           int s = (int)renderState;
@@ -64,7 +64,7 @@ namespace vc::imgui_helpers {
 		return addTopBarButton("Switch view", callback);
 	}
 
-	bool addToggleButton(const char* offText, const char* onText, bool &variable) {
+	bool addToggleButton(const char* offText, const char* onText, std::atomic_bool &variable) {
 		const char* text = offText;
 		if (variable) {
 			text = onText;
@@ -75,17 +75,17 @@ namespace vc::imgui_helpers {
 		return addTopBarButton(text, callback);
 	}
 
-	bool addPauseResumeToggle(bool& paused)
+	bool addPauseResumeToggle(std::atomic_bool& paused)
 	{
 		return addToggleButton("Pause", "Resume", paused);
 	}
 	
-	bool addCalibrateToggle(bool& calibrate)
+	bool addCalibrateToggle(std::atomic_bool& calibrate)
 	{
 		return addToggleButton("Calibrate", "Stop Calibration", calibrate);
 	}
 
-	bool addAlignPointCloudsButton(bool& paused, std::map<int, rs2::points>& filtered_points)
+	bool addAlignPointCloudsButton(std::atomic_bool& paused, std::map<int, rs2::points>& filtered_points)
 	{
         const auto callback = [&]() {
           paused = true;
