@@ -30,6 +30,7 @@ namespace vc::capture {
 		std::shared_ptr<rs2::pipeline > pipeline;
 
 		std::shared_ptr < std::atomic_bool> isPipelineRunning;
+		std::shared_ptr < std::atomic_bool> isThreadRunning;
 		std::shared_ptr < std::atomic_bool> paused;
 		std::shared_ptr < std::atomic_bool> calibrateCameras;
 
@@ -41,16 +42,15 @@ namespace vc::capture {
 			isPipelineRunning->store(true);
 			setCameras();
 			this->thread = std::make_shared<std::thread>(&vc::capture::CaptureDevice::captureThreadFunction, this);
+			isThreadRunning->store(true);
 			resumeThread();
 
 			//this->data->setIntrinsics(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
 		}
+
 		void stopPipeline() {
 			stopThread();
-			if (thread) {
-				thread->join();
-			}
-			if (!isPipelineRunning) {
+			if (isPipelineRunning->load()) {
 				this->pipeline->stop();
 			}
 			isPipelineRunning->store(false);
@@ -65,7 +65,12 @@ namespace vc::capture {
 		}
 
 		void stopThread() {
-			this->isPipelineRunning->store(false);
+			if (isThreadRunning->load()) {
+				this->isThreadRunning->store(false);
+				if (thread) {
+					thread->join();
+				}
+			}
 		}
 
 		void calibrate(bool calibrate) {
@@ -122,6 +127,7 @@ namespace vc::capture {
 			this->depth_camera = other.depth_camera;
 
 			this->isPipelineRunning = other.isPipelineRunning;
+			this->isThreadRunning = other.isThreadRunning;
 			this->paused = other.paused;
 			this->calibrateCameras = other.calibrateCameras;
 			this->thread = other.thread;
@@ -133,6 +139,7 @@ namespace vc::capture {
 			this->processing = std::make_shared<vc::processing::Processing>();
 			this->pipeline = std::make_shared<rs2::pipeline>(context);
 			this->isPipelineRunning = std::make_shared<std::atomic_bool>(false);
+			this->isThreadRunning = std::make_shared<std::atomic_bool>(false);
 			this->paused = std::make_shared<std::atomic_bool>(true);
 			this->calibrateCameras = std::make_shared<std::atomic_bool>(false);
 			//setCameras();
@@ -149,7 +156,7 @@ namespace vc::capture {
 			rs2::align alignToColor(RS2_STREAM_COLOR);
 			processing->startCharucoProcessing(*rgb_camera);
 
-			while (isPipelineRunning->load()) //While application is running
+			while (isThreadRunning->load() && isPipelineRunning->load()) //While application is running
 			{
 				while (paused->load()) {
 					continue;
@@ -196,7 +203,7 @@ namespace vc::capture {
 					stream << "******************** THREAD ERROR *******************" << std::endl << e.what() << "****************************************************" << std::endl;
 				}
 			}
-			this->pipeline->stop();
+			stopPipeline();
 		}
 	};
 

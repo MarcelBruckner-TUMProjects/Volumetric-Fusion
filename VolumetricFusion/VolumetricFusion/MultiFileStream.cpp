@@ -103,19 +103,20 @@ float lastFrame = 0.0f;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::CALIBRATED_POINTCLOUD);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
 
 bool renderVoxelgrid = false;
 vc::fusion::Voxelgrid* voxelgrid;
-std::atomic_bool calibrateCameras = true;
+std::atomic_bool calibrateCameras = false;
+std::atomic_bool fuseFrames = false;
 
 int main(int argc, char* argv[]) try {
 	
 	vc::settings::FolderSettings folderSettings;
-	folderSettings.recordingsFolder = "recordings/test/";
+	folderSettings.recordingsFolder = "recordings/allCameras/";
 
 	// glfw: initialize and configure
 	// ------------------------------
@@ -238,19 +239,14 @@ int main(int argc, char* argv[]) try {
 		bool allPipelinesEnteredLooped = false;
 	} programState;
 
-	std::atomic_bool calibrateCameras = false;
-	std::atomic_bool fuseFrames = false;
-
 	for (int i = 0; i < pipelines.size(); i++) {
-		pipelines[i]->startPipeline();
-		pipelines[i]->calibrate(calibrateCameras);
 		pipelines[i]->processing->visualize = visualizeCharucoResults;
 	}
 
 #pragma region Camera Calibration Thread
 
 	setCalibration(calibrateCameras);
-	calibrationThread = std::thread([&stopped, &calibrateCameras, &fuseFrames, &programState, &relativeTransformations]() {
+	calibrationThread = std::thread([&stopped, &programState, &relativeTransformations]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
 				continue;
@@ -335,7 +331,7 @@ int main(int argc, char* argv[]) try {
 
 
 #pragma region Fusion Thread
-	fusionThread = std::thread([&stopped, &calibrateCameras, &fuseFrames, &programState, &relativeTransformations]() {
+	fusionThread = std::thread([&stopped, &programState, &relativeTransformations]() {
 		const int maxIntegrations = 10;
 		int integrations = 0;
 		while (!stopped) {
@@ -433,8 +429,7 @@ int main(int argc, char* argv[]) try {
 
 	stopped.store(true);
 	for (int i = 0; i < pipelines.size(); i++) {
-		pipelines[i]->stopThread();
-		pipelines[i]->thread->join();
+		pipelines[i]->stopPipeline();
 	}
 	calibrationThread.join();
 	fusionThread.join();
