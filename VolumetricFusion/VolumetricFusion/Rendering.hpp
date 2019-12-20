@@ -147,12 +147,13 @@ namespace vc::rendering {
             glBindBuffer(GL_ARRAY_BUFFER, VBOs[2]);
         }
 
-        void renderAllPointclouds(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection,
+        void renderAllPointclouds(const rs2::frame depth_frame, const rs2::frame color_frame, std::shared_ptr<vc::data::Camera> depth_camera, std::shared_ptr < vc::data::Camera> rgb_camera, 
+            glm::mat4 model, glm::mat4 view, glm::mat4 projection,
             const int viewport_width, const int viewport_height, glm::mat4 relativeTransformation, const int i = 0) {
-            renderPointcloud(points, texture, model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, i);
+            renderPointcloud(depth_frame, color_frame, depth_camera, rgb_camera, model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, i);
         }
 
-        void renderPointcloudNew(const rs2::frame depth_frame, const rs2::frame color_frame, std::shared_ptr<vc::data::Camera> depth_camera, std::shared_ptr < vc::data::Camera> rgb_camera,
+        void renderPointcloud(const rs2::frame depth_frame, const rs2::frame color_frame, std::shared_ptr<vc::data::Camera> depth_camera, std::shared_ptr < vc::data::Camera> rgb_camera,
             glm::mat4 model, glm::mat4 view, glm::mat4 projection,
             const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), const int i = 0) {
             setViewport(viewport_width, viewport_height, pos_x, pos_y);
@@ -217,64 +218,64 @@ namespace vc::rendering {
             glBindVertexArray(0);
         }
     
-        void renderPointcloud(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection,
-                const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), const int i = 0) {
-            setViewport(viewport_width, viewport_height, pos_x, pos_y);
+        //void renderPointcloud(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection,
+        //        const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), const int i = 0) {
+        //    setViewport(viewport_width, viewport_height, pos_x, pos_y);
 
-            renderCoordinateSystem(model, view, projection);
-            //return;
+        //    renderCoordinateSystem(model, view, projection);
+        //    //return;
 
-            const rs2::vertex* vertices = points.get_vertices();
-            const rs2::texture_coordinate* texCoords = points.get_texture_coordinates();
-            const int num_vertices = points.size();
+        //    const rs2::vertex* vertices = points.get_vertices();
+        //    const rs2::texture_coordinate* texCoords = points.get_texture_coordinates();
+        //    const int num_vertices = points.size();
 
-            //int num_not_zero_texCoords = 0;
-            //std::stringstream ss;
-            //for (int i = 0; i < num_vertices; i++)
-            ////for (int i = num_vertices; i > 0; i--)
-            //{
-            //    rs2::texture_coordinate coord = texCoords[i];
-            //    if (coord.u > 0 || coord.v > 0) {
-            //        ss << coord.u << ", " << coord.v << "-";
-            //        num_not_zero_texCoords++;
-            //    }
-            //    //ss << coord.u << ", " << coord.v << "-";
-            //}
-            //std::cout << ss.str() << std::endl;
-            //std::cout << std::endl << std::endl << std::endl << std::endl << std::endl << std::endl;
-            glEnable(GL_DEPTH_TEST);
+        //    //int num_not_zero_texCoords = 0;
+        //    //std::stringstream ss;
+        //    //for (int i = 0; i < num_vertices; i++)
+        //    ////for (int i = num_vertices; i > 0; i--)
+        //    //{
+        //    //    rs2::texture_coordinate coord = texCoords[i];
+        //    //    if (coord.u > 0 || coord.v > 0) {
+        //    //        ss << coord.u << ", " << coord.v << "-";
+        //    //        num_not_zero_texCoords++;
+        //    //    }
+        //    //    //ss << coord.u << ", " << coord.v << "-";
+        //    //}
+        //    //std::cout << ss.str() << std::endl;
+        //    //std::cout << std::endl << std::endl << std::endl << std::endl << std::endl << std::endl;
+        //    glEnable(GL_DEPTH_TEST);
 
-            POINTCLOUD_shader->use();
+        //    POINTCLOUD_shader->use();
 
-            const int width = texture.as<rs2::video_frame>().get_width();
-            const int height = texture.as<rs2::video_frame>().get_height();
-            glBindTexture(GL_TEXTURE_2D, textures[0]);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture.get_data());
+        //    const int width = texture.as<rs2::video_frame>().get_width();
+        //    const int height = texture.as<rs2::video_frame>().get_height();
+        //    glBindTexture(GL_TEXTURE_2D, textures[0]);
+        //    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture.get_data());
 
-            glBindVertexArray(VAOs[1]);
-            
-            glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
-            glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(rs2::vertex), vertices, GL_STREAM_DRAW);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(rs2::vertex), (void*)0);
-            glEnableVertexAttribArray(0);
+        //    glBindVertexArray(VAOs[1]);
+        //    
+        //    glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
+        //    glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(rs2::vertex), vertices, GL_STREAM_DRAW);
+        //    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(rs2::vertex), (void*)0);
+        //    glEnableVertexAttribArray(0);
 
-            glBindBuffer(GL_ARRAY_BUFFER, VBOs[2]);
-            glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(rs2::texture_coordinate), texCoords, GL_STREAM_DRAW);
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(rs2::texture_coordinate), (void*)0);
-            glEnableVertexAttribArray(1);
+        //    glBindBuffer(GL_ARRAY_BUFFER, VBOs[2]);
+        //    glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(rs2::texture_coordinate), texCoords, GL_STREAM_DRAW);
+        //    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(rs2::texture_coordinate), (void*)0);
+        //    glEnableVertexAttribArray(1);
 
-            //auto color = DEBUG_COLORS[i];
-            //POINTCLOUD_shader->setColor("color", color.r, color.g, color.b, 1);
-            POINTCLOUD_shader->setColor("color", 1, 1, 1, 1);
-            POINTCLOUD_shader->setMat4("relativeTransformation", relativeTransformation);
-            POINTCLOUD_shader->setMat4("correction", COORDINATE_CORRECTION);
-            POINTCLOUD_shader->setMat4("model", model);
-            POINTCLOUD_shader->setMat4("view", view);
-            POINTCLOUD_shader->setMat4("projection", projection);
+        //    //auto color = DEBUG_COLORS[i];
+        //    //POINTCLOUD_shader->setColor("color", color.r, color.g, color.b, 1);
+        //    POINTCLOUD_shader->setColor("color", 1, 1, 1, 1);
+        //    POINTCLOUD_shader->setMat4("relativeTransformation", relativeTransformation);
+        //    POINTCLOUD_shader->setMat4("correction", COORDINATE_CORRECTION);
+        //    POINTCLOUD_shader->setMat4("model", model);
+        //    POINTCLOUD_shader->setMat4("view", view);
+        //    POINTCLOUD_shader->setMat4("projection", projection);
 
-            glDrawArrays(GL_POINTS, 0, num_vertices);
-            glBindVertexArray(0);
-        }
+        //    glDrawArrays(GL_POINTS, 0, num_vertices);
+        //    glBindVertexArray(0);
+        //}
 
         void renderTexture(rs2::frame color_image, const float pos_x, const float pos_y, const float aspect, const int viewport_width, const int viewport_height) {
             setViewport(viewport_width, viewport_height, pos_x, pos_y);

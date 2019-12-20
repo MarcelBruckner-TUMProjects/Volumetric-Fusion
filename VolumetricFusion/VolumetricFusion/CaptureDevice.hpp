@@ -83,29 +83,16 @@ namespace vc::capture {
 				this->rendering->renderTexture(data->colorizedDepthFrames, pos_x, pos_y, aspect, viewport_width, viewport_height);
 			}
 		}
-
-		void renderPointcloud(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
-			const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), const int i = 0) {
-			if (data->points && data->filteredColorFrames) {
-				rendering->renderPointcloud(data->points, data->filteredColorFrames, model, view, projection,
-					viewport_width, viewport_height, pos_x, pos_y, relativeTransformation, i);
-			}
-		}
-
+		
 		void renderAllPointclouds(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
 			const int viewport_width, const int viewport_height, glm::mat4 relativeTransformation, const int i = 0) {
 			renderPointcloud(model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, i);
 		}
 
-		void renderAllPointcloudsNew(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
-			const int viewport_width, const int viewport_height, glm::mat4 relativeTransformation, const int i = 0) {
-			renderPointcloudNew(model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, i);
-		}
-
-		void renderPointcloudNew(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
+		void renderPointcloud(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
 			const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), const int i = 0) {
 			if (data->filteredDepthFrames && data->filteredColorFrames) {
-				rendering->renderPointcloudNew(data->filteredDepthFrames, data->filteredColorFrames, depth_camera, rgb_camera, model, view, projection,
+				rendering->renderPointcloud(data->filteredDepthFrames, data->filteredColorFrames, depth_camera, rgb_camera, model, view, projection,
 					viewport_width, viewport_height, pos_x, pos_y, relativeTransformation, i);
 			}
 		}
@@ -114,10 +101,10 @@ namespace vc::capture {
 			pauseThread();
 			stopPipeline();
 			if (colorStream.size() == 2) {
-				this->cfg.enable_stream(RS2_STREAM_COLOR, colorStream[0], colorStream[1]);
+				this->cfg.enable_stream(RS2_STREAM_COLOR, colorStream[0], colorStream[1], RS2_FORMAT_RGB8, 30);
 			}
 			if (depthStream.size() == 2) {
-				this->cfg.enable_stream(RS2_STREAM_DEPTH, depthStream[0], depthStream[1]);
+				this->cfg.enable_stream(RS2_STREAM_DEPTH, depthStream[0], depthStream[1], RS2_FORMAT_Z16, 30);
 			}
 			if (directResume) {
 				startPipeline();
@@ -199,9 +186,10 @@ namespace vc::capture {
 					// Push filtered & original data to their respective queues
 					data->filteredDepthFrames = filteredDepthFrame;
 
-					data->points = data->pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
 					data->colorizedDepthFrames = data->colorizer.process(depthFrame);		// Colorize the depth frame with a color map
-					data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud
+
+					//data->points = data->pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
+					//data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud
 				}
 				catch (const std::exception & e) {
 					std::stringstream stream;

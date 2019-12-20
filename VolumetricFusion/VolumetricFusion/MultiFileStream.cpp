@@ -103,7 +103,7 @@ float lastFrame = 0.0f;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::CALIBRATED_POINTCLOUD_NEW);
+vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::CALIBRATED_POINTCLOUD);
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
@@ -414,10 +414,6 @@ int main(int argc, char* argv[]) try {
 			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, relativeTransformations[i], i);
 				}
-			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD_NEW) {
-					pipelines[i]->renderAllPointcloudsNew(model, view, projection, width, height, relativeTransformations[i], i);
-
-			}
 		}
 		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 			voxelgrid->renderGrid(model, view, projection);
@@ -549,10 +545,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_4: {
 			state.renderState = RenderState::CALIBRATED_POINTCLOUD;
-			break;
-		}
-		case GLFW_KEY_7: {
-			state.renderState = RenderState::CALIBRATED_POINTCLOUD_NEW;
 			break;
 		}
 		case GLFW_KEY_5: {
