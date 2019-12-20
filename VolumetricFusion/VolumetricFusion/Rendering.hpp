@@ -80,7 +80,8 @@ namespace vc::rendering {
             glGenBuffers(3, VBOs);
             glGenBuffers(1, &COORDINATE_SYSTEM_VBO);
             glGenBuffers(1, EBOs);
-            glGenBuffers(2, textures);
+            glGenTextures(2, textures);
+
             initializeVerticesBuffer();
             initializeTextureBuffer();
             initializeCoordinateSystemBuffers();
@@ -239,6 +240,7 @@ namespace vc::rendering {
             glBindVertexArray(0);
             glDisable(GL_DEPTH_TEST);
         }
+
     };
     
     void startFrame(GLFWwindow* window) {
@@ -248,7 +250,7 @@ namespace vc::rendering {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         //glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_DEPTH);
+        glEnable(GL_DEPTH_TEST);
     }
 
     void setViewport(const int viewport_width, const int viewport_height, const int pos_x, const int pos_y) {

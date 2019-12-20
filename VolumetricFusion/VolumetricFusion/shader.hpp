@@ -68,6 +68,10 @@ namespace vc::rendering {
 			glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(matrix));
 		}
 
+		void setArray3(const std::string& name, GLfloat *vec, int count) {
+			glUniform3fv(glGetUniformLocation(ID, name.c_str()), count, vec);
+		}
+
 	protected:
 		// utility function for checking shader compilation/linking errors.
 		// ------------------------------------------------------------------------

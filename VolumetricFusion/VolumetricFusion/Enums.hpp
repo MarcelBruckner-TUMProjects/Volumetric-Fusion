@@ -4,6 +4,7 @@ namespace vc::enums {
 	enum class RenderState {
 		MULTI_POINTCLOUD,
 		CALIBRATED_POINTCLOUD,
+		VOXELGRID,
 		ONLY_COLOR,
 		ONLY_DEPTH,
 		COUNT
