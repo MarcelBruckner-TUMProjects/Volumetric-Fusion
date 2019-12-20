@@ -112,6 +112,7 @@ bool renderVoxelgrid = false;
 vc::fusion::Voxelgrid* voxelgrid;
 std::atomic_bool calibrateCameras = false;
 std::atomic_bool fuseFrames = false;
+std::atomic_bool renderCoordinateSystem = false;
 
 int main(int argc, char* argv[]) try {
 	
@@ -270,8 +271,8 @@ int main(int argc, char* argv[]) try {
 					glm::mat4 baseToMarkerRotation = pipelines[0]->processing->rotation;
 
 					if (i == 0) {
-						relativeTransformations[i] = glm::inverse(baseToMarkerTranslation);
-						//relativeTransformations[i] = glm::mat4(1.0f); 
+						//relativeTransformations[i] = glm::inverse(baseToMarkerTranslation);
+						relativeTransformations[i] = glm::mat4(1.0f); 
 						continue;
 					}
 
@@ -288,8 +289,8 @@ int main(int argc, char* argv[]) try {
 
 						//baseToMarkerTranslation * (baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
 						//baseToMarkerTranslation * glm::inverse((baseToMarkerRotation) * glm::inverse(markerToRelativeRotation)) * glm::inverse(markerToRelativeTranslation)
-						/*baseToMarkerTranslation **/ glm::inverse(baseToMarkerRotation)* (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
-						//baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
+						///*baseToMarkerTranslation **/ glm::inverse(baseToMarkerRotation)* (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
+						baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
 						//baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
 
 						//glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerTranslation * baseToMarkerRotation
@@ -402,13 +403,13 @@ int main(int argc, char* argv[]) try {
 					pipelines[i]->renderDepth(x, y, aspect, width, height);
 				}
 			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, relativeTransformations[i]);
+					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, relativeTransformations[i], renderCoordinateSystem);
 					if (renderVoxelgrid) {
 						voxelgrid->renderGrid(model, view, projection);
 					}
 				}
 			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, relativeTransformations[i], i);
+					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, relativeTransformations[i], i, renderCoordinateSystem);
 				}
 		}
 		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
@@ -559,6 +560,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_C: {
 			setCalibration(!calibrateCameras);
+			break;
+		}
+		case GLFW_KEY_L: {
+			renderCoordinateSystem = !renderCoordinateSystem;
 			break;
 		}
 		}

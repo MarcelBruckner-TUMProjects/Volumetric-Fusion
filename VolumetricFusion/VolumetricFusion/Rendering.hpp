@@ -148,17 +148,17 @@ namespace vc::rendering {
         }
 
         void renderAllPointclouds(const rs2::frame depth_frame, const rs2::frame color_frame, std::shared_ptr<vc::data::Camera> depth_camera, std::shared_ptr < vc::data::Camera> rgb_camera, 
-            glm::mat4 model, glm::mat4 view, glm::mat4 projection,
-            const int viewport_width, const int viewport_height, glm::mat4 relativeTransformation, const int i = 0) {
-            renderPointcloud(depth_frame, color_frame, depth_camera, rgb_camera, model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, i);
+            glm::mat4 model, glm::mat4 view, glm::mat4 projection, const int viewport_width, const int viewport_height, glm::mat4 relativeTransformation, const int i = 0, bool renderCoordinateSystem = false) {
+            renderPointcloud(depth_frame, color_frame, depth_camera, rgb_camera, model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, i, renderCoordinateSystem);
         }
 
         void renderPointcloud(const rs2::frame depth_frame, const rs2::frame color_frame, std::shared_ptr<vc::data::Camera> depth_camera, std::shared_ptr < vc::data::Camera> rgb_camera,
-            glm::mat4 model, glm::mat4 view, glm::mat4 projection,
-            const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), const int i = 0) {
+            glm::mat4 model, glm::mat4 view, glm::mat4 projection, const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), const int i = 0, bool renderCoordinateSystem = false) {
             setViewport(viewport_width, viewport_height, pos_x, pos_y);
 
-            renderCoordinateSystem(model, view, projection);
+            if (renderCoordinateSystem) {
+                this->renderCoordinateSystem(model, view, projection);
+            }
 
             glEnable(GL_DEPTH_TEST);
 
