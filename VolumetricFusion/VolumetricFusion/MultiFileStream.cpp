@@ -74,14 +74,18 @@ void mouse_button_callback(GLFWwindow*, int button, int action, int mods);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
+void setCalibration(bool calibrate);
 
 // settings
 const unsigned int SCR_WIDTH = 800 * 2;
 const unsigned int TOP_BAR_HEIGHT = 0;
 const unsigned int SCR_HEIGHT = 600 * 2 ;
 
-std::vector<int> colorStream = { 1280, 720 };
-std::vector<int> depthStream = { 1280, 720 };
+std::vector<int> DEFAULT_COLOR_STREAM = { 640, 480 };
+std::vector<int> DEFAULT_DEPTH_STREAM = { 640, 480 };
+
+std::vector<int> CALIBRATION_COLOR_STREAM = { 1920, 1080 };
+std::vector<int> CALIBRATION_DEPTH_STREAM = { 1280, 720 };
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
@@ -183,10 +187,10 @@ int main(int argc, char* argv[]) try {
 		for (auto&& device : ctx.query_devices())
 		{
 			if (state.captureState == CaptureState::RECORDING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, colorStream, depthStream, folderSettings.recordingsFolder));
+				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM, folderSettings.recordingsFolder));
 			}
 			else if (state.captureState == CaptureState::STREAMING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, colorStream, depthStream));
+				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM));
 			}
 			i++;
 		}
@@ -220,7 +224,7 @@ int main(int argc, char* argv[]) try {
 	std::map<int, glm::mat4> relativeTransformations = {
 		{0, glm::mat4(1.0f)},
 		{1, glm::mat4(1.0f)},
-	{2, glm::mat4(1.0f)},
+		{2, glm::mat4(1.0f)},
 		{3, glm::mat4(1.0f)},
 	};
 
@@ -234,18 +238,18 @@ int main(int argc, char* argv[]) try {
 		bool allPipelinesEnteredLooped = false;
 	} programState;
 
-	std::atomic_bool calibrateCameras = true;
+	std::atomic_bool calibrateCameras = false;
 	std::atomic_bool fuseFrames = false;
 
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i]->startPipeline();
-		pipelines[i]->resumeThread();
 		pipelines[i]->calibrate(calibrateCameras);
 		pipelines[i]->processing->visualize = visualizeCharucoResults;
 	}
 
 #pragma region Camera Calibration Thread
 
+	setCalibration(calibrateCameras);
 	calibrationThread = std::thread([&stopped, &calibrateCameras, &fuseFrames, &programState, &relativeTransformations]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
@@ -320,7 +324,7 @@ int main(int argc, char* argv[]) try {
 			programState.allPipelinesEnteredLooped = pipelinesEnteredLoop == pipelines.size();
 
 			if (programState.allMarkersDetected) {
-				calibrateCameras.store(false);
+				setCalibration(false);
 				// start fusion thread logic
 				fuseFrames.store(true);
 			}
@@ -482,6 +486,19 @@ std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
 	return c;
 }
 
+void setCalibration(bool calibrate) {
+	calibrateCameras.store(calibrate);
+	for (int i = 0; i < pipelines.size(); i++) {
+		if (calibrateCameras) {
+			pipelines[i]->setResolutions(CALIBRATION_COLOR_STREAM, CALIBRATION_DEPTH_STREAM);
+		}
+		else {
+			pipelines[i]->setResolutions(DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM);
+		}
+		pipelines[i]->calibrate(calibrateCameras);
+	}
+}
+
 bool isKeyPressed(GLFWwindow* window, int key) {
 	return glfwGetKey(window, key) == GLFW_PRESS;
 }
@@ -551,10 +568,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			break;
 		}
 		case GLFW_KEY_C: {
-			calibrateCameras.store(!calibrateCameras);
-			for (int i = 0; i < pipelines.size(); i++) {
-				pipelines[i]->calibrate(calibrateCameras);
-			}
+			setCalibration(!calibrateCameras);
 			break;
 		}
 		}
