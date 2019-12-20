@@ -27,8 +27,6 @@
     <None Include="packages.config" />
     <None Include="readme.md" />
     <None Include="shader\compute_shader.comp" />
-    <None Include="shader\coordinate.fs" />
-    <None Include="shader\coordinate.vs" />
     <None Include="shader\texture.vs">
       <Filter>Shader</Filter>
     </None>
@@ -53,10 +51,19 @@
     <None Include="shader\voxelgrid.fs">
       <Filter>Shader</Filter>
     </None>
-    <None Include="shader\pointcloud.fs">
+    <None Include="shader\pointcloud.vs">
       <Filter>Shader</Filter>
     </None>
-    <None Include="shader\pointcloud.vs">
+    <None Include="shader\coordinate.fs">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\coordinate.vs">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\pointcloud_new.vert">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\pointcloud.frag">
       <Filter>Shader</Filter>
     </None>
   </ItemGroup>

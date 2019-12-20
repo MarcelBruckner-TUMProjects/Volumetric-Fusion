@@ -103,7 +103,7 @@ float lastFrame = 0.0f;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::ONLY_COLOR);
+vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::CALIBRATED_POINTCLOUD_NEW);
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
@@ -399,25 +399,24 @@ int main(int argc, char* argv[]) try {
 		{
 			int x = i % 2;
 			int y = floor(i / 2);
-			if(state.renderState == RenderState::ONLY_COLOR || state.renderState == RenderState::ONLY_DEPTH)
-			{
 				if (state.renderState == RenderState::ONLY_COLOR) {
 					pipelines[i]->renderColor(x, y, aspect, width, height);
 				}
 				else if (state.renderState == RenderState::ONLY_DEPTH) {
 					pipelines[i]->renderDepth(x, y, aspect, width, height);
 				}
-			}
-			else if ((state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD)) {
-				if (state.renderState == RenderState::MULTI_POINTCLOUD) {
+			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
 					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, relativeTransformations[i]);
 					if (renderVoxelgrid) {
 						voxelgrid->renderGrid(model, view, projection);
 					}
 				}
-				else {
+			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, relativeTransformations[i], i);
 				}
+			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD_NEW) {
+					pipelines[i]->renderAllPointcloudsNew(model, view, projection, width, height, relativeTransformations[i], i);
+
 			}
 		}
 		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
@@ -550,6 +549,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_4: {
 			state.renderState = RenderState::CALIBRATED_POINTCLOUD;
+			break;
+		}
+		case GLFW_KEY_7: {
+			state.renderState = RenderState::CALIBRATED_POINTCLOUD_NEW;
 			break;
 		}
 		case GLFW_KEY_5: {

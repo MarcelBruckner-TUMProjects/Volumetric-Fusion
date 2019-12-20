@@ -42,6 +42,7 @@ namespace vc::capture {
 			setCameras();
 			this->thread = std::make_shared<std::thread>(&vc::capture::CaptureDevice::captureThreadFunction, this);
 			resumeThread();
+
 			//this->data->setIntrinsics(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
 		}
 		void stopPipeline() {
@@ -78,7 +79,7 @@ namespace vc::capture {
 		}
 
 		void renderDepth(const float pos_x, const float pos_y, const float aspect, const int viewport_width, const int viewport_height) {
-			if (data->filteredDepthFrames) {
+			if (data->colorizedDepthFrames) {
 				this->rendering->renderTexture(data->colorizedDepthFrames, pos_x, pos_y, aspect, viewport_width, viewport_height);
 			}
 		}
@@ -96,6 +97,18 @@ namespace vc::capture {
 			renderPointcloud(model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, i);
 		}
 
+		void renderAllPointcloudsNew(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
+			const int viewport_width, const int viewport_height, glm::mat4 relativeTransformation, const int i = 0) {
+			renderPointcloudNew(model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, i);
+		}
+
+		void renderPointcloudNew(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
+			const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), const int i = 0) {
+			if (data->filteredDepthFrames && data->filteredColorFrames) {
+				rendering->renderPointcloudNew(data->filteredDepthFrames, data->filteredColorFrames, depth_camera, rgb_camera, model, view, projection,
+					viewport_width, viewport_height, pos_x, pos_y, relativeTransformation, i);
+			}
+		}
 
 		void setResolutions(const std::vector<int> colorStream, const std::vector<int> depthStream, bool directResume = true) {
 			pauseThread();
@@ -141,7 +154,8 @@ namespace vc::capture {
 
 		void setCameras() {
 			this->rgb_camera = std::make_shared<vc::data::Camera>(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
-			this->depth_camera = std::make_shared<vc::data::Camera>(this->pipeline->get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>().get_intrinsics());
+			this->depth_camera = std::make_shared<vc::data::Camera>(this->pipeline->get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>().get_intrinsics(), 
+				this->pipeline->get_active_profile().get_device().first<rs2::depth_sensor>().get_depth_scale());
 		}
 
 		void captureThreadFunction() {

@@ -35,6 +35,10 @@
 
 #include "Processing.hpp"
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 namespace vc::processing {
 	class Processing;
 }
@@ -46,14 +50,30 @@ namespace vc::data {
 		// Pose estimation camera stuff
 		rs2_intrinsics intrinsics;
 		cv::Matx33f K;
+		cv::Matx33f world2cam;
+		glm::mat3 cam2world;
 		std::vector<float> distCoeffs;
 
+		float depthScale;
+
 		// TODO maybe more mvvc
-		Camera(rs2_intrinsics intrinsics) {
-			intrinsics = intrinsics;
+		Camera(rs2_intrinsics intrinsics, float depthScale = 0.0f) {
+			this->depthScale = depthScale;
+			this->intrinsics = intrinsics;
 			K = cv::Matx33f(
 				intrinsics.fx, 0, intrinsics.ppx,
 				0, intrinsics.fy, intrinsics.ppy,
+				0, 0, 1
+			);
+
+			world2cam = cv::Matx33f(
+				1.0f / intrinsics.fx, 0, (-intrinsics.ppx) / intrinsics.fx,
+				0, 1.0f / intrinsics.fy, (-intrinsics.ppy) / intrinsics.fy,
+				0, 0, 1
+			);
+			cam2world = glm::mat3(
+				1.0f / intrinsics.fx, 0, (-intrinsics.ppx) / intrinsics.fx,
+				0, 1.0f / intrinsics.fy, (-intrinsics.ppy) / intrinsics.fy,
 				0, 0, 1
 			);
 

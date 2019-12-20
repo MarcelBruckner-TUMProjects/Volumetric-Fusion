@@ -68,18 +68,28 @@ namespace vc::rendering {
         0.01f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
     };
 
+    glm::vec2* vertices;
+    int num_vertices = 0;
+
     class Rendering {
     private:
         unsigned int COORDINATE_SYSTEM_VBO, COORDINATE_SYSTEM_VAO;
-        unsigned int VBOs[3], VAOs[2], EBOs[1], textures[2];
+        unsigned int VBOs[3], VAOs[2], EBOs[1], textures[3];
         vc::rendering::Shader* TEXTURE_shader;
         vc::rendering::Shader* POINTCLOUD_shader;
+        vc::rendering::Shader* POINTCLOUD_new_shader;
         vc::rendering::Shader* COORDINATE_SYSTEM_shader;
 
+        std::vector<int> types = { GL_UNSIGNED_BYTE, GL_BYTE, GL_UNSIGNED_SHORT, GL_SHORT, GL_UNSIGNED_INT, GL_INT, GL_HALF_FLOAT, GL_FLOAT, GL_UNSIGNED_BYTE_3_3_2,
+            GL_UNSIGNED_BYTE_2_3_3_REV, GL_UNSIGNED_SHORT_5_6_5, GL_UNSIGNED_SHORT_5_6_5_REV, GL_UNSIGNED_SHORT_4_4_4_4, GL_UNSIGNED_SHORT_4_4_4_4_REV,
+            GL_UNSIGNED_SHORT_5_5_5_1, GL_UNSIGNED_SHORT_1_5_5_5_REV, GL_UNSIGNED_INT_8_8_8_8, GL_UNSIGNED_INT_8_8_8_8_REV, GL_UNSIGNED_INT_10_10_10_2, GL_UNSIGNED_INT_2_10_10_10_REV };
+
     public:
+        int currentType = 0;
         Rendering() {
             TEXTURE_shader = new vc::rendering::VertexFragmentShader("shader/texture.vs", "shader/texture.fs");
-            POINTCLOUD_shader = new vc::rendering::VertexFragmentShader("shader/pointcloud.vs", "shader/pointcloud.fs");
+            POINTCLOUD_shader = new vc::rendering::VertexFragmentShader("shader/pointcloud.vs", "shader/pointcloud.frag");
+            POINTCLOUD_new_shader = new vc::rendering::VertexFragmentShader("shader/pointcloud_new.vert", "shader/pointcloud.frag");
             COORDINATE_SYSTEM_shader = new vc::rendering::VertexFragmentShader("shader/coordinate.vs", "shader/coordinate.fs");
 
             glGenVertexArrays(2, VAOs);
@@ -87,7 +97,17 @@ namespace vc::rendering {
             glGenBuffers(3, VBOs);
             glGenBuffers(1, &COORDINATE_SYSTEM_VBO);
             glGenBuffers(1, EBOs);
-            glGenTextures(2, textures);
+            glGenTextures(3, textures);
+
+            for (int i = 0; i < 3; i++) {
+                glBindTexture(GL_TEXTURE_2D, textures[i]); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
+                // set the texture wrapping parameters
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+                // set texture filtering parameters
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            }
 
             initializeVerticesBuffer();
             initializeTextureBuffer();
@@ -119,28 +139,12 @@ namespace vc::rendering {
             // color attribute
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
             glEnableVertexAttribArray(1);
-
-            glBindTexture(GL_TEXTURE_2D, textures[0]); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
-            // set the texture wrapping parameters
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            // set texture filtering parameters
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         }
 
         void initializeVerticesBuffer() {
             glBindVertexArray(VAOs[1]);
             glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
             glBindBuffer(GL_ARRAY_BUFFER, VBOs[2]);
-
-            glBindTexture(GL_TEXTURE_2D, textures[1]); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
-            // set the texture wrapping parameters
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            // set texture filtering parameters
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         }
 
         void renderAllPointclouds(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection,
@@ -148,8 +152,73 @@ namespace vc::rendering {
             renderPointcloud(points, texture, model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, i);
         }
 
-        void renderPointcloud(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection, 
+        void renderPointcloudNew(const rs2::frame depth_frame, const rs2::frame color_frame, std::shared_ptr<vc::data::Camera> depth_camera, std::shared_ptr < vc::data::Camera> rgb_camera,
+            glm::mat4 model, glm::mat4 view, glm::mat4 projection,
             const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), const int i = 0) {
+            setViewport(viewport_width, viewport_height, pos_x, pos_y);
+
+            renderCoordinateSystem(model, view, projection);
+
+            glEnable(GL_DEPTH_TEST);
+
+            POINTCLOUD_new_shader->use();
+
+            int width = color_frame.as<rs2::video_frame>().get_width();
+            int height = color_frame.as<rs2::video_frame>().get_height();
+            int color_size = color_frame.get_data_size();
+            
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, textures[0]);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, color_frame.get_data());
+            POINTCLOUD_new_shader->setInt("color_frame", 1);
+
+            width = depth_frame.as<rs2::video_frame>().get_width();
+            height = depth_frame.as<rs2::video_frame>().get_height();
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, textures[1]);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, width, height, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, depth_frame.get_data());
+            POINTCLOUD_new_shader->setInt("depth_frame", 0);
+
+            int current_num_vertices = width * height;
+            if (current_num_vertices != num_vertices) {
+                num_vertices = current_num_vertices;
+                delete[] vertices;
+                vertices = new glm::vec2[num_vertices];
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        vertices[y * width + x] = glm::vec2(1.0f * x / width, 1.0f * y / height);
+                    }
+                }
+            }
+
+            glBindVertexArray(VAOs[1]);
+
+            glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
+            glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(glm::vec2), vertices, GL_STATIC_DRAW);
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), (void*)0);
+            glEnableVertexAttribArray(0);
+
+            //POINTCLOUD_new_shader->set
+
+            POINTCLOUD_new_shader->setMat3("cam2world", depth_camera->cam2world);
+            POINTCLOUD_new_shader->setFloat("depth_scale", depth_camera->depthScale);
+            POINTCLOUD_new_shader->setFloat("aspect", 1.0f * width / height);
+
+            POINTCLOUD_new_shader->setMat4("relativeTransformation", relativeTransformation);
+            POINTCLOUD_new_shader->setMat4("correction", COORDINATE_CORRECTION);
+            POINTCLOUD_new_shader->setMat4("model", model);
+            POINTCLOUD_new_shader->setMat4("view", view);
+            POINTCLOUD_new_shader->setMat4("projection", projection);
+
+            glDrawArrays(GL_POINTS, 0, num_vertices);
+            glBindVertexArray(0);
+        }
+    
+        void renderPointcloud(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection,
+                const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), const int i = 0) {
             setViewport(viewport_width, viewport_height, pos_x, pos_y);
 
             renderCoordinateSystem(model, view, projection);
@@ -241,6 +310,7 @@ namespace vc::rendering {
         void renderCoordinateSystem(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
             glEnable(GL_DEPTH_TEST);
             COORDINATE_SYSTEM_shader->use();
+            COORDINATE_SYSTEM_shader->setMat4("correction", COORDINATE_CORRECTION);
             COORDINATE_SYSTEM_shader->setMat4("model", model);
             COORDINATE_SYSTEM_shader->setMat4("view", view);
             COORDINATE_SYSTEM_shader->setMat4("projection", projection);
@@ -273,4 +343,4 @@ namespace vc::rendering {
     }
 }
 
-#endif // !_RENDERING_HEADER_
+#endif

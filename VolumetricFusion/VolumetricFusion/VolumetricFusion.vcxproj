@@ -29,8 +29,9 @@
     <None Include="shader\compute_shader.comp" />
     <None Include="shader\coordinate.fs" />
     <None Include="shader\coordinate.vs" />
-    <None Include="shader\pointcloud.fs" />
+    <None Include="shader\pointcloud.frag" />
     <None Include="shader\pointcloud.vs" />
+    <None Include="shader\pointcloud_new.vert" />
     <None Include="shader\texture.fs" />
     <None Include="shader\texture.vs" />
     <None Include="shader\voxelgrid.fs" />
