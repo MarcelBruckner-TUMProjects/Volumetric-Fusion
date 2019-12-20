@@ -110,7 +110,7 @@ bool visualizeCharucoResults = true;
 
 bool renderVoxelgrid = false;
 vc::fusion::Voxelgrid* voxelgrid;
-std::atomic_bool calibrateCameras = true;
+bool calibrateCameras = true;
 
 int main(int argc, char* argv[]) try {
 	
@@ -213,8 +213,8 @@ int main(int argc, char* argv[]) try {
 
 	// Create a thread for getting frames from the device and process them
 	// to prevent UI thread from blocking due to long computations.
-	std::atomic_bool stopped(false);
-	std::atomic_bool paused(false);
+	bool stopped(false);
+	bool paused(false);
 
 	// Create custom depth processing block and their output queues:
 	/*std::map<int, rs2::frame_queue> depth_processing_queues;
@@ -238,8 +238,8 @@ int main(int argc, char* argv[]) try {
 		bool allPipelinesEnteredLooped = false;
 	} programState;
 
-	std::atomic_bool calibrateCameras = false;
-	std::atomic_bool fuseFrames = false;
+	bool calibrateCameras = false;
+	bool fuseFrames = false;
 
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i]->startPipeline();
@@ -326,7 +326,7 @@ int main(int argc, char* argv[]) try {
 			if (programState.allMarkersDetected) {
 				setCalibration(false);
 				// start fusion thread logic
-				fuseFrames.store(true);
+				fuseFrames = true;
 			}
 		}
 	});
@@ -358,7 +358,7 @@ int main(int argc, char* argv[]) try {
 			integrations++;
 			if (integrations >= maxIntegrations) {
 				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
-				fuseFrames.store(false);
+				fuseFrames = false;
 				break;
 			}
 		}
@@ -431,7 +431,7 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Final cleanup
 
-	stopped.store(true);
+	stopped = true;
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i]->stopThread();
 		pipelines[i]->thread->join();
@@ -482,7 +482,7 @@ std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
 }
 
 void setCalibration(bool calibrate) {
-	calibrateCameras.store(calibrate);
+	calibrateCameras = calibrate;
 	for (int i = 0; i < pipelines.size(); i++) {
 		if (calibrateCameras) {
 			pipelines[i]->setResolutions(CALIBRATION_COLOR_STREAM, CALIBRATION_DEPTH_STREAM);
