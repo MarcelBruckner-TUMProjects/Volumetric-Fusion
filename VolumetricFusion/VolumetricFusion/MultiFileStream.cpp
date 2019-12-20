@@ -401,22 +401,22 @@ int main(int argc, char* argv[]) try {
 			int y = floor(i / 2);
 			if(state.renderState == RenderState::ONLY_COLOR || state.renderState == RenderState::ONLY_DEPTH)
 			{
-				if (state.renderState == RenderState::ONLY_COLOR && pipelines[i]->data->filteredColorFrames) {
-					pipelines[i]->rendering->renderTexture(pipelines[i]->data->filteredColorFrames, x, y, aspect, width, height);
+				if (state.renderState == RenderState::ONLY_COLOR) {
+					pipelines[i]->renderColor(x, y, aspect, width, height);
 				}
-				else if (state.renderState == RenderState::ONLY_DEPTH && pipelines[i]->data->colorizedDepthFrames) {
-					pipelines[i]->rendering->renderTexture(pipelines[i]->data->colorizedDepthFrames, x, y, aspect, width, height);
+				else if (state.renderState == RenderState::ONLY_DEPTH) {
+					pipelines[i]->renderDepth(x, y, aspect, width, height);
 				}
 			}
-			else if ((state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) && pipelines[i]->data->points && pipelines[i]->data->filteredColorFrames) {
+			else if ((state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD)) {
 				if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y, relativeTransformations[i]);
+					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, relativeTransformations[i]);
 					if (renderVoxelgrid) {
 						voxelgrid->renderGrid(model, view, projection);
 					}
 				}
 				else {
-					pipelines[i]->rendering->renderAllPointclouds(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, relativeTransformations[i], i);
+					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, relativeTransformations[i], i);
 				}
 			}
 		}

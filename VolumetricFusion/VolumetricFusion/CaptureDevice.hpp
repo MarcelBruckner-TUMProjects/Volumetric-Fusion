@@ -71,6 +71,32 @@ namespace vc::capture {
 			this->calibrateCameras->store(calibrate);
 		}
 
+		void renderColor(const float pos_x, const float pos_y, const float aspect, const int viewport_width, const int viewport_height) {
+			if (data->filteredColorFrames) {
+				this->rendering->renderTexture(data->filteredColorFrames, pos_x, pos_y, aspect, viewport_width, viewport_height);
+			}
+		}
+
+		void renderDepth(const float pos_x, const float pos_y, const float aspect, const int viewport_width, const int viewport_height) {
+			if (data->filteredDepthFrames) {
+				this->rendering->renderTexture(data->colorizedDepthFrames, pos_x, pos_y, aspect, viewport_width, viewport_height);
+			}
+		}
+
+		void renderPointcloud(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
+			const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), const int i = 0) {
+			if (data->points && data->filteredColorFrames) {
+				rendering->renderPointcloud(data->points, data->filteredColorFrames, model, view, projection,
+					viewport_width, viewport_height, pos_x, pos_y, relativeTransformation, i);
+			}
+		}
+
+		void renderAllPointclouds(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
+			const int viewport_width, const int viewport_height, glm::mat4 relativeTransformation, const int i = 0) {
+			renderPointcloud(model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, i);
+		}
+
+
 		void setResolutions(const std::vector<int> colorStream, const std::vector<int> depthStream, bool directResume = true) {
 			pauseThread();
 			stopPipeline();
@@ -220,4 +246,4 @@ namespace vc::capture {
 	};
 }
 
-#endif // !_CAPTURE_DEVICE_
+#endif
