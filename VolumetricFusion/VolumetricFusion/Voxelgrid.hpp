@@ -55,8 +55,8 @@ namespace vc::fusion {
 	/*	float* voxel_grid_tsdf = nullptr;
 		float* voxel_grid_weight = nullptr;*/
 
-		std::vector<float> tsdf;
-		std::vector<float> weights;
+		float* tsdf;
+		float* weights;
 		int integratedFrames = 0;
 
 		glm::vec3 totalMin = glm::vec3((float)INT_MAX);
@@ -76,11 +76,7 @@ namespace vc::fusion {
 			this->sizeNormalized += glm::vec3(1.0f);
 
 			this->num_gridPoints = (sizeNormalized.x * sizeNormalized.y * sizeNormalized.z);
-
-			tsdf = std::vector<float>(num_gridPoints);
-			weights = std::vector<float>(num_gridPoints);
-
-
+					   
 			for (float i = -size.x / 2.0f; i <= size.x / 2.0f; i += resolution)
 			{
 				for (float j = -size.y / 2.0f; j <= size.y / 2.0f; j += resolution)
@@ -144,14 +140,14 @@ namespace vc::fusion {
 		}
 
 		void renderGrid(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
-			//gridShader->use();
-			//gridShader->setVec3("size", size);
-			//gridShader->setMat4("model", model);
-			//gridShader->setMat4("view", view);
-			//gridShader->setMat4("projection", projection);
-			//glBindVertexArray(VAO);
-			//glDrawArrays(GL_POINTS, 0, points.size());
-			//glBindVertexArray(0);
+			gridShader->use();
+			gridShader->setVec3("size", size);
+			gridShader->setMat4("model", model);
+			gridShader->setMat4("view", view);
+			gridShader->setMat4("projection", projection);
+			glBindVertexArray(VAO);
+			glDrawArrays(GL_POINTS, 0, points.size());
+			glBindVertexArray(0);
 		}
 
 		int hashFunc(glm::vec3 v) {
@@ -171,13 +167,13 @@ namespace vc::fusion {
 
 			// bind the sdf values
 			glBindBuffer(GL_ARRAY_BUFFER, VBO_cubes[1]);
-			glBufferData(GL_ARRAY_BUFFER, num_gridPoints * sizeof(float), tsdf.data(), GL_STREAM_DRAW);
+			glBufferData(GL_ARRAY_BUFFER, num_gridPoints * sizeof(float), tsdf, GL_STREAM_DRAW);
 			glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 0, (void*)0);
 			glEnableVertexAttribArray(1);
 
 			// bind the weights
 			glBindBuffer(GL_ARRAY_BUFFER, VBO_cubes[1]);
-			glBufferData(GL_ARRAY_BUFFER, num_gridPoints * sizeof(float), weights.data(), GL_STREAM_DRAW);
+			glBufferData(GL_ARRAY_BUFFER, num_gridPoints * sizeof(float), weights, GL_STREAM_DRAW);
 			glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 0, (void*)0);
 			glEnableVertexAttribArray(2);
 
@@ -194,7 +190,6 @@ namespace vc::fusion {
 			glBindVertexArray(0);
 		}
 
-		// TODO Wrong currently - just a fast mockup
 		glm::vec3 hashFuncInv(int hash) {
 			int x = hash % (int)sizeNormalized.x;
 			float y = (int)(hash / sizeNormalized.x) % (int)sizeNormalized.y;
@@ -210,11 +205,11 @@ namespace vc::fusion {
 
 
 		void reset() {
-			tsdf.clear();
-			weights.clear();			
+			delete tsdf;
+			delete weights;
 
-			tsdf = std::vector<float>(num_gridPoints);
-			weights = std::vector<float>(num_gridPoints);
+			tsdf = new float[num_gridPoints];
+			weights = new float[num_gridPoints];
 			/*if (voxel_grid_tsdf != nullptr) {
 				delete[] voxel_grid_tsdf;
 			}
@@ -234,7 +229,7 @@ namespace vc::fusion {
 			totalMax = glm::vec3((float)INT_MIN);
 		}
 
-		void integrateFrameCPU(const rs2::points points, glm::mat4 relativeTransformation, const int pipelineId, const int frameId) {
+		void integrateFrameCPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, glm::mat4 relativeTransformation, const int pipelineId, const int frameId) {
 			std::cout << "Integrating " << pipelineId << " - Frame: " << frameId << std::endl;
 			
 			if (integratedFramesPerPipeline.count(pipelineId) <= 0) {
@@ -246,16 +241,20 @@ namespace vc::fusion {
 					return;
 				}
 			}
+
+			pipeline->depth_camera->K;
+
 			integratedFramesPerPipeline[pipelineId].push_back(frameId);
-			const rs2::vertex* vertices = points.get_vertices();
+			//const rs2::vertex* vertices = points.get_vertices();
 
 			// insert them into the voxel grid (point by point)
 			// yes, it is fucking slow
 			std::stringstream ss;
 			for (int i = 0; i < num_gridPoints; i++) {
-				glm::vec3 voxel = hashFuncInv(i);
+				glm::vec3 pt_base = hashFuncInv(i);
 				//std::cout << voxel.x << ", " << voxel.y << ", " << voxel.z << std::endl;
 
+				pt_base += origin;
 
 				//glm::vec4 vert = glm::vec4(vertices[i].x, vertices[i].y, vertices[i].z, 1.0f);
 				//vert = relativeTransformation * vert;

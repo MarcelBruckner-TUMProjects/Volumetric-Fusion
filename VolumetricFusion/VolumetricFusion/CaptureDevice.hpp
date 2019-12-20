@@ -24,20 +24,34 @@ namespace vc::capture {
 		std::shared_ptr < vc::rendering::Rendering> rendering;
 		std::shared_ptr < vc::processing::Processing> processing;
 		std::shared_ptr < vc::data::Data> data;
+		std::shared_ptr < vc::data::Camera> rgb_camera;
+		std::shared_ptr < vc::data::Camera> depth_camera;
 
 		std::shared_ptr<rs2::pipeline > pipeline;
 
-		std::shared_ptr < std::atomic_bool> stopped;
+		std::shared_ptr < std::atomic_bool> isPipelineRunning;
 		std::shared_ptr < std::atomic_bool> paused;
 		std::shared_ptr < std::atomic_bool> calibrateCameras;
 
 		std::shared_ptr < std::thread> thread;
 
 
-
 		void startPipeline() {
 			this->pipeline->start(this->cfg);
-			this->data->setIntrinsics(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
+			isPipelineRunning->store(true);
+			setCameras();
+			this->thread = std::make_shared<std::thread>(&vc::capture::CaptureDevice::captureThreadFunction, this);
+			//this->data->setIntrinsics(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
+		}
+		void stopPipeline() {
+			stopThread();
+			if (thread) {
+				thread->join();
+			}
+			if (!isPipelineRunning) {
+				this->pipeline->stop();
+			}
+			isPipelineRunning->store(false);
 		}
 
 		void pauseThread() {
@@ -49,11 +63,26 @@ namespace vc::capture {
 		}
 
 		void stopThread() {
-			this->stopped->store(true);
+			this->isPipelineRunning->store(false);
 		}
 
 		void calibrate(bool calibrate) {
 			this->calibrateCameras->store(calibrate);
+		}
+
+		void setResolutions(const std::vector<int> colorStream, const std::vector<int> depthStream, bool directResume = true) {
+			pauseThread();
+			stopPipeline();
+			if (colorStream.size() == 2) {
+				this->cfg.enable_stream(RS2_STREAM_COLOR, colorStream[0], colorStream[1]);
+			}
+			if (depthStream.size() == 2) {
+				this->cfg.enable_stream(RS2_STREAM_DEPTH, depthStream[0], depthStream[1]);
+			}
+			if (directResume) {
+				startPipeline();
+				resumeThread();
+			}
 		}
 
 		CaptureDevice(CaptureDevice& other) {
@@ -62,8 +91,10 @@ namespace vc::capture {
 			this->processing = other.processing;
 			this->pipeline = other.pipeline;
 			this->cfg = other.cfg;
+			this->rgb_camera = other.rgb_camera;
+			this->depth_camera = other.depth_camera;
 
-			this->stopped = other.stopped;
+			this->isPipelineRunning = other.isPipelineRunning;
 			this->paused = other.paused;
 			this->calibrateCameras = other.calibrateCameras;
 			this->thread = other.thread;
@@ -74,18 +105,23 @@ namespace vc::capture {
 			this->data = std::make_shared<vc::data::Data>();
 			this->processing = std::make_shared<vc::processing::Processing>();
 			this->pipeline = std::make_shared<rs2::pipeline>(context);
-			this->stopped = std::make_shared<std::atomic_bool>(false);
+			this->isPipelineRunning = std::make_shared<std::atomic_bool>(false);
 			this->paused = std::make_shared<std::atomic_bool>(true);
 			this->calibrateCameras = std::make_shared<std::atomic_bool>(false);
+			//setCameras();
 
-			this->thread = std::make_shared<std::thread>(&vc::capture::CaptureDevice::captureThreadFunction, this);
+		}
+
+		void setCameras() {
+			this->rgb_camera = std::make_shared<vc::data::Camera>(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
+			this->depth_camera = std::make_shared<vc::data::Camera>(this->pipeline->get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>().get_intrinsics());
 		}
 
 		void captureThreadFunction() {
 			rs2::align alignToColor(RS2_STREAM_COLOR);
-			processing->startCharucoProcessing(data->camera);
+			processing->startCharucoProcessing(*rgb_camera);
 
-			while (!stopped->load()) //While application is running
+			while (isPipelineRunning->load()) //While application is running
 			{
 				while (paused->load()) {
 					continue;
@@ -141,15 +177,13 @@ namespace vc::capture {
 	/// <seealso cref="CaptureDevice" />
 	class StreamingCaptureDevice : public CaptureDevice {
 	public:
-		StreamingCaptureDevice(rs2::context context, rs2::device device) :
+		StreamingCaptureDevice(rs2::context context, rs2::device device, const std::vector<int> colorStream, const std::vector<int> depthStream) :
 			CaptureDevice(context)
 		{
 			data->deviceName = device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
 
 			this->cfg.enable_device(data->deviceName);
-			//this->cfg.enable_all_streams();
-			this->cfg.enable_stream(RS2_STREAM_COLOR, 1920, 1080);
-			this->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
+			setResolutions(colorStream, depthStream, false);
 		}
 	};
 
@@ -159,11 +193,11 @@ namespace vc::capture {
 	/// <seealso cref="StreamingCaptureDevice" />
 	class RecordingCaptureDevice : public StreamingCaptureDevice {
 	public:
-		RecordingCaptureDevice(rs2::context context, rs2::device device, std::string foldername) :
-			StreamingCaptureDevice(context, device)
+		RecordingCaptureDevice(rs2::context context, rs2::device device, const std::vector<int> colorStream, const std::vector<int> depthStream, std::string foldername) :
+			StreamingCaptureDevice(context, device, colorStream, depthStream)
 		{
-			this->cfg.enable_device(data->deviceName);
-			this->cfg.enable_all_streams();
+			/*this->cfg.enable_device(data->deviceName);
+			setResolutions(colorStream, depthStream);*/
 			this->cfg.enable_record_to_file(foldername + data->deviceName + ".bag");
 		}
 	};

@@ -80,6 +80,9 @@ const unsigned int SCR_WIDTH = 800 * 2;
 const unsigned int TOP_BAR_HEIGHT = 0;
 const unsigned int SCR_HEIGHT = 600 * 2 ;
 
+std::vector<int> colorStream = { 1280, 720 };
+std::vector<int> depthStream = { 1280, 720 };
+
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
 float lastX = SCR_WIDTH / 2.0f;
@@ -96,7 +99,7 @@ float lastFrame = 0.0f;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::ONLY_COLOR);
+vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::ONLY_COLOR);
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
@@ -108,7 +111,7 @@ std::atomic_bool calibrateCameras = true;
 int main(int argc, char* argv[]) try {
 	
 	vc::settings::FolderSettings folderSettings;
-	folderSettings.recordingsFolder = "recordings/allCameras/";
+	folderSettings.recordingsFolder = "recordings/test/";
 
 	// glfw: initialize and configure
 	// ------------------------------
@@ -180,10 +183,10 @@ int main(int argc, char* argv[]) try {
 		for (auto&& device : ctx.query_devices())
 		{
 			if (state.captureState == CaptureState::RECORDING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, folderSettings.recordingsFolder));
+				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, colorStream, depthStream, folderSettings.recordingsFolder));
 			}
 			else if (state.captureState == CaptureState::STREAMING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device));
+				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, colorStream, depthStream));
 			}
 			i++;
 		}
@@ -215,6 +218,10 @@ int main(int argc, char* argv[]) try {
 
 	// Calculated relative transformations between cameras per frame
 	std::map<int, glm::mat4> relativeTransformations = {
+		{0, glm::mat4(1.0f)},
+		{1, glm::mat4(1.0f)},
+	{2, glm::mat4(1.0f)},
+		{3, glm::mat4(1.0f)},
 	};
 
 	std::thread calibrationThread;
@@ -341,7 +348,7 @@ int main(int argc, char* argv[]) try {
 				const rs2::vertex* vertices = pipelines[i]->data->points.get_vertices();
 
 				auto pip = pipelines[i]->processing;
-				voxelgrid->integrateFrameCPU(pipelines[i]->data->points, relativeTransformations[i], i, pip->frameId);
+				voxelgrid->integrateFrameCPU(pipelines[i], relativeTransformations[i], i, pip->frameId);
 			}
 
 			integrations++;
@@ -400,20 +407,21 @@ int main(int argc, char* argv[]) try {
 			else if ((state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) && pipelines[i]->data->points && pipelines[i]->data->filteredColorFrames) {
 				if (state.renderState == RenderState::MULTI_POINTCLOUD) {
 					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y, relativeTransformations[i]);
-					/*if (renderVoxelgrid) {
-						voxelgrid->render(model, view, projection);
-					}*/
+					if (renderVoxelgrid) {
+						voxelgrid->renderGrid(model, view, projection);
+					}
 				}
 				else {
 					pipelines[i]->rendering->renderAllPointclouds(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, relativeTransformations[i], i);
 				}
 			}
 		}
+		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+			voxelgrid->renderGrid(model, view, projection);
+		}
 		if (state.renderState == RenderState::VOXELGRID) {
 			voxelgrid->renderField(model, view, projection);
-			if (renderVoxelgrid) {
-				voxelgrid->renderGrid(model, view, projection);
-			}
+			
 		}
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
@@ -577,7 +585,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 			firstMouse = false;
 		}
 
-		float xoffset = xpos - lastX;
+		float xoffset = lastX - xpos;
 		float yoffset = ypos - lastY; // reversed since y-coordinates go from bottom to top
 		//float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
 

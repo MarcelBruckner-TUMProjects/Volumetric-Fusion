@@ -31,6 +31,13 @@
 namespace vc::rendering {
     void setViewport(const int viewport_width, const int viewport_height, const int pos_x, const int pos_y);
 
+    glm::mat4 COORDINATE_CORRECTION = glm::mat4(
+        -1.0f, 0,0,0,
+        0, -1.0f, 0,0,
+        0,0, 1.0f, 0,
+        0,0,0, 1.0f
+    );
+
     const glm::vec3 DEBUG_COLORS[4] = {
         glm::vec3(1.0f, 0.0f, 0.0f),
         glm::vec3(0.0f, 1.0f, 0.0f),
@@ -190,6 +197,7 @@ namespace vc::rendering {
             //POINTCLOUD_shader->setColor("color", color.r, color.g, color.b, 1);
             POINTCLOUD_shader->setColor("color", 1, 1, 1, 1);
             POINTCLOUD_shader->setMat4("relativeTransformation", relativeTransformation);
+            POINTCLOUD_shader->setMat4("correction", COORDINATE_CORRECTION);
             POINTCLOUD_shader->setMat4("model", model);
             POINTCLOUD_shader->setMat4("view", view);
             POINTCLOUD_shader->setMat4("projection", projection);
