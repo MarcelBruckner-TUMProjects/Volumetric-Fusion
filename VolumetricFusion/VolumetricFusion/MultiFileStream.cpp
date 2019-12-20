@@ -528,7 +528,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			break;
 		}
 		case GLFW_KEY_5: {
-			state.renderState = RenderState::VOXELGRID;
+			//state.renderState = RenderState::VOXELGRID;
 			break;
 		}
 		case GLFW_KEY_V: {

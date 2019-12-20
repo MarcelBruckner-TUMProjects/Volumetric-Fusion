@@ -67,12 +67,13 @@ namespace vc::fusion {
 		int num_gridPoints;
 
 	public:
-		Voxelgrid(const float resolution = 0.1, const glm::vec3 size = glm::vec3(5.0f), const glm::vec3 origin = glm::vec3(0.0f)) {
+		Voxelgrid(const float resolution = 1, const glm::vec3 size = glm::vec3(2.0f), const glm::vec3 origin = glm::vec3(0.0f)) {
 			this->resolution = resolution;
 			this->origin = origin;
 			this->size = size;
 			this->sizeHalf = size / 2.0f;
 			this->sizeNormalized = size / resolution;
+			this->sizeNormalized += glm::vec3(1.0f);
 
 			this->num_gridPoints = (sizeNormalized.x * sizeNormalized.y * sizeNormalized.z);
 
@@ -197,15 +198,14 @@ namespace vc::fusion {
 		glm::vec3 hashFuncInv(int hash) {
 			int x = hash % (int)sizeNormalized.x;
 			float y = (int)(hash / sizeNormalized.x) % (int)sizeNormalized.y;
-			float z = (int)(hash / (sizeNormalized.x * size.y)) % (int)sizeNormalized.z;
+			float z = (int)(hash / (sizeNormalized.x * sizeNormalized.y)) % (int)sizeNormalized.z;
 
-			x /= resolution;
-			y /= resolution;
-			z /= resolution;
+			glm::vec3 result = glm::vec3(x, y, z);
+			result -= sizeHalf;
+			
+			std::cout << hash << ":\t" << result.x << "\t" << result.y << "\t" << result.z << std::endl;
 
-			std::cout << x << "," << y << "," << z << ": " << hash << std::endl;
-
-			return glm::vec3(x, y, z);
+			return result;
 		}
 
 
@@ -252,35 +252,37 @@ namespace vc::fusion {
 			// insert them into the voxel grid (point by point)
 			// yes, it is fucking slow
 			std::stringstream ss;
-			for (int i = 0; i < points.size(); ++i) {
-				// apply transformation
-				auto index = i;
-				glm::vec4 vert = glm::vec4(vertices[i].x, vertices[i].y, vertices[i].z, 1.0f);
-				vert = relativeTransformation * vert;
-				glm::vec3 v = glm::vec3(vert.x, vert.y, vert.z);
+			for (int i = 0; i < num_gridPoints; i++) {
+				glm::vec3 voxel = hashFuncInv(i);
+				//std::cout << voxel.x << ", " << voxel.y << ", " << voxel.z << std::endl;
 
-				glm::vec3 pt_grid = (v + sizeHalf) / resolution;
-				
-				int volume_idx = hashFunc(pt_grid);
 
-				if (volume_idx >= num_gridPoints || volume_idx < 0) {
-					ss << "ERROR: (" << v.x << ", " << v.y << ", " << v.z << ")" << " not in grid!" << std::endl;
-					continue;
-				}
-				//float dist = fmin(1.0f, diff / trunc_margin);
-				float weight_old = weights[volume_idx];
-				float weight_new = weight_old + 1.0f;
-				weights[volume_idx] = weight_new;
-				//voxel_grid_TSDF[volume_idx] = (voxel_grid_TSDF[volume_idx] * weight_old + dist) / weight_new;
-				float dist = 0;
-				tsdf[volume_idx] = ((tsdf[volume_idx] * weight_old) + dist) / weight_new;
+				//glm::vec4 vert = glm::vec4(vertices[i].x, vertices[i].y, vertices[i].z, 1.0f);
+				//vert = relativeTransformation * vert;
+				//glm::vec3 v = glm::vec3(vert.x, vert.y, vert.z);
 
-				totalMin.x = MIN(totalMin.x, v.x);
-				totalMax.x = MAX(totalMax.x, v.x);
-				totalMin.y = MIN(totalMin.y, v.y);
-				totalMax.y = MAX(totalMax.y, v.y);
-				totalMin.z = MIN(totalMin.z, v.z);
-				totalMax.z = MAX(totalMax.z, v.z);
+				//glm::vec3 pt_grid = (v + sizeHalf) / resolution;
+				//
+				//int volume_idx = hashFunc(pt_grid);
+
+				//if (volume_idx >= num_gridPoints || volume_idx < 0) {
+				//	ss << "ERROR: (" << v.x << ", " << v.y << ", " << v.z << ")" << " not in grid!" << std::endl;
+				//	continue;
+				//}
+				////float dist = fmin(1.0f, diff / trunc_margin);
+				//float weight_old = weights[volume_idx];
+				//float weight_new = weight_old + 1.0f;
+				//weights[volume_idx] = weight_new;
+				////voxel_grid_TSDF[volume_idx] = (voxel_grid_TSDF[volume_idx] * weight_old + dist) / weight_new;
+				//float dist = 0;
+				//tsdf[volume_idx] = ((tsdf[volume_idx] * weight_old) + dist) / weight_new;
+
+				//totalMin.x = MIN(totalMin.x, v.x);
+				//totalMax.x = MAX(totalMax.x, v.x);
+				//totalMin.y = MIN(totalMin.y, v.y);
+				//totalMax.y = MAX(totalMax.y, v.y);
+				//totalMin.z = MIN(totalMin.z, v.z);
+				//totalMax.z = MAX(totalMax.z, v.z);
 
 				//std::cout << "(" << transformedVertex.x << "," << transformedVertex.y << "," << transformedVertex.z << ")" << std::endl;
 			}
@@ -292,7 +294,7 @@ namespace vc::fusion {
 			std::cout << std::fixed << "Max: (" << totalMax.x << "," << totalMax.y << "," << totalMax.z << ")" << std::endl;
 			integratedFrames++;
 
-			std::cout << "" << std::endl;
+			std::cout << std::endl;
 		}
 	};
 }
