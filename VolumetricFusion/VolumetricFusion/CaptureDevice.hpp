@@ -41,14 +41,14 @@ namespace vc::capture {
 			this->pipeline->start(this->cfg);
 			isPipelineRunning->store(true);
 			setCameras();
-			this->thread = std::make_shared<std::thread>(&vc::capture::CaptureDevice::captureThreadFunction, this);
 			isThreadRunning->store(true);
+			this->thread = std::make_shared<std::thread>(&vc::capture::CaptureDevice::captureThreadFunction, this);
 			resumeThread();
 
 			//this->data->setIntrinsics(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
 		}
 
-		void stopPipeline() {
+		void stopPipeline() { 
 			stopThread();
 			if (isPipelineRunning->load()) {
 				this->pipeline->stop();
@@ -113,7 +113,6 @@ namespace vc::capture {
 			}
 			if (directResume) {
 				startPipeline();
-				resumeThread();
 			}
 		}
 

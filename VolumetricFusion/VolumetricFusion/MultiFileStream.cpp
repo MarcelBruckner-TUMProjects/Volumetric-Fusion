@@ -117,7 +117,7 @@ std::atomic_bool renderCoordinateSystem = false;
 int main(int argc, char* argv[]) try {
 	
 	vc::settings::FolderSettings folderSettings;
-	folderSettings.recordingsFolder = "recordings/allCameras/";
+	folderSettings.recordingsFolder = "recordings/static_scene_front/";
 
 	// glfw: initialize and configure
 	// ------------------------------
@@ -478,6 +478,7 @@ std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
 }
 
 void setCalibration(bool calibrate) {
+	fuseFrames.store(!calibrate);
 	calibrateCameras.store(calibrate);
 	for (int i = 0; i < pipelines.size(); i++) {
 		if (calibrateCameras) {
