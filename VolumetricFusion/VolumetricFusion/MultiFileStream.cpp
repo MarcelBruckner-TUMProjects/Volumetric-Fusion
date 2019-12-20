@@ -96,7 +96,7 @@ float lastFrame = 0.0f;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::ONLY_COLOR);
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
@@ -108,7 +108,7 @@ std::atomic_bool calibrateCameras = true;
 int main(int argc, char* argv[]) try {
 	
 	vc::settings::FolderSettings folderSettings;
-	folderSettings.recordingsFolder = "allCameras/";
+	folderSettings.recordingsFolder = "C:\\Users\\Marcel\\Documents\\low_resolution_topdown\\";
 
 	// glfw: initialize and configure
 	// ------------------------------
@@ -201,7 +201,6 @@ int main(int argc, char* argv[]) try {
 
 	// Calculated relative transformations between cameras per frame
 	std::map<int, glm::mat4> relativeTransformations = {
-		//{0, glm::mat4(1.0f)}
 	};
 
 	// Camera calibration thread
@@ -294,7 +293,7 @@ int main(int argc, char* argv[]) try {
 
 			for (int i = 0; i < pipelines.size(); i++) {
 				// Only integrate frames with a valid transformation
-				if (relativeTransformations.count(i) <= 0) {
+				if (relativeTransformations.count(i) <= 0 || !pipelines[i]->data->points) {
 					continue;
 				}
 

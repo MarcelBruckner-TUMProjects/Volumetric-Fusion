@@ -33,6 +33,8 @@ namespace vc::capture {
 
 		std::shared_ptr < std::thread> thread;
 
+
+
 		void startPipeline() {
 			this->pipeline->start(this->cfg);
 			this->data->setIntrinsics(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
@@ -145,7 +147,9 @@ namespace vc::capture {
 			data->deviceName = device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
 
 			this->cfg.enable_device(data->deviceName);
-			this->cfg.enable_all_streams();
+			//this->cfg.enable_all_streams();
+			this->cfg.enable_stream(RS2_STREAM_COLOR, 1920, 1080);
+			this->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
 		}
 	};
 
