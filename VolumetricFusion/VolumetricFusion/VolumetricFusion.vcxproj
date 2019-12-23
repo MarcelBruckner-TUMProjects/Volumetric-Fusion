@@ -26,10 +26,12 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="readme.md" />
+    <None Include="shader\compute_shader.comp" />
     <None Include="shader\coordinate.fs" />
     <None Include="shader\coordinate.vs" />
-    <None Include="shader\pointcloud.fs" />
+    <None Include="shader\pointcloud.frag" />
     <None Include="shader\pointcloud.vs" />
+    <None Include="shader\pointcloud_new.vert" />
     <None Include="shader\texture.fs" />
     <None Include="shader\texture.vs" />
     <None Include="shader\voxelgrid.fs" />
@@ -48,6 +50,7 @@
   <ItemGroup>
     <ClInclude Include="camera.hpp" />
     <ClInclude Include="CaptureDevice.hpp" />
+    <ClInclude Include="ComputeShader.hpp" />
     <ClInclude Include="Data.hpp" />
     <ClInclude Include="Enums.hpp" />
     <ClInclude Include="FileAccess.hpp" />
@@ -58,7 +61,7 @@
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />
-    <ClInclude Include="shader.hpp" />
+    <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Voxelgrid.hpp" />
   </ItemGroup>
@@ -124,7 +127,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\Program Files\OpenGL\glad\include;C:\Program Files\OpenGL\glm-stable;C:\dev\eigen;C:\dev\glfw-3.3\include;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\include;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party\glfw-imgui\include;$(OPENCV_DIR)\..\..\..\include;glad\include;C:\dev\glm-0.9.9.6;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Program Files\OpenGL\glfw-3.3\include;C:\Program Files\OpenGL\glm-stable;C:\dev\eigen;C:\dev\glfw-3.3\include;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\include;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party\glfw-imgui\include;$(OPENCV_DIR)\..\..\..\include;glad\include;C:\dev\glm-0.9.9.6;$(IncludePath)</IncludePath>
     <LibraryPath>$(OPENCV_DIR)\lib;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\lib\x64;C:\dev\opencv\build\lib\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

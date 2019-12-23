@@ -98,7 +98,7 @@ namespace vc::processing {
 		glm::mat4 translation = glm::mat4(1.0f);
 		unsigned long long frameId;
 
-		void startCharucoProcessing(vc::data::Camera& camera) {
+		void startCharucoProcessing(vc::data::Camera camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
@@ -122,11 +122,11 @@ namespace vc::processing {
 							cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
 						}
 						cv::Vec3d r, t;
-						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.cameraMatrices, camera.distCoeffs, r, t);
+						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.K, camera.distCoeffs, r, t);
 						// if charuco pose is valid
 						if (valid) {
 							if (visualize) {
-								cv::aruco::drawAxis(image, camera.cameraMatrices, camera.distCoeffs, r, t, 0.1);
+								cv::aruco::drawAxis(image, camera.K, camera.distCoeffs, r, t, 0.1);
 							}
 
 							rotation = glm::mat4(1.0f);

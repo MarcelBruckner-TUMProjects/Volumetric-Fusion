@@ -19,6 +19,7 @@
 #include <map>
 #include <iostream>
 #include <string>
+#include <chrono>
 #include <thread>
 #include <atomic>
 #include <filesystem>
@@ -74,11 +75,18 @@ void mouse_button_callback(GLFWwindow*, int button, int action, int mods);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
+void setCalibration(bool calibrate);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int TOP_BAR_HEIGHT = 0;
 const unsigned int SCR_HEIGHT = 600;
+
+std::vector<int> DEFAULT_COLOR_STREAM = { 640, 480 };
+std::vector<int> DEFAULT_DEPTH_STREAM = { 640, 480 };
+
+std::vector<int> CALIBRATION_COLOR_STREAM = { 1920, 1080 };
+std::vector<int> CALIBRATION_DEPTH_STREAM = { 1280, 720 };
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
@@ -96,24 +104,28 @@ float lastFrame = 0.0f;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::VOXELGRID);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
 
 bool renderVoxelgrid = false;
 vc::fusion::Voxelgrid* voxelgrid;
+std::atomic_bool calibrateCameras = true;
+std::atomic_bool fuseFrames = false;
+std::atomic_bool renderCoordinateSystem = false;
 
 int main(int argc, char* argv[]) try {
 	
 	vc::settings::FolderSettings folderSettings;
+	//folderSettings.recordingsFolder = "recordings/static_scene_front/";
 	folderSettings.recordingsFolder = "allCameras/";
 
 	// glfw: initialize and configure
 	// ------------------------------
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
@@ -154,7 +166,7 @@ int main(int argc, char* argv[]) try {
 
 		if (error_code != GL_NO_ERROR) {
 			// shut this up for a while
-			//fprintf(stderr, "ERROR %d in %s\n", error_code, name);
+			fprintf(stderr, "ERROR %d in %s\n", error_code, name);
 		}
 	});
 
@@ -179,10 +191,10 @@ int main(int argc, char* argv[]) try {
 		for (auto&& device : ctx.query_devices())
 		{
 			if (state.captureState == CaptureState::RECORDING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, folderSettings.recordingsFolder));
+				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM, folderSettings.recordingsFolder));
 			}
 			else if (state.captureState == CaptureState::STREAMING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device));
+				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM));
 			}
 			i++;
 		}
@@ -214,7 +226,10 @@ int main(int argc, char* argv[]) try {
 
 	// Calculated relative transformations between cameras per frame
 	std::map<int, glm::mat4> relativeTransformations = {
-		//{0, glm::mat4(1.0f)}
+		{0, glm::mat4(1.0f)},
+		{1, glm::mat4(1.0f)},
+		{2, glm::mat4(1.0f)},
+		{3, glm::mat4(1.0f)},
 	};
 
 	std::thread calibrationThread;
@@ -227,19 +242,14 @@ int main(int argc, char* argv[]) try {
 		bool allPipelinesEnteredLooped = false;
 	} programState;
 
-	std::atomic_bool calibrateCameras = true;
-	std::atomic_bool fuseFrames = false;
-
 	for (int i = 0; i < pipelines.size(); i++) {
-		pipelines[i]->startPipeline();
-		pipelines[i]->resumeThread();
-		pipelines[i]->calibrate(calibrateCameras);
 		pipelines[i]->processing->visualize = visualizeCharucoResults;
 	}
 
 #pragma region Camera Calibration Thread
 
-	calibrationThread = std::thread([&stopped, &calibrateCameras, &fuseFrames, &programState, &relativeTransformations]() {
+	setCalibration(calibrateCameras);
+	calibrationThread = std::thread([&stopped, &programState, &relativeTransformations]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
 				continue;
@@ -263,8 +273,8 @@ int main(int argc, char* argv[]) try {
 					glm::mat4 baseToMarkerRotation = pipelines[0]->processing->rotation;
 
 					if (i == 0) {
-						relativeTransformations[i] = glm::inverse(baseToMarkerTranslation);
-						//relativeTransformations[i] = glm::mat4(1.0f); 
+						//relativeTransformations[i] = glm::inverse(baseToMarkerTranslation);
+						relativeTransformations[i] = glm::mat4(1.0f); 
 						continue;
 					}
 
@@ -281,8 +291,8 @@ int main(int argc, char* argv[]) try {
 
 						//baseToMarkerTranslation * (baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
 						//baseToMarkerTranslation * glm::inverse((baseToMarkerRotation) * glm::inverse(markerToRelativeRotation)) * glm::inverse(markerToRelativeTranslation)
-						/*baseToMarkerTranslation **/ glm::inverse(baseToMarkerRotation)* (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
-						//baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
+						///*baseToMarkerTranslation **/ glm::inverse(baseToMarkerRotation)* (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
+						baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
 						//baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
 
 						//glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerTranslation * baseToMarkerRotation
@@ -313,7 +323,7 @@ int main(int argc, char* argv[]) try {
 			programState.allPipelinesEnteredLooped = pipelinesEnteredLoop == pipelines.size();
 
 			if (programState.allMarkersDetected) {
-				calibrateCameras.store(false);
+				setCalibration(false);
 				// start fusion thread logic
 				fuseFrames.store(true);
 			}
@@ -324,7 +334,7 @@ int main(int argc, char* argv[]) try {
 
 
 #pragma region Fusion Thread
-	fusionThread = std::thread([&stopped, &calibrateCameras, &fuseFrames, &programState, &relativeTransformations]() {
+	fusionThread = std::thread([&stopped, &programState, &relativeTransformations]() {
 		const int maxIntegrations = 10;
 		int integrations = 0;
 		while (!stopped) {
@@ -338,10 +348,8 @@ int main(int argc, char* argv[]) try {
 					continue;
 				}
 
-				const rs2::vertex* vertices = pipelines[i]->data->points.get_vertices();
-
-				auto pip = pipelines[i]->processing;
-				voxelgrid->integrateFrame(pipelines[i]->data->points, relativeTransformations[i], i, pip->frameId);
+				auto p = pipelines[i];
+				voxelgrid->integrateFrameCPU(p, relativeTransformations[i], i, p->processing->frameId);
 			}
 
 			integrations++;
@@ -349,6 +357,11 @@ int main(int argc, char* argv[]) try {
 				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
 				fuseFrames.store(false);
 				break;
+			}
+
+			{
+				//using namespace std::literals::chrono_literals;
+				//std::this_thread::sleep_for(2s);
 			}
 		}
 		});
@@ -401,32 +414,28 @@ int main(int argc, char* argv[]) try {
 		{
 			int x = i % 2;
 			int y = floor(i / 2);
-			if(state.renderState == RenderState::ONLY_COLOR || state.renderState == RenderState::ONLY_DEPTH)
-			{
-				if (state.renderState == RenderState::ONLY_COLOR && pipelines[i]->data->filteredColorFrames) {
-					pipelines[i]->rendering->renderTexture(pipelines[i]->data->filteredColorFrames, x, y, aspect, width, height);
+				if (state.renderState == RenderState::ONLY_COLOR) {
+					pipelines[i]->renderColor(x, y, aspect, width, height);
 				}
-				else if (state.renderState == RenderState::ONLY_DEPTH && pipelines[i]->data->colorizedDepthFrames) {
-					pipelines[i]->rendering->renderTexture(pipelines[i]->data->colorizedDepthFrames, x, y, aspect, width, height);
+				else if (state.renderState == RenderState::ONLY_DEPTH) {
+					pipelines[i]->renderDepth(x, y, aspect, width, height);
 				}
-			}
-			else if ((state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) && pipelines[i]->data->points && pipelines[i]->data->filteredColorFrames) {
-				if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-					pipelines[i]->rendering->renderPointcloud(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, x, y, relativeTransformations[i]);
-					/*if (renderVoxelgrid) {
-						voxelgrid->render(model, view, projection);
-					}*/
+			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
+					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, relativeTransformations[i], renderCoordinateSystem);
+					if (renderVoxelgrid) {
+						voxelgrid->renderGrid(model, view, projection);
+					}
 				}
-				else {
-					pipelines[i]->rendering->renderAllPointclouds(pipelines[i]->data->points, pipelines[i]->data->filteredColorFrames, model, view, projection, width, height, relativeTransformations[i], i);
+			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, relativeTransformations[i], i, renderCoordinateSystem);
 				}
-			}
+		}
+		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+			voxelgrid->renderGrid(model, view, projection);
 		}
 		if (state.renderState == RenderState::VOXELGRID) {
 			voxelgrid->renderField(model, view, projection);
-			if (renderVoxelgrid) {
-				voxelgrid->renderGrid(model, view, projection);
-			}
+			
 		}
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
@@ -439,8 +448,7 @@ int main(int argc, char* argv[]) try {
 
 	stopped.store(true);
 	for (int i = 0; i < pipelines.size(); i++) {
-		pipelines[i]->stopThread();
-		pipelines[i]->thread->join();
+		pipelines[i]->stopPipeline();
 	}
 	calibrationThread.join();
 	fusionThread.join();
@@ -485,6 +493,20 @@ std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
 	}
 
 	return c;
+}
+
+void setCalibration(bool calibrate) {
+	fuseFrames.store(!calibrate);
+	calibrateCameras.store(calibrate);
+	for (int i = 0; i < pipelines.size(); i++) {
+		if (calibrateCameras) {
+			pipelines[i]->setResolutions(CALIBRATION_COLOR_STREAM, CALIBRATION_DEPTH_STREAM);
+		}
+		else {
+			pipelines[i]->setResolutions(DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM);
+		}
+		pipelines[i]->calibrate(calibrateCameras);
+	}
 }
 
 bool isKeyPressed(GLFWwindow* window, int key) {
@@ -555,6 +577,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			renderVoxelgrid = !renderVoxelgrid;
 			break;
 		}
+		case GLFW_KEY_C: {
+			setCalibration(!calibrateCameras);
+			break;
+		}
+		case GLFW_KEY_L: {
+			renderCoordinateSystem = !renderCoordinateSystem;
+			break;
+		}
 		}
 	}
 }
@@ -583,7 +613,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 			firstMouse = false;
 		}
 
-		float xoffset = xpos - lastX;
+		float xoffset = lastX - xpos;
 		float yoffset = ypos - lastY; // reversed since y-coordinates go from bottom to top
 		//float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
 
