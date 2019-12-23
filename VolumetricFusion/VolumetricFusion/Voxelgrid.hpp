@@ -121,6 +121,19 @@ namespace vc::fusion {
 			initializeOpenGL();
 		}
 
+		~Voxelgrid() {
+			glDeleteVertexArrays(1, &VAO_grid);
+			glDeleteBuffers(1, &VBO_grid);
+
+			glDeleteVertexArrays(1, &VAO_cubes);
+			glDeleteBuffers(1, &VBO_cubes);
+			glDeleteBuffers(1, &VBO_sdfs);
+			glDeleteBuffers(1, &VBO_weights);
+
+			glDeleteVertexArrays(1, &VAO_lamp);
+			glDeleteBuffers(1, &VBO_lamp);
+		}
+
 		void initializeOpenGL() {
 
 			gridShader = new vc::rendering::VertexFragmentShader("shader/voxelgrid.vs", "shader/voxelgrid.fs");
@@ -161,6 +174,11 @@ namespace vc::fusion {
 
 			// Enable point size
 			glEnable(GL_PROGRAM_POINT_SIZE);
+
+			//glEnable(GL_DEPTH_TEST);
+			//glDepthFunc(GL_LESS);
+			//glDepthRange(0.0f, 50.0f);
+			//glEnable(GL_STENCIL_TEST);
 		}
 
 		void renderGrid(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
@@ -184,17 +202,18 @@ namespace vc::fusion {
 			if (integratedFrames <= 0) {
 				return;
 			}
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			//view = glm::mat4(
-			//	0.562084, -0.536047, -0.629853, 0.000000, 
-			//	-0.000000, 0.761538, -0.648120, 0.000000,
-			//	0.827080, 0.364298, 0.428048, 0.000000, 
-			//	-0.171635, 0.491150, 0.070795, 1.000000
+			//	0.942055, -0.227064, 0.246930, 0.000000,
+			//	0.000000, 0.736097, 0.676876, 0.000000,
+			//	-0.335458, -0.637655, 0.693444, 0.000000,
+			//	-0.389230, -0.007644, -0.465928, 1.000000
 			//);
 			//projection = glm::mat4(
-			//	1.608380, 0.000000, 0.000000, 0.000000, 
-			//	0.000000, 2.144507, 0.000000, 0.000000, 
-			//	0.000000, 0.000000, -1.002002, -1.000000, 
+			//	2.453140, 0.000000, 0.000000, 0.000000,
+			//	0.000000, 3.270853, 0.000000, 0.000000,
+			//	0.000000, 0.000000, -1.002002, -1.000000,
 			//	0.000000, 0.000000, -0.200200, 0.000000
 			//);
 
@@ -230,13 +249,12 @@ namespace vc::fusion {
 
 			// Render the light source
 			lampShader->use();
-			lampShader->setMat4("model", model);
-			lampShader->setMat4("view", view);
-			lampShader->setMat4("projection", projection);
 			model = glm::mat4(1.0f);
 			model = glm::translate(model, lightPos);
 			model = glm::scale(model, glm::vec3(0.2f)); // a smaller cube
 			lampShader->setMat4("model", model);
+			lampShader->setMat4("view", view);
+			lampShader->setMat4("projection", projection);
 			glBindVertexArray(VAO_lamp);
 			glDrawArrays(GL_TRIANGLES, 0, 36);
 

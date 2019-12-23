@@ -18,9 +18,8 @@ uniform vec3 objectColor;
 
 void main()
 {
-
     if (fs_in.sdf == 0.0f) {
-        // hide
+        // alpha testing gets rid of this when alpha=0.0f
         FragColor = vec4(0.0f, 0.0f, 0.0f, 0.0f);
         return;
     }
@@ -33,7 +32,7 @@ void main()
     // diffuse 
     vec3 norm = normalize(fs_in.normal);
     vec3 lightDir = normalize(lightPos - fs_in.frag_pos);
-    float diff = max(dot(norm, lightDir), 0.0);
+    float diff = abs(dot(norm, lightDir));
     vec3 diffuse = diff * lightColor;
     
     // specular
@@ -41,7 +40,7 @@ void main()
     vec3 viewPos = vec3(view);
     vec3 viewDir = normalize(viewPos - fs_in.frag_pos);
     vec3 reflectDir = reflect(-lightDir, norm);  
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 16);
     vec3 specular = specularStrength * spec * lightColor;  
         
     //vec3 result = (ambient + diffuse + specular) * objectColor;
