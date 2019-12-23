@@ -52,6 +52,8 @@ using namespace vc::enums;
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
+
 #include "camera.hpp"
 #include "shader.hpp"
 #include <VolumetricFusion\Voxelgrid.hpp>
@@ -104,7 +106,7 @@ float lastFrame = 0.0f;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::VOXELGRID);
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
@@ -585,6 +587,13 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			renderCoordinateSystem = !renderCoordinateSystem;
 			break;
 		}
+		case GLFW_KEY_M: {
+			glm::mat4 view = camera.GetViewMatrix();
+			glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+			std::cout << "glm::mat4 view = " << glm::to_string(view) << std::endl;
+			std::cout << "glm::mat4 projection = " << glm::to_string(projection) << std::endl;
+			break;
+		}
 		}
 	}
 }
@@ -613,9 +622,10 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 			firstMouse = false;
 		}
 
-		float xoffset = lastX - xpos;
-		float yoffset = ypos - lastY; // reversed since y-coordinates go from bottom to top
-		//float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+		//float xoffset = lastX - xpos;
+		//float yoffset = ypos - lastY; // reversed since y-coordinates go from bottom to top
+		float xoffset = xpos - lastX;
+		float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
 
 		lastX = xpos;
 		lastY = ypos;

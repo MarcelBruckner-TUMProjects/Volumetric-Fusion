@@ -39,12 +39,6 @@
     <None Include="shader\voxelgrid_trippy.fs">
       <Filter>Shader</Filter>
     </None>
-    <None Include="shader\voxelgrid_cube.vs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\voxelgrid_cube.fs">
-      <Filter>Shader</Filter>
-    </None>
     <None Include="shader\voxelgrid.vs">
       <Filter>Shader</Filter>
     </None>
@@ -71,6 +65,8 @@
     <None Include="shader\voxelgrid_cube.vert" />
     <None Include="shader\voxelgrid_cube.frag" />
     <None Include="shader\voxelgrid_cube.geom" />
+    <None Include="shader\lamp.vert" />
+    <None Include="shader\lamp.frag" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Shader">

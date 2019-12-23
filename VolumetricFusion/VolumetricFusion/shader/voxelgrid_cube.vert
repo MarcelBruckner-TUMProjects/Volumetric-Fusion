@@ -16,8 +16,8 @@ uniform mat4 projection;
 void main()
 {
     gl_Position = projection * view * model * vec4(pos, 1.0);
-    gl_Position.y *= -1;
-    gl_PointSize = 2.0f;
+    //gl_Position.y *= -1;
+    //gl_PointSize = 2.0f;
     vs_out.sdf = sdf;
     vs_out.weight = weight;
 }

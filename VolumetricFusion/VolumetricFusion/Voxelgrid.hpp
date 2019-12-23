@@ -11,6 +11,50 @@
 
 namespace vc::fusion {
 
+	float single_cube[] = {
+		-0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+		 0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+		 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+		 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+		-0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+
+		-0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+		 0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+		 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+		 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+		-0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+
+		-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+		-0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+		-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+		-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+		-0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+		-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+
+		 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+		 0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+		 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+		 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+		 0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+		 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+
+		-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+		 0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+		 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+		 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+
+		-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+		 0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+		 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+		 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+		-0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+		-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
+	};
+
 	class Voxelgrid {
 	private:
 		float resolution;
@@ -25,6 +69,9 @@ namespace vc::fusion {
 
 		GLuint VBO_cubes, VAO_cubes, VBO_sdfs, VBO_weights;
 		vc::rendering::Shader* cubeShader;
+
+		GLuint VBO_lamp, VAO_lamp;
+		vc::rendering::Shader* lampShader;
 
 		float* voxel_grid_tsdf = nullptr;
 		float* voxel_grid_weight = nullptr;
@@ -77,27 +124,33 @@ namespace vc::fusion {
 		void initializeOpenGL() {
 
 			gridShader = new vc::rendering::VertexFragmentShader("shader/voxelgrid.vs", "shader/voxelgrid.fs");
-
 			glGenVertexArrays(1, &VAO_grid);
 			glGenBuffers(1, &VBO_grid);
 			glBindVertexArray(VAO_grid);
 			glBindBuffer(GL_ARRAY_BUFFER, VBO_grid);
-
 			glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(float), points.data(), GL_STATIC_DRAW);
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 			glEnableVertexAttribArray(0);
-
-			glGenBuffers(1, &VBO_sdfs);
-			glGenBuffers(1, &VBO_weights);
 
 			cubeShader = new vc::rendering::VertexFragmentShader("shader/voxelgrid_cube.vert", "shader/voxelgrid_cube.frag", "shader/voxelgrid_cube.geom");
 			//cubeShader = new vc::rendering::Shader("shader/voxelgrid_cube.vert", "shader/voxelgrid_cube.frag");
 			glGenVertexArrays(1, &VAO_cubes);
 			glGenBuffers(1, &VBO_cubes);
+			glGenBuffers(1, &VBO_sdfs);
+			glGenBuffers(1, &VBO_weights);
 			glBindVertexArray(VAO_cubes);
 			glBindBuffer(GL_ARRAY_BUFFER, VBO_cubes);
 			glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(float), points.data(), GL_STATIC_DRAW);
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+			glEnableVertexAttribArray(0);
+
+			lampShader = new vc::rendering::VertexFragmentShader("shader/lamp.vert", "shader/lamp.frag");
+			glGenVertexArrays(1, &VAO_lamp);
+			glGenBuffers(1, &VBO_lamp);
+			glBindVertexArray(VAO_lamp);
+			glBindBuffer(GL_ARRAY_BUFFER, VBO_lamp);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(single_cube), single_cube, GL_STATIC_DRAW);
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
 			glEnableVertexAttribArray(0);
 
 			glBindVertexArray(0);
@@ -132,6 +185,19 @@ namespace vc::fusion {
 				return;
 			}
 
+			//view = glm::mat4(
+			//	0.562084, -0.536047, -0.629853, 0.000000, 
+			//	-0.000000, 0.761538, -0.648120, 0.000000,
+			//	0.827080, 0.364298, 0.428048, 0.000000, 
+			//	-0.171635, 0.491150, 0.070795, 1.000000
+			//);
+			//projection = glm::mat4(
+			//	1.608380, 0.000000, 0.000000, 0.000000, 
+			//	0.000000, 2.144507, 0.000000, 0.000000, 
+			//	0.000000, 0.000000, -1.002002, -1.000000, 
+			//	0.000000, 0.000000, -0.200200, 0.000000
+			//);
+
 			cubeShader->use();
 
 			glBindVertexArray(VAO_cubes);
@@ -151,14 +217,28 @@ namespace vc::fusion {
 			cubeShader->setMat4("model", model);
 			cubeShader->setMat4("view", view);
 			cubeShader->setMat4("projection", projection);
-
+			cubeShader->setFloat("resolution", this->resolution * 0.75f);
+			//glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+			glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
 			cubeShader->setVec3("objectColor", 1.0f, 0.5f, 0.31f);
 			cubeShader->setVec3("lightColor", 1.0f, 1.0f, 1.0f);
-			cubeShader->setVec3("lightPos", glm::vec3(0.0f, 0.0f, 0.0f));
-
+			cubeShader->setVec3("lightPos", lightPos);
 			glDrawArrays(GL_POINTS, 0, points.size());  
-
 			//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+			glBindVertexArray(0);
+
+			// Render the light source
+			lampShader->use();
+			lampShader->setMat4("model", model);
+			lampShader->setMat4("view", view);
+			lampShader->setMat4("projection", projection);
+			model = glm::mat4(1.0f);
+			model = glm::translate(model, lightPos);
+			model = glm::scale(model, glm::vec3(0.2f)); // a smaller cube
+			lampShader->setMat4("model", model);
+			glBindVertexArray(VAO_lamp);
+			glDrawArrays(GL_TRIANGLES, 0, 36);
 
 			glBindVertexArray(0);
 		}
@@ -222,6 +302,12 @@ namespace vc::fusion {
 			// insert them into the voxel grid (point by point)
 			// yes, it is fucking slow
 			auto size_half = size / 2.0f;
+
+			//weights[84529] = 1.0f;
+			//tsdf[84529] = 1.0f;
+			//integratedFrames++;
+			//return;
+
 			for (int i = 0; i < num_gridPoints; i++) {
 				auto index = i * 3;
 				glm::vec3 vertex = glm::make_vec3(vertices_f + index);
