@@ -76,9 +76,9 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 
 // settings
-const unsigned int SCR_WIDTH = 800 * 2;
+const unsigned int SCR_WIDTH = 800;
 const unsigned int TOP_BAR_HEIGHT = 0;
-const unsigned int SCR_HEIGHT = 600 * 2 ;
+const unsigned int SCR_HEIGHT = 600;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
@@ -383,6 +383,19 @@ int main(int argc, char* argv[]) try {
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
 		vc::rendering::startFrame(window);
+
+		//projection = glm::mat4(
+		//	glm::vec4(1.81f, 0.0f, 0.0f, 0.0f),
+		//	glm::vec4(0.0f, 2.41f, 0.0f, 0.0f),
+		//	glm::vec4(0.0f, 0.0f, -1.0f, -1.0f),
+		//	glm::vec4(0.0f, 0.0f, -0.2, 0.0f)
+		//);
+		//view = glm::mat4(
+		//	glm::vec4(-0.76f, 0.02f, -0.65, 0.0f),
+		//	glm::vec4(0.0f, 1.0f, 0.04f, 0.0f),
+		//	glm::vec4(0.65f, 0.03f, -0.76, 0.0f),
+		//	glm::vec4(0.37f, 0.29f, -8.45, 1.0f)
+		//);
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{

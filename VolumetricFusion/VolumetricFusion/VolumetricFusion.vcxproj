@@ -34,8 +34,9 @@
     <None Include="shader\texture.vs" />
     <None Include="shader\voxelgrid.fs" />
     <None Include="shader\voxelgrid.vs" />
-    <None Include="shader\voxelgrid_cube.fs" />
-    <None Include="shader\voxelgrid_cube.vs" />
+    <None Include="shader\voxelgrid_cube.frag" />
+    <None Include="shader\voxelgrid_cube.geom" />
+    <None Include="shader\voxelgrid_cube.vert" />
     <None Include="shader\voxelgrid_trippy.fs" />
     <None Include="shader\voxelgrid_trippy.vs" />
   </ItemGroup>
