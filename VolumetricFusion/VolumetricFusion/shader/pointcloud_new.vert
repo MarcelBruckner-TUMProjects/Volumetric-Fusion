@@ -17,26 +17,24 @@ uniform mat4 projection;
 void main()
 {
     float z = texture(depth_frame, aPos).x * depth_scale;
-
-    if(z == 0){
-        gl_Position = vec4(0.0f, 0.0f, 0.0f, 0.0f);
-        texCoord = vec2(-1.0f, -1.0f);
-        return;
-    }
-
+    
     vec3 pos = vec3(aPos - 0.5f, 1.0f); 
-    if(aspect > 1.0f){
+
+    if(aspect > 1.0f) {
         pos.y /= aspect;
-    }else{
+    } else {
         pos.x *= aspect;
     }
-
+    
     pos *= z;
-    //pos = cam2World * pos;
-    // pos *= z;
-   
-    gl_Position = projection * view * model * relativeTransformation * vec4(pos, 1.0);
+    
+    gl_Position = vec4(pos, 1.0f);
+    gl_Position = projection * view * model * relativeTransformation * gl_Position;
     gl_Position = correction * gl_Position;
 
-    texCoord = aPos;
+    if(z == 0){
+        texCoord = vec2(-1.0f, -1.0f);
+    }else{
+        texCoord = aPos;
+    }
 }

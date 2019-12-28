@@ -56,6 +56,8 @@ using namespace vc::enums;
 #include <VolumetricFusion\Voxelgrid.hpp>
 //#include <io.h>
 
+#include "Optimization.hpp"
+
 #pragma endregion
 
 template<typename T, typename V>
@@ -116,8 +118,10 @@ std::atomic_bool renderCoordinateSystem = false;
 
 int main(int argc, char* argv[]) try {
 	
+	vc::optimization::testFunc();
+
 	vc::settings::FolderSettings folderSettings;
-	folderSettings.recordingsFolder = "recordings/static_scene_front/";
+	folderSettings.recordingsFolder = "recordings/allCameras/";
 
 	// glfw: initialize and configure
 	// ------------------------------
@@ -175,6 +179,8 @@ int main(int argc, char* argv[]) try {
 	//vc::rendering::Rendering rendering(app, viewOrientation);
 
 	rs2::context ctx; // Create librealsense context for managing devices
+	rs2::log_to_file(RS2_LOG_SEVERITY_WARN, "realsense_rs2.log");
+
 	//std::vector<vc::data::Data> datas;
 	std::vector<std::string> streamNames;
 
@@ -331,36 +337,36 @@ int main(int argc, char* argv[]) try {
 
 
 
-#pragma region Fusion Thread
-	fusionThread = std::thread([&stopped, &programState, &relativeTransformations]() {
-		const int maxIntegrations = 10;
-		int integrations = 0;
-		while (!stopped) {
-			if (calibrateCameras || !fuseFrames) {
-				continue;
-			}
-
-			for (int i = 0; i < pipelines.size(); i++) {
-				// Only integrate frames with a valid transformation
-				if (relativeTransformations.count(i) <= 0 || !pipelines[i]->data->points) {
-					continue;
-				}
-
-				const rs2::vertex* vertices = pipelines[i]->data->points.get_vertices();
-
-				auto pip = pipelines[i]->processing;
-				voxelgrid->integrateFrameCPU(pipelines[i], relativeTransformations[i], i, pip->frameId);
-			}
-
-			integrations++;
-			if (integrations >= maxIntegrations) {
-				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
-				fuseFrames.store(false);
-				break;
-			}
-		}
-		});
-#pragma endregion
+//#pragma region Fusion Thread
+//	fusionThread = std::thread([&stopped, &programState, &relativeTransformations]() {
+//		const int maxIntegrations = 10;
+//		int integrations = 0;
+//		while (!stopped) {
+//			if (calibrateCameras || !fuseFrames) {
+//				continue;
+//			}
+//
+//			for (int i = 0; i < pipelines.size(); i++) {
+//				// Only integrate frames with a valid transformation
+//				if (relativeTransformations.count(i) <= 0 || !pipelines[i]->data->points) {
+//					continue;
+//				}
+//
+//				const rs2::vertex* vertices = pipelines[i]->data->points.get_vertices();
+//
+//				auto pip = pipelines[i]->processing;
+//				voxelgrid->integrateFrameCPU(pipelines[i], relativeTransformations[i], i, pip->frameId);
+//			}
+//
+//			integrations++;
+//			if (integrations >= maxIntegrations) {
+//				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
+//				fuseFrames.store(false);
+//				break;
+//			}
+//		}
+//		});
+//#pragma endregion
 
 #pragma region Main loop
 
@@ -409,7 +415,7 @@ int main(int argc, char* argv[]) try {
 					}
 				}
 			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, relativeTransformations[i], i, renderCoordinateSystem);
+					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, relativeTransformations[i], renderCoordinateSystem);
 				}
 		}
 		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {

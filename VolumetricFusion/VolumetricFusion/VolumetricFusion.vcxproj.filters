@@ -22,6 +22,7 @@
     <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Voxelgrid.hpp" />
+    <ClInclude Include="Optimization.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
