@@ -112,7 +112,7 @@ bool visualizeCharucoResults = true;
 
 bool renderVoxelgrid = false;
 vc::fusion::Voxelgrid* voxelgrid;
-std::atomic_bool calibrateCameras = false;
+std::atomic_bool calibrateCameras = true;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
@@ -258,22 +258,25 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
-			int markersDetected = 0;
+			bool allMarkersDetected = true;
+			for (auto pipe : pipelines) {
+				if (!pipe->chArUco->hasMarkersDetected) {
+					allMarkersDetected = false;
+				}
+			}
+			if (!allMarkersDetected) {
+				continue;
+			}
+
+			//bundleAdjustment = new vc::optimization::BAProblem(pipelines);
+			
 			int pipelinesEnteredLoop = 0;
 			for (int i = 0; i < pipelines.size(); i++) {
 				{
-					if (!pipelines[i]->chArUco->hasMarkersDetected/* || relativeTransformations.count(i) != 0*/) {
-						continue;
-					}
-					markersDetected++;
-
 					programState.highestFrameIds[i] = MAX(pipelines[i]->chArUco->frameId, programState.highestFrameIds[i]);
 					if (programState.highestFrameIds[i] > pipelines[i]->chArUco->frameId) {
 						pipelinesEnteredLoop++;
 					}
-
-					glm::mat4 baseToMarkerTranslation = pipelines[0]->chArUco->translation;
-					glm::mat4 baseToMarkerRotation = pipelines[0]->chArUco->rotation;
 
 					if (i == 0) {
 						//relativeTransformations[i] = glm::inverse(baseToMarkerTranslation);
@@ -281,8 +284,11 @@ int main(int argc, char* argv[]) try {
 						continue;
 					}
 
-					glm::mat4 markerToRelativeTranslation = pipelines[i]->chArUco->translation;
-					glm::mat4 markerToRelativeRotation = pipelines[i]->chArUco->rotation;
+					glm::mat4 baseToMarkerTranslation = pipelines[0]->chArUco->getTranslationMatrix();
+					glm::mat4 baseToMarkerRotation = pipelines[0]->chArUco->getRotationMatrix();
+
+					glm::mat4 markerToRelativeTranslation = pipelines[i]->chArUco->getTranslationMatrix();
+					glm::mat4 markerToRelativeRotation = pipelines[i]->chArUco->getRotationMatrix();
 
 					glm::mat4 relativeTransformation = (
 						//glm::mat4(1.0f)
@@ -322,15 +328,14 @@ int main(int argc, char* argv[]) try {
 					relativeTransformations[i] = relativeTransformation;
 				}
 			}
-			programState.allMarkersDetected = markersDetected == pipelines.size();
 			programState.allPipelinesEnteredLooped = pipelinesEnteredLoop == pipelines.size();
 
-			if (programState.allMarkersDetected) {
+			//if (programState.allMarkersDetected) 
+			{
 				setCalibration(false);
 				// start fusion thread logic
 				fuseFrames.store(true);
 
-				//bundleAdjustment = new vc::optimization::BAProblem(pipelines);
 			}
 		}
 	});

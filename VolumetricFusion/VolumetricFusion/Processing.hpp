@@ -10,6 +10,8 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/aruco/charuco.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
 
 #include "Data.hpp"
 #include <glm/glm.hpp>
@@ -94,8 +96,6 @@ namespace vc::processing {
 		bool visualize = false;
 		bool hasMarkersDetected = false;
 
-		glm::mat4 rotation = glm::mat4(1.0f);
-		glm::mat4 translation = glm::mat4(1.0f);
 		unsigned long long frameId;
 
 		std::vector<int> ids;
@@ -104,7 +104,22 @@ namespace vc::processing {
 		std::vector<cv::Point2f> charucoCorners;
 		std::vector<int> charucoIds;
 
-		cv::Vec3d r, t;
+		cv::Vec3d rotation, translation;
+
+		glm::mat4 getRotationMatrix() {
+			cv::Matx33d tmp;
+			cv::Rodrigues(rotation, tmp);
+			return glm::mat4(
+				tmp.val[0], tmp.val[1], tmp.val[2], 0,
+				tmp.val[3], tmp.val[4], tmp.val[5], 0,
+				tmp.val[6], tmp.val[7], tmp.val[8], 0,
+				0, 0, 0, 1
+			);
+		}
+
+		glm::mat4 getTranslationMatrix() {
+			return glm::translate(glm::mat4(1.0f), glm::vec3(translation[0], translation[1], translation[2]));
+		}
 
 		void startCharucoProcessing(vc::data::Camera camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
@@ -114,13 +129,13 @@ namespace vc::processing {
 				this->frameId = frameId;
 				cv::aruco::detectMarkers(image, dictionary, markerCorners, ids);
 
-				int i = 0;
+				/*int i = 0;
 				for (auto corner_list : markerCorners) {
 					std::cout << ids[i++] << std::endl;
 					for (auto corner : corner_list) {
 						std::cout << corner << std::endl;
 					}
-				}
+				}*/
 
 				// if at least one marker detected
 				if (ids.size() > 0) {
@@ -133,25 +148,12 @@ namespace vc::processing {
 						if (visualize) {
 							cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
 						}
-						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.K, camera.distCoeffs, r, t);
+						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.K, camera.distCoeffs, rotation, translation);
 						// if charuco pose is valid
 						if (valid) {
 							if (visualize) {
-								cv::aruco::drawAxis(image, camera.K, camera.distCoeffs, r, t, 0.1);
+								cv::aruco::drawAxis(image, camera.K, camera.distCoeffs, rotation, translation, 0.1);
 							}
-
-							rotation = glm::mat4(1.0f);
-							translation = glm::mat4(1.0f);
-							translation = glm::translate(translation, glm::vec3(t[0], t[1], t[2]));
-
-							cv::Matx33d tmp;
-							cv::Rodrigues(r, tmp);
-							rotation = glm::mat4(
-								tmp.val[0], tmp.val[1], tmp.val[2], 0,
-								tmp.val[3], tmp.val[4], tmp.val[5], 0,
-								tmp.val[6], tmp.val[7], tmp.val[8], 0,
-								0, 0, 0, 1
-							);
 
 							hasMarkersDetected = true;
 						}

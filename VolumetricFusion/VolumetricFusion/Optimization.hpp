@@ -22,8 +22,8 @@ namespace vc::optimization {
     // 4 distortion - k1, k2, p1, p2
 
     struct SnavelyReprojectionError {
-        SnavelyReprojectionError(cv::Point2f observed_pixel, double* observed_point)
-            : observed_pixel(observed_pixel), observed_point(observed_point) {}
+        SnavelyReprojectionError(cv::Point2f observed_pixel, glm::vec3 observed_point, double* intrinsics, double* distCoeffs)
+            : observed_pixel(observed_pixel), observed_point(observed_point), intrinsics(intrinsics), distortion(distCoeffs) {}
 
         /// <summary>
         /// </summary>
@@ -36,12 +36,12 @@ namespace vc::optimization {
         /// <returns></returns>
         template <typename T>                
         bool operator()(const T* const translation, const T* const rotation, 
-            const T* intrinsics, const T* const distortion, 
-            const T* const point, T* residuals) const {
+            //const T* intrinsics, const T* const distortion, 
+            T* residuals) const {
 
             // camera[0,1,2] are the angle-axis rotation.
             T p[3];
-            ceres::AngleAxisRotatePoint(rotation, point, p);
+            ceres::AngleAxisRotatePoint(rotation, new T[3]{ T(observed_point.x), T(observed_point.y), T(observed_point.z) }, p);
 
             // camera[3,4,5] are the translation.
             p[0] += translation[0];
@@ -72,17 +72,24 @@ namespace vc::optimization {
 
         // Factory to hide the construction of the CostFunction object from
         // the client code.
-        static ceres::CostFunction* Create(cv::Point2f observed_pixel, double* observed_point) {
-            return (new ceres::AutoDiffCostFunction<SnavelyReprojectionError, 2, 3, 3, 4, 4, 3>(
-                new SnavelyReprojectionError(observed_pixel, observed_point)));
+        static ceres::CostFunction* Create(cv::Point2f observed_pixel, glm::vec3 observed_point, double* intrinsics, double* distCoeffs) {
+            return (new ceres::AutoDiffCostFunction<SnavelyReprojectionError, 2, 3, 3>(
+                new SnavelyReprojectionError(observed_pixel, observed_point, intrinsics, distCoeffs)));
         }
 
         cv::Point2f observed_pixel;
-        double* observed_point;
+        glm::vec3 observed_point;
+        double* intrinsics;
+        double* distortion;
     };
 
     class BAProblem {
     private:
+        const int num_translation_parameters = 3;
+        const int num_rotation_parameters = 3;
+        const int num_intrinsic_parameters = 4;
+        const int num_distCoeff_parameters = 4;
+
         double* translations;
         double* rotations;
         double* intrinsics;
@@ -92,27 +99,27 @@ namespace vc::optimization {
     public:
         BAProblem(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
             this->pipelines = pipelines;
-            translations = new double[3 * pipelines.size()];
-            rotations = new double[3 * pipelines.size()];
-            intrinsics = new double[4 * pipelines.size()];
-            distCoeffs = new double[5 * pipelines.size()];
+            translations = new double[num_translation_parameters * pipelines.size()];
+            rotations = new double[num_rotation_parameters * pipelines.size()];
+            intrinsics = new double[num_intrinsic_parameters * pipelines.size()];
+            distCoeffs = new double[num_distCoeff_parameters * pipelines.size()];
             
             for (int i = 0; i < pipelines.size(); i++) {
-                for (int j = 0; j < 3; j++)
+                for (int j = 0; j < num_translation_parameters; j++)
                 {
-                    translations[i * 3 + j] = pipelines[i]->chArUco->t[j];
+                    translations[i * num_translation_parameters + j] = pipelines[i]->chArUco->translation[j];
                 }
-                for (int j = 0; j < 3; j++)
+                for (int j = 0; j < num_rotation_parameters; j++)
                 {
-                    rotations[i * 3 + j] = pipelines[i]->chArUco->r[j];
+                    rotations[i * num_rotation_parameters + j] = pipelines[i]->chArUco->rotation[j];
                 }
-                intrinsics[i * 4 + 0] = pipelines[i]->depth_camera->intrinsics.fx;
-                intrinsics[i * 4 + 1] = pipelines[i]->depth_camera->intrinsics.fy;
-                intrinsics[i * 4 + 2] = pipelines[i]->depth_camera->intrinsics.ppx;
-                intrinsics[i * 4 + 3] = pipelines[i]->depth_camera->intrinsics.ppy;
-                for (int j = 0; j < 5; j++)
+                intrinsics[i * num_intrinsic_parameters + 0] = pipelines[i]->depth_camera->intrinsics.fx;
+                intrinsics[i * num_intrinsic_parameters + 1] = pipelines[i]->depth_camera->intrinsics.fy;
+                intrinsics[i * num_intrinsic_parameters + 2] = pipelines[i]->depth_camera->intrinsics.ppx;
+                intrinsics[i * num_intrinsic_parameters + 3] = pipelines[i]->depth_camera->intrinsics.ppy;
+                for (int j = 0; j < num_distCoeff_parameters; j++)
                 {
-                    distCoeffs[i * 5 + j] = pipelines[i]->depth_camera->distCoeffs[j];
+                    distCoeffs[i * num_distCoeff_parameters + j] = pipelines[i]->depth_camera->distCoeffs[j];
                 }
             }
 
@@ -125,6 +132,17 @@ namespace vc::optimization {
             delete[] intrinsics;
             delete[] distCoeffs;
         }
+
+        glm::vec3 pixel2Point(cv::Point2f observation, float color2DepthWidth, float color2DepthHeight, glm::mat3 cam2World, rs2::depth_frame depth_frame) {
+            int x = observation.x * color2DepthWidth;
+            int y = observation.y * color2DepthHeight;
+
+            glm::vec3 point = glm::vec3(x * 2.0f, y * 2.0f, 1.0f);
+            point = point * cam2World;
+            point *= depth_frame.get_distance(x, y);
+
+            return point;
+        }
         
         void solve() {
             google::InitGoogleLogging("Bundle Adjustment");
@@ -133,6 +151,7 @@ namespace vc::optimization {
             // parameters for cameras and points are added automatically.
             ceres::Problem problem;
 
+            int o = 0;
             for (int i = 0; i < pipelines.size(); i++) {
                 auto pipe = pipelines[i];
 
@@ -144,22 +163,41 @@ namespace vc::optimization {
                 int color_width = color_frame.as<rs2::video_frame>().get_width();
                 int color_height = color_frame.as<rs2::video_frame>().get_height();
 
+                glm::mat3 cam2World = pipe->depth_camera->cam2world;
+
                 float color2DepthWidth = 1.0f * depth_width / color_width;
                 float color2DepthHeight = 1.0f * depth_height / color_height;
 
                 for (auto markerCorners : pipe->chArUco->markerCorners) {
                     for (auto observation : markerCorners) {
-                        int x = observation.x * color2DepthWidth;
-                        int y = observation.y * color2DepthHeight;
+                        glm::vec3 point = pixel2Point(observation, color2DepthWidth, color2DepthHeight, cam2World, depth_frame);
 
-                        float z = depth_frame.get_distance(x, y);
-
-                        std::cout << "";
-
-
+                        ceres::CostFunction* cost_function = SnavelyReprojectionError::Create(observation, point, intrinsics, distCoeffs);
+                        problem.AddResidualBlock(cost_function, NULL,
+                            translations + i * num_translation_parameters,
+                            rotations + i * num_rotation_parameters
+                            //intrinsics + i * num_intrinsic_parameters,
+                            //distCoeffs + i * num_distCoeff_parameters
+                        );
+                        o++;
                     }
                 }
+
+                for (auto observation : pipe->chArUco->charucoCorners) {
+                    glm::vec3 point = pixel2Point(observation, color2DepthWidth, color2DepthHeight, cam2World, depth_frame);
+
+                    ceres::CostFunction* cost_function = SnavelyReprojectionError::Create(observation, point, intrinsics, distCoeffs);
+                    problem.AddResidualBlock(cost_function, NULL,
+                        translations + i * num_translation_parameters,
+                        rotations + i * num_rotation_parameters
+                        //intrinsics + i * num_intrinsic_parameters,
+                        //distCoeffs + i * num_distCoeff_parameters
+                    );
+                    o++;
+                }
             }
+
+            std::cout << "Added observations: " << o << std::endl;
 
 
             //for (int i = 0; i < num_observations(); ++i) {
@@ -180,6 +218,7 @@ namespace vc::optimization {
             ceres::Solver::Options options;
             options.linear_solver_type = ceres::DENSE_SCHUR;
             options.minimizer_progress_to_stdout = true;
+            options.max_num_iterations = 500;
             ceres::Solver::Summary summary;
             ceres::Solve(options, &problem, &summary);
             std::cout << summary.FullReport() << "\n";
