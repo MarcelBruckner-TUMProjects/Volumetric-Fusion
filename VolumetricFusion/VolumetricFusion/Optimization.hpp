@@ -15,11 +15,60 @@
 namespace vc::optimization {
 
     using namespace ceres;
+    
+    struct PointCorrespondenceError {
+        PointCorrespondenceError(glm::vec4 observed_point, glm::vec4 expected_point)
+            : observed_point(observed_point), expected_point(expected_point) {}
 
-    // 3 translation
-    // 3 rotation
-    // 4 intrinsics - fx, fy, ppx, ppy
-    // 4 distortion - k1, k2, p1, p2
+        template <typename T>
+        bool operator()(const T* const translation, const T* const rotation,
+            //const T* intrinsics, const T* const distortion, 
+            T* residuals) const {
+            
+            // Column major
+            T rot[9];
+            ceres::AngleAxisToRotationMatrix(rotation, rot);
+
+            T p[3];
+            p[0] = T(observed_point.x);
+            p[1] = T(observed_point.y);
+            p[2] = T(observed_point.z);
+            
+            for (int i = 0; i < 2; i++) {
+                p[i] -= translation[i];
+            }
+
+            T p_rot[3];
+            for (int i = 0; i < 3; i++) {
+                p_rot[i] = rot[i] * p[0] + rot[i + 3] * p[1] + rot[i + 6] * p[2];
+            }
+
+            T expected[3];
+            expected[0] = T(expected_point.x);
+            expected[1] = T(expected_point.y);
+            expected[2] = T(expected_point.z);
+
+            for (int i = 0; i < 3; i++) {
+                residuals[i] = p_rot[i] - expected[i];
+            }
+
+            //std::stringstream ss;
+            //ss << residuals[0] << ", " << residuals[1] << ", " << residuals[2] << std::endl;
+            //std::cout << ss.str();
+
+            return true;
+        }
+
+        glm::vec4 observed_point;
+        glm::vec4 expected_point;
+
+        // Factory to hide the construction of the CostFunction object from
+        // the client code.
+        static ceres::CostFunction* Create(glm::vec4 observed_point, glm::vec4 expected_point) {
+            return (new ceres::AutoDiffCostFunction<PointCorrespondenceError, 3, 3, 3>(
+                new PointCorrespondenceError(observed_point, expected_point)));
+        }
+    };
 
     struct ReprojectionError {
         ReprojectionError(cv::Point2f observed_pixel, glm::vec4 observed_point, double* intrinsics, double* distCoeffs)
@@ -78,6 +127,20 @@ namespace vc::optimization {
     };
 
     class BAProblem {
+    private:
+        rs2::depth_frame* depth_frame;
+        int depth_width;
+        int depth_height;
+
+        rs2::frame* color_frame;
+        int color_width;
+        int color_height;
+
+        glm::mat3 cam2World;
+
+        float color2DepthWidth;
+        float color2DepthHeight;
+
     public:
         const int num_translation_parameters = 3;
         const int num_rotation_parameters = 3;
@@ -153,13 +216,18 @@ namespace vc::optimization {
             return true;
         }
 
-        bool optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+        bool optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines, bool reprojectionError = false) {
             hasSolution = false;
             if (!init(pipelines)) {
                 return false;
             }
 
-            solve(pipelines);
+            if (reprojectionError) {
+                solveReprojectionError(pipelines);
+            }
+            else {
+                solve3DCorrespondenceError(pipelines);
+            }
             calculateRelativeTransformations(pipelines.size());
 
             return true;
@@ -191,43 +259,115 @@ namespace vc::optimization {
             ));
         }
         
-        glm::vec4 pixel2Point(cv::Point2f observation, float color2DepthWidth, float color2DepthHeight, glm::mat3 cam2World, rs2::depth_frame depth_frame) {
+        glm::vec4 pixel2Point(cv::Point2f observation) {
             int x = observation.x * color2DepthWidth;
             int y = observation.y * color2DepthHeight;
 
-            glm::vec3 point = glm::vec3(x * 2.0f, y * 2.0f, 1.0f);
+            glm::vec3 point = glm::vec3(x, y, 1.0f);
             point = point * cam2World;
-            point *= depth_frame.get_distance(x, y);
+            point *= depth_frame->get_distance(x, y);
 
             return glm::vec4(point.x, point.y, point.z, 1.0f);
         }
-        
-        void solve(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+
+        void setPipelineStuff(std::shared_ptr<vc::capture::CaptureDevice> pipe) {
+            depth_frame = (rs2::depth_frame*) & pipe->data->filteredDepthFrames;
+            depth_width = depth_frame->as<rs2::video_frame>().get_width();
+            depth_height = depth_frame->as<rs2::video_frame>().get_height();
+
+            color_frame = &pipe->data->filteredColorFrames;
+            color_width = color_frame->as<rs2::video_frame>().get_width();
+            color_height = color_frame->as<rs2::video_frame>().get_height();
+
+            cam2World = pipe->depth_camera->cam2world;
+
+            color2DepthWidth = 1.0f * depth_width / color_width;
+            color2DepthHeight = 1.0f * depth_height / color_height;
+        }
+
+        void solveProblem(ceres::Problem* problem) {
+            ceres::Solver::Options options;
+            options.linear_solver_type = ceres::DENSE_SCHUR;
+            options.minimizer_progress_to_stdout = true;
+            options.max_num_iterations = 500;
+            ceres::Solver::Summary summary;
+            ceres::Solve(options, problem, &summary);
+            std::cout << summary.FullReport() << "\n";
+        }
+
+        void solve3DCorrespondenceError(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
 
             // Create residuals for each observation in the bundle adjustment problem. The
             // parameters for cameras and points are added automatically.
             ceres::Problem problem;
 
+            glm::mat4 baseToMarkerTranslation = getTranslationMatrix(0);
+            glm::mat4 baseToMarkerRotation = getRotationMatrix(0);
+            glm::mat4 inverseBaseTransformation = glm::inverse(baseToMarkerTranslation * glm::inverse(baseToMarkerRotation));
+
+            std::map<int, std::vector<glm::vec4>> baseMarkerCorners;
+            std::map<int, glm::vec4> baseCharucoCorners;
+            
             int o = 0;
             for (int i = 0; i < pipelines.size(); i++) {
                 auto pipe = pipelines[i];
 
-                rs2::depth_frame depth_frame = pipe->data->filteredDepthFrames;
-                int depth_width = depth_frame.as<rs2::video_frame>().get_width();
-                int depth_height = depth_frame.as<rs2::video_frame>().get_height();
+                setPipelineStuff(pipe);
 
-                rs2::frame color_frame = pipe->data->filteredColorFrames;
-                int color_width = color_frame.as<rs2::video_frame>().get_width();
-                int color_height = color_frame.as<rs2::video_frame>().get_height();
+                for (auto id : pipelines[i]->chArUco->ids) {
+                    for (int j = 0; j < pipelines[i]->chArUco->markerCorners[id].size(); j++) {
+                        glm::vec4 point = pixel2Point(pipelines[i]->chArUco->markerCorners[id][j]);
 
-                glm::mat3 cam2World = pipe->depth_camera->cam2world;
+                        if (i == 0) {
+                            baseMarkerCorners[id].emplace_back(inverseBaseTransformation * point);
+                        }
+                        else {
+                            ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
+                                point, baseMarkerCorners[id][j]
+                            );
+                            problem.AddResidualBlock(cost_function, NULL,
+                                &translations[i * num_translation_parameters],
+                                &rotations[i * num_rotation_parameters]
+                            );
+                        }
+                    }
+                }
 
-                float color2DepthWidth = 1.0f * depth_width / color_width;
-                float color2DepthHeight = 1.0f * depth_height / color_height;
+                for (auto id : pipelines[i]->chArUco->charucoIds) {
+                    glm::vec4 point = pixel2Point(pipelines[i]->chArUco->charucoCorners[id]);
 
+                    if (i == 0) {
+                        baseCharucoCorners[id] = inverseBaseTransformation * point;
+                    }
+                    else {
+                        ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
+                            point, baseCharucoCorners[id]
+                        );
+                        problem.AddResidualBlock(cost_function, NULL,
+                            &translations[i * num_translation_parameters],
+                            &rotations[i * num_rotation_parameters]
+                        );
+                    }
+                }
+            }
+
+            solveProblem(&problem);
+        }
+        
+        void solveReprojectionError(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+
+            // Create residuals for each observation in the bundle adjustment problem. The
+            // parameters for cameras and points are added automatically.
+            ceres::Problem problem;
+
+            for (int i = 0; i < pipelines.size(); i++) {
+                auto pipe = pipelines[i];
+
+                setPipelineStuff(pipe);
+                
                 for (auto markerCorners : pipe->chArUco->markerCorners) {
                     for (auto observation : markerCorners) {
-                        glm::vec4 point = pixel2Point(observation, color2DepthWidth, color2DepthHeight, cam2World, depth_frame);
+                        glm::vec4 point = pixel2Point(observation);
                         //point = relativeTransformations[i] * point;
                         //point = vc::rendering::COORDINATE_CORRECTION * relativeTransformations[i] * point;
 
@@ -238,12 +378,11 @@ namespace vc::optimization {
                             //intrinsics + i * num_intrinsic_parameters,
                             //distCoeffs + i * num_distCoeff_parameters
                         );
-                        o++;
                     }
                 }
 
                 for (auto observation : pipe->chArUco->charucoCorners) {
-                    glm::vec4 point = pixel2Point(observation, color2DepthWidth, color2DepthHeight, cam2World, depth_frame);
+                    glm::vec4 point = pixel2Point(observation);
                     //point = relativeTransformations[i] * point;
                     //point = vc::rendering::COORDINATE_CORRECTION * relativeTransformations[i] * point;
 
@@ -254,19 +393,10 @@ namespace vc::optimization {
                         //intrinsics + i * num_intrinsic_parameters,
                         //distCoeffs + i * num_distCoeff_parameters
                     );
-                    o++;
                 }
             }
-
-            std::cout << "Added observations: " << o << std::endl;
-
-            ceres::Solver::Options options;
-            options.linear_solver_type = ceres::DENSE_SCHUR;
-            options.minimizer_progress_to_stdout = true;
-            options.max_num_iterations = 500;
-            ceres::Solver::Summary summary;
-            ceres::Solve(options, &problem, &summary);
-            std::cout << summary.FullReport() << "\n";
+            
+            solveProblem(&problem);
         }
 
         bool checkForAllMarkers(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
@@ -279,17 +409,19 @@ namespace vc::optimization {
         }
 
         void calculateRelativeTransformations(int num_pipelines) {
+            glm::mat4 baseToMarkerTranslation = getTranslationMatrix(0);
+            glm::mat4 baseToMarkerRotation = getRotationMatrix(0);
+            glm::mat4 baseTransformation = baseToMarkerTranslation * glm::inverse(baseToMarkerRotation);
+
             for (int i = 0; i < num_pipelines; i++) {
                 //programState.highestFrameIds[i] = MAX(pipelines[i]->chArUco->frameId, programState.highestFrameIds[i]);
 
                 if (i == 0) {
                     //relativeTransformations[i] = glm::inverse(baseToMarkerTranslation);
+                    //relativeTransformations[i] = glm::inverse(baseTransformation);
                     relativeTransformations[i] = glm::mat4(1.0f);
                     continue;
                 }
-
-                glm::mat4 baseToMarkerTranslation = getTranslationMatrix(0);
-                glm::mat4 baseToMarkerRotation = getRotationMatrix(0);
 
                 glm::mat4 markerToRelativeTranslation = getTranslationMatrix(i);
                 glm::mat4 markerToRelativeRotation = getRotationMatrix(i);
@@ -305,7 +437,8 @@ namespace vc::optimization {
                     //baseToMarkerTranslation * (baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
                     //baseToMarkerTranslation * glm::inverse((baseToMarkerRotation) * glm::inverse(markerToRelativeRotation)) * glm::inverse(markerToRelativeTranslation)
                     ///*baseToMarkerTranslation **/ glm::inverse(baseToMarkerRotation)* (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
-                    baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
+                    //(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
+                    baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
                     //baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
 
                     //glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerTranslation * baseToMarkerRotation
