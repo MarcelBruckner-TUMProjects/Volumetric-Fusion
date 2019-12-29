@@ -105,22 +105,7 @@ namespace vc::processing {
 		std::vector<int> charucoIds;
 
 		cv::Vec3d rotation, translation;
-
-		glm::mat4 getRotationMatrix() {
-			cv::Matx33d tmp;
-			cv::Rodrigues(rotation, tmp);
-			return glm::mat4(
-				tmp.val[0], tmp.val[1], tmp.val[2], 0,
-				tmp.val[3], tmp.val[4], tmp.val[5], 0,
-				tmp.val[6], tmp.val[7], tmp.val[8], 0,
-				0, 0, 0, 1
-			);
-		}
-
-		glm::mat4 getTranslationMatrix() {
-			return glm::translate(glm::mat4(1.0f), glm::vec3(translation[0], translation[1], translation[2]));
-		}
-
+		
 		void startCharucoProcessing(vc::data::Camera camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);

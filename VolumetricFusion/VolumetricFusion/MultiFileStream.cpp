@@ -57,6 +57,7 @@ using namespace vc::enums;
 //#include <io.h>
 
 #include "Optimization.hpp"
+#include "glog/logging.h"
 
 #pragma endregion
 
@@ -116,11 +117,14 @@ std::atomic_bool calibrateCameras = true;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
-vc::optimization::BAProblem* bundleAdjustment;
+vc::optimization::BAProblem bundleAdjustment = vc::optimization::BAProblem();
 
 int main(int argc, char* argv[]) try {
 	
 	//vc::optimization::testFunc();
+
+	google::InitGoogleLogging("Bundle Adjustment");
+	ceres::Solver::Summary summary;
 
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "recordings/allCameras/";
@@ -229,12 +233,7 @@ int main(int argc, char* argv[]) try {
 	// Create custom depth processing block and their output queues:
 	/*std::map<int, rs2::frame_queue> depth_processing_queues;
 	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
-
-	// Calculated relative transformations between cameras per frame
-	std::vector<glm::mat4> relativeTransformations = {
-		glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f)
-	};
-
+	
 	std::thread calibrationThread;
 	std::thread fusionThread;
 
@@ -252,83 +251,18 @@ int main(int argc, char* argv[]) try {
 #pragma region Camera Calibration Thread
 
 	setCalibration(calibrateCameras);
-	calibrationThread = std::thread([&stopped, &programState, &relativeTransformations]() {
+	calibrationThread = std::thread([&stopped, &programState]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
 				continue;
 			}
 
-			bool allMarkersDetected = true;
-			for (auto pipe : pipelines) {
-				if (!pipe->chArUco->hasMarkersDetected) {
-					allMarkersDetected = false;
-				}
-			}
-			if (!allMarkersDetected) {
+			bundleAdjustment.optimize(pipelines);
+			if (!bundleAdjustment.hasSolution) {
 				continue;
 			}
 
-			//bundleAdjustment = new vc::optimization::BAProblem(pipelines);
 			
-			int pipelinesEnteredLoop = 0;
-			for (int i = 0; i < pipelines.size(); i++) {
-				{
-					programState.highestFrameIds[i] = MAX(pipelines[i]->chArUco->frameId, programState.highestFrameIds[i]);
-					if (programState.highestFrameIds[i] > pipelines[i]->chArUco->frameId) {
-						pipelinesEnteredLoop++;
-					}
-
-					if (i == 0) {
-						//relativeTransformations[i] = glm::inverse(baseToMarkerTranslation);
-						relativeTransformations[i] = glm::mat4(1.0f); 
-						continue;
-					}
-
-					glm::mat4 baseToMarkerTranslation = pipelines[0]->chArUco->getTranslationMatrix();
-					glm::mat4 baseToMarkerRotation = pipelines[0]->chArUco->getRotationMatrix();
-
-					glm::mat4 markerToRelativeTranslation = pipelines[i]->chArUco->getTranslationMatrix();
-					glm::mat4 markerToRelativeRotation = pipelines[i]->chArUco->getRotationMatrix();
-
-					glm::mat4 relativeTransformation = (
-						//glm::mat4(1.0f)
-
-						//baseToMarkerTranslation * (markerToRelativeRotation) * (baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation)
-						//baseToMarkerTranslation * glm::inverse(markerToRelativeRotation) * (baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation)
-						//baseToMarkerTranslation * (markerToRelativeRotation) * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation)
-						//baseToMarkerTranslation * glm::inverse(markerToRelativeRotation) * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation) 
-
-						//baseToMarkerTranslation * (baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
-						//baseToMarkerTranslation * glm::inverse((baseToMarkerRotation) * glm::inverse(markerToRelativeRotation)) * glm::inverse(markerToRelativeTranslation)
-						///*baseToMarkerTranslation **/ glm::inverse(baseToMarkerRotation)* (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
-						baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
-						//baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
-
-						//glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerTranslation * baseToMarkerRotation
-						//glm::inverse(markerToRelativeTranslation * markerToRelativeRotation) * baseToMarkerRotation * baseToMarkerTranslation
-						//glm::inverse(markerToRelativeRotation * markerToRelativeTranslation) * baseToMarkerTranslation * baseToMarkerRotation
-						//glm::inverse(markerToRelativeRotation * markerToRelativeTranslation) * baseToMarkerRotation * baseToMarkerTranslation
-
-						//baseToMarkerTranslation * baseToMarkerRotation * glm::inverse(markerToRelativeTranslation * markerToRelativeRotation)
-						//baseToMarkerRotation * baseToMarkerTranslation * glm::inverse(markerToRelativeTranslation * markerToRelativeRotation)
-						//baseToMarkerTranslation * baseToMarkerRotation * glm::inverse(markerToRelativeRotation * markerToRelativeTranslation)
-						//baseToMarkerRotation * baseToMarkerTranslation * glm::inverse(markerToRelativeRotation * markerToRelativeTranslation)
-
-						//markerToRelativeTranslation * markerToRelativeRotation* glm::inverse(baseToMarkerTranslation * baseToMarkerRotation) 
-						//markerToRelativeTranslation * markerToRelativeRotation* glm::inverse(baseToMarkerRotation * baseToMarkerTranslation) 
-						//markerToRelativeRotation * markerToRelativeTranslation* glm::inverse(baseToMarkerTranslation * baseToMarkerRotation) 
-						//markerToRelativeRotation * markerToRelativeTranslation* glm::inverse(baseToMarkerRotation * baseToMarkerTranslation) 
-
-						//glm::inverse(baseToMarkerTranslation * baseToMarkerRotation) * markerToRelativeTranslation * markerToRelativeRotation
-						//glm::inverse(baseToMarkerRotation * baseToMarkerTranslation) * markerToRelativeTranslation * markerToRelativeRotation
-						//glm::inverse(baseToMarkerTranslation * baseToMarkerRotation) * markerToRelativeRotation * markerToRelativeTranslation
-						//glm::inverse(baseToMarkerRotation * baseToMarkerTranslation) * markerToRelativeRotation * markerToRelativeTranslation
-					);
-
-					relativeTransformations[i] = relativeTransformation;
-				}
-			}
-			programState.allPipelinesEnteredLooped = pipelinesEnteredLoop == pipelines.size();
 
 			//if (programState.allMarkersDetected) 
 			{
@@ -415,13 +349,13 @@ int main(int argc, char* argv[]) try {
 					pipelines[i]->renderDepth(x, y, aspect, width, height);
 				}
 			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, relativeTransformations[i], renderCoordinateSystem);
+					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
 					if (renderVoxelgrid) {
 						voxelgrid->renderGrid(model, view, projection);
 					}
 				}
 			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, relativeTransformations[i], renderCoordinateSystem);
+					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
 				}
 		}
 		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
