@@ -22,7 +22,7 @@ namespace vc::capture {
 	public:
 		rs2::config cfg;
 		std::shared_ptr < vc::rendering::Rendering> rendering;
-		std::shared_ptr < vc::processing::Processing> processing;
+		std::shared_ptr < vc::processing::ChArUco> chArUco;
 		std::shared_ptr < vc::data::Data> data;
 		std::shared_ptr < vc::data::Camera> rgb_camera;
 		std::shared_ptr < vc::data::Camera> depth_camera;
@@ -35,7 +35,6 @@ namespace vc::capture {
 		std::shared_ptr < std::atomic_bool> calibrateCameras;
 
 		std::shared_ptr < std::thread> thread;
-
 
 		void startPipeline() {
 			this->pipeline->start(this->cfg);
@@ -119,7 +118,7 @@ namespace vc::capture {
 		CaptureDevice(CaptureDevice& other) {
 			this->rendering = other.rendering;
 			this->data = other.data;
-			this->processing = other.processing;
+			this->chArUco = other.chArUco;
 			this->pipeline = other.pipeline;
 			this->cfg = other.cfg;
 			this->rgb_camera = other.rgb_camera;
@@ -135,7 +134,7 @@ namespace vc::capture {
 		CaptureDevice(rs2::context context) {
 			this->rendering = std::make_shared<vc::rendering::Rendering>();
 			this->data = std::make_shared<vc::data::Data>();
-			this->processing = std::make_shared<vc::processing::Processing>();
+			this->chArUco = std::make_shared<vc::processing::ChArUco>();
 			this->pipeline = std::make_shared<rs2::pipeline>(context);
 			this->isPipelineRunning = std::make_shared<std::atomic_bool>(false);
 			this->isThreadRunning = std::make_shared<std::atomic_bool>(false);
@@ -153,7 +152,7 @@ namespace vc::capture {
 
 		void captureThreadFunction() {
 			rs2::align alignToColor(RS2_STREAM_COLOR);
-			processing->startCharucoProcessing(*rgb_camera);
+			chArUco->startCharucoProcessing(*rgb_camera);
 
 			while (isThreadRunning->load() && isPipelineRunning->load()) //While application is running
 			{
@@ -177,9 +176,9 @@ namespace vc::capture {
 
 					if (calibrateCameras->load()) {
 						// Send color frame for processing
-						processing->charucoProcessingBlocks->invoke(colorFrame);
+						chArUco->charucoProcessingBlocks->invoke(colorFrame);
 						// Wait for results
-						colorFrame = processing->charucoProcessingQueues.wait_for_frame();
+						colorFrame = chArUco->charucoProcessingQueues.wait_for_frame();
 					}
 
 					data->filteredColorFrames = colorFrame;

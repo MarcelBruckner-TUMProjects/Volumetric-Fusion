@@ -116,9 +116,11 @@ std::atomic_bool calibrateCameras = false;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
+vc::optimization::BAProblem* bundleAdjustment;
+
 int main(int argc, char* argv[]) try {
 	
-	vc::optimization::testFunc();
+	//vc::optimization::testFunc();
 
 	vc::settings::FolderSettings folderSettings;
 	folderSettings.recordingsFolder = "recordings/allCameras/";
@@ -229,11 +231,8 @@ int main(int argc, char* argv[]) try {
 	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
 
 	// Calculated relative transformations between cameras per frame
-	std::map<int, glm::mat4> relativeTransformations = {
-		{0, glm::mat4(1.0f)},
-		{1, glm::mat4(1.0f)},
-		{2, glm::mat4(1.0f)},
-		{3, glm::mat4(1.0f)},
+	std::vector<glm::mat4> relativeTransformations = {
+		glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f), glm::mat4(1.0f)
 	};
 
 	std::thread calibrationThread;
@@ -247,7 +246,7 @@ int main(int argc, char* argv[]) try {
 	} programState;
 
 	for (int i = 0; i < pipelines.size(); i++) {
-		pipelines[i]->processing->visualize = visualizeCharucoResults;
+		pipelines[i]->chArUco->visualize = visualizeCharucoResults;
 	}
 
 #pragma region Camera Calibration Thread
@@ -263,18 +262,18 @@ int main(int argc, char* argv[]) try {
 			int pipelinesEnteredLoop = 0;
 			for (int i = 0; i < pipelines.size(); i++) {
 				{
-					if (!pipelines[i]->processing->hasMarkersDetected/* || relativeTransformations.count(i) != 0*/) {
+					if (!pipelines[i]->chArUco->hasMarkersDetected/* || relativeTransformations.count(i) != 0*/) {
 						continue;
 					}
 					markersDetected++;
 
-					programState.highestFrameIds[i] = MAX(pipelines[i]->processing->frameId, programState.highestFrameIds[i]);
-					if (programState.highestFrameIds[i] > pipelines[i]->processing->frameId) {
+					programState.highestFrameIds[i] = MAX(pipelines[i]->chArUco->frameId, programState.highestFrameIds[i]);
+					if (programState.highestFrameIds[i] > pipelines[i]->chArUco->frameId) {
 						pipelinesEnteredLoop++;
 					}
 
-					glm::mat4 baseToMarkerTranslation = pipelines[0]->processing->translation;
-					glm::mat4 baseToMarkerRotation = pipelines[0]->processing->rotation;
+					glm::mat4 baseToMarkerTranslation = pipelines[0]->chArUco->translation;
+					glm::mat4 baseToMarkerRotation = pipelines[0]->chArUco->rotation;
 
 					if (i == 0) {
 						//relativeTransformations[i] = glm::inverse(baseToMarkerTranslation);
@@ -282,8 +281,8 @@ int main(int argc, char* argv[]) try {
 						continue;
 					}
 
-					glm::mat4 markerToRelativeTranslation = pipelines[i]->processing->translation;
-					glm::mat4 markerToRelativeRotation = pipelines[i]->processing->rotation;
+					glm::mat4 markerToRelativeTranslation = pipelines[i]->chArUco->translation;
+					glm::mat4 markerToRelativeRotation = pipelines[i]->chArUco->rotation;
 
 					glm::mat4 relativeTransformation = (
 						//glm::mat4(1.0f)
@@ -330,6 +329,8 @@ int main(int argc, char* argv[]) try {
 				setCalibration(false);
 				// start fusion thread logic
 				fuseFrames.store(true);
+
+				//bundleAdjustment = new vc::optimization::BAProblem(pipelines);
 			}
 		}
 	});
@@ -557,7 +558,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		case GLFW_KEY_V: {
 			visualizeCharucoResults = !visualizeCharucoResults;
 			for (auto pipe : pipelines) {
-				pipe->processing->visualize = visualizeCharucoResults;
+				pipe->chArUco->visualize = visualizeCharucoResults;
 			}
 			break;
 		}

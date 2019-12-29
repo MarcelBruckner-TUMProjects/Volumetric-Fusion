@@ -3,8 +3,8 @@ layout (location = 0) in vec2 aPos;
 
 out vec2 texCoord;
 
+uniform vec2 depth_resolution;
 uniform float depth_scale;
-uniform float aspect;
 uniform usampler2D depth_frame;
 uniform mat3 cam2World;
 
@@ -16,15 +16,10 @@ uniform mat4 projection;
 
 void main()
 {
-    float z = texture(depth_frame, aPos).x * depth_scale;
+    vec2 uv = aPos / depth_resolution;
+    float z = texture(depth_frame, uv).x * depth_scale;
     
-    vec3 pos = vec3(aPos - 0.5f, 1.0f); 
-
-    if(aspect > 1.0f) {
-        pos.y /= aspect;
-    } else {
-        pos.x *= aspect;
-    }
+    vec3 pos = vec3(aPos * 2.0f, 1.0f) * cam2World; 
     
     pos *= z;
     
@@ -35,6 +30,6 @@ void main()
     if(z == 0){
         texCoord = vec2(-1.0f, -1.0f);
     }else{
-        texCoord = aPos;
+        texCoord = uv;
     }
 }

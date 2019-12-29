@@ -40,7 +40,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 namespace vc::processing {
-	class Processing;
+	class ChArUco;
 }
 
 namespace vc::data {
@@ -56,10 +56,10 @@ namespace vc::data {
 
 		float depthScale;
 
-		// TODO maybe more mvvc
 		Camera(rs2_intrinsics intrinsics, float depthScale = 0.0f) {
 			this->depthScale = depthScale;
 			this->intrinsics = intrinsics;
+		
 			K = cv::Matx33f(
 				intrinsics.fx, 0, intrinsics.ppx,
 				0, intrinsics.fy, intrinsics.ppy,
@@ -97,7 +97,7 @@ namespace vc::data {
 		rs2::frame colorizedDepthFrames;
 		rs2::points points;
 		
-		vc::processing::Processing* processing;
+		vc::processing::ChArUco* processing;
 
 		Data() {}
 

@@ -197,7 +197,7 @@ namespace vc::rendering {
                 {
                     for (int x = 0; x < width; x++)
                     {
-                        vertices[y * width + x] = glm::vec2(1.0f * x / depth_width, 1.0f * y / depth_height);
+                        vertices[y * width + x] = glm::vec2(x, y);
                     }
                 }
                 glBindVertexArray(VAOs[1]);
@@ -211,9 +211,9 @@ namespace vc::rendering {
 
             //POINTCLOUD_new_shader->set
 
-            POINTCLOUD_new_shader->setMat3("cam2world", depth_camera->cam2world);
+            POINTCLOUD_new_shader->setMat3("cam2World", depth_camera->cam2world);
             POINTCLOUD_new_shader->setFloat("depth_scale", depth_camera->depthScale);
-            POINTCLOUD_new_shader->setFloat("aspect", (1.0f * width) / height);
+            POINTCLOUD_new_shader->setVec2("depth_resolution", depth_width, depth_height);
 
             POINTCLOUD_new_shader->setMat4("relativeTransformation", relativeTransformation);
             POINTCLOUD_new_shader->setMat4("correction", COORDINATE_CORRECTION);
