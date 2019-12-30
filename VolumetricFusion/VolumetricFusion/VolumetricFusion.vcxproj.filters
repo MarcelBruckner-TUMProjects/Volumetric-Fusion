@@ -4,6 +4,9 @@
     <ClCompile Include="glad\src\glad.c" />
     <ClCompile Include="MultiFileStream.cpp" />
     <ClCompile Include="std_image.cpp" />
+    <ClCompile Include="ReprojectionError.hpp">
+      <Filter>OptimizationMethods</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.hpp" />
@@ -23,6 +26,9 @@
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Voxelgrid.hpp" />
     <ClInclude Include="Optimization.hpp" />
+    <ClInclude Include="PointCorrespondenceError.hpp">
+      <Filter>OptimizationMethods</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -71,6 +77,9 @@
   <ItemGroup>
     <Filter Include="Shader">
       <UniqueIdentifier>{0756d57a-0053-4b05-9f92-a9a0ee2a40e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="OptimizationMethods">
+      <UniqueIdentifier>{4fca5f87-8acd-40b3-9188-9f595e9eca06}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

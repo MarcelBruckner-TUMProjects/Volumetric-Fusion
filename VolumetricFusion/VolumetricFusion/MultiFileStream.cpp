@@ -91,8 +91,8 @@ std::vector<int> CALIBRATION_COLOR_STREAM = { 1920, 1080 };
 std::vector<int> CALIBRATION_DEPTH_STREAM = { 1280, 720 };
 
 // camera
-//Camera camera(glm::vec3(0.0f, 0.0f, -3.0f));
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.f);
+Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
+//Camera camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.f);
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -258,8 +258,7 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
-			bundleAdjustment.optimize(pipelines);
-			if (!bundleAdjustment.hasSolution) {
+			if (!bundleAdjustment.optimize(pipelines) || !bundleAdjustment.hasSolution) {
 				continue;
 			}
 
