@@ -88,7 +88,7 @@ namespace vc::optimization {
                 for (int j = 0; j < num_translation_parameters; j++)
                 {
                     translations[i * num_translation_parameters + j] = (double)pipelines[i]->chArUco->translation[j];
-                    std::cout << translations[i * num_translation_parameters + j] << std::endl;
+                    //std::cout << translations[i * num_translation_parameters + j] << std::endl;
                 }
                 for (int j = 0; j < num_rotation_parameters; j++)
                 {
@@ -111,6 +111,10 @@ namespace vc::optimization {
         }
 
         bool optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines, bool reprojectionError = false) {
+          /*  hasSolution = true;
+            return true;*/
+            
+            
             hasSolution = false;
             if (!init(pipelines)) {
                 return false;
@@ -120,7 +124,7 @@ namespace vc::optimization {
                 solveReprojectionError(pipelines);
             }
             else {
-                if (!solve3DCorrespondenceError(pipelines)) {
+                if (!solvePointCorrespondenceError(pipelines)) {
                     return false;
                 }
             }
@@ -190,15 +194,16 @@ namespace vc::optimization {
 
         void solveProblem(ceres::Problem* problem) {
             ceres::Solver::Options options;
-            options.linear_solver_type = ceres::DENSE_SCHUR;
+            options.num_threads = 8;
+            options.linear_solver_type = ceres::DENSE_QR;
             options.minimizer_progress_to_stdout = true;
-            options.max_num_iterations = 500;
+            options.max_num_iterations = 5;
             ceres::Solver::Summary summary;
             ceres::Solve(options, problem, &summary);
             std::cout << summary.FullReport() << "\n";
         }
 
-        bool solve3DCorrespondenceError(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+        bool solvePointCorrespondenceError(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
 
             // Create residuals for each observation in the bundle adjustment problem. The
             // parameters for cameras and points are added automatically.
@@ -206,7 +211,7 @@ namespace vc::optimization {
 
             glm::mat4 baseToMarkerTranslation = getTranslationMatrix(0);
             glm::mat4 baseToMarkerRotation = getRotationMatrix(0);
-            //glm::mat4 inverseBaseTransformation = glm::inverse(baseToMarkerTranslation * glm::inverse(baseToMarkerRotation));
+            //glm::mat4 baseToMarkerRotation = glm::mat4(1.0f);
             glm::mat4 baseTransformation = baseToMarkerTranslation * glm::inverse(baseToMarkerRotation);
             //glm::mat4 baseTransformation = baseToMarkerTranslation * glm::mat4(1.0f);
             glm::f32* baseTrans = glm::value_ptr(baseTransformation);
@@ -218,22 +223,53 @@ namespace vc::optimization {
             for (int i = 0; i < pipelines.size(); i++) {
                 auto pipe = pipelines[i];
 
-                //glm::mat4 relativeToMarkerRotation = getRotationMatrix(i);
+                glm::mat4 markerToRelativeRotation = getRotationMatrix(i);
+                glm::mat4 markerToRelativeTranslation = getTranslationMatrix(i);
 
                 if (!setPipelineStuff(pipe)) {
                     return false;
                 }
-                for (auto id : pipelines[i]->chArUco->ids) {
-                    for (int j = 0; j < pipelines[i]->chArUco->markerCorners[id].size(); j++) {
-                        glm::vec4 point = pixel2Point(pipelines[i]->chArUco->markerCorners[id][j]);
+
+                std::vector<int> ids = pipelines[i]->chArUco->ids;
+                std::vector<std::vector<cv::Point2f>> markerCorners = pipelines[i]->chArUco->markerCorners;
+
+                std::vector<cv::Point2f> charucoCorners = pipelines[i]->chArUco->charucoCorners;
+                std::vector<int> charucoIds = pipelines[i]->chArUco->charucoIds;
+
+                for (auto markerId : ids) {
+                    for (int cornerId = 0; cornerId < markerCorners[markerId].size(); cornerId++) {
+                        glm::vec4 point = pixel2Point(markerCorners[markerId][cornerId]);
 
                         if (i == 0) {
                             //baseMarkerCorners[id].emplace_back(inverseBaseTransformation * point);
-                            baseMarkerCorners[id].emplace_back(point);
+                            baseMarkerCorners[markerId].emplace_back(point);
                         }
                         else {
+
+                            // ********************** Debugging stuff *******************************
+                            // Tryed to see if the correspondence matching is correct 
+
+                            //for (auto test_id : ids) {
+                            //    for (int test_j = 0; test_j < markerCorners[test_id].size(); test_j++) {
+                            //        glm::vec4 expected = baseMarkerCorners[test_id][test_j];
+                            //        glm::vec4 p_base = baseTransformation * (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) * point; //######################################################################
+
+                            //        glm::vec4 distance = p_base - expected;
+
+                            //        if (test_id == id && test_j == j) {
+                            //            std::cout << "--> ";
+                            //        }
+                            //        std::cout << distance.x << ", " << distance.y << ", " << distance.z << std::endl;
+                            //    }
+                            //}
+
+                            //std::cout << "*************************************************************************" << std::endl;
+
+                            // TODO:
+                            // Not sure if the correspondence matching is correct, so if the ids from charuco markers
+                            // are correctly taken and matched with the charuco markers in the other camera frame
                             ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
-                                point, baseMarkerCorners[id][j], baseTrans
+                                markerId, cornerId, point, baseMarkerCorners[markerId][cornerId], baseTrans
                             );
                             problem.AddResidualBlock(cost_function, NULL,
                                 &translations[i * num_translation_parameters],
@@ -242,17 +278,17 @@ namespace vc::optimization {
                         }
                     }
                 }
-
-                for (auto id : pipelines[i]->chArUco->charucoIds) {
-                    glm::vec4 point = pixel2Point(pipelines[i]->chArUco->charucoCorners[id]);
+                
+                for (auto cornerId : charucoIds) {
+                    glm::vec4 point = pixel2Point(charucoCorners[cornerId]);
 
                     if (i == 0) {
                         //baseCharucoCorners[id] = inverseBaseTransformation * point;
-                        baseCharucoCorners[id] = point;
+                        baseCharucoCorners[cornerId] = point;
                     }
                     else {
                         ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
-                            point, baseCharucoCorners[id], baseTrans
+                            cornerId, -1, point, baseCharucoCorners[cornerId], baseTrans
                         );
                         problem.AddResidualBlock(cost_function, NULL,
                             &translations[i * num_translation_parameters],
