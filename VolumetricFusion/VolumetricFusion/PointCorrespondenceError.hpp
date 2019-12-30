@@ -29,7 +29,13 @@ namespace vc::optimization {
             //const T* intrinsics, const T* const distortion, 
             T* residuals) const {
 
-            // Column major
+            T m2rR[3];
+
+            for (int i = 0; i < 3; i++) {
+                m2rR[i] = markerToRelativeRotation[i];
+            }
+
+            // Row major
             T rot[9];
             ceres::AngleAxisToRotationMatrix(markerToRelativeRotation, rot);
 
@@ -50,7 +56,7 @@ namespace vc::optimization {
             T p_rot[3];
             for (int i = 0; i < 3; i++) {
                 //p_rot[i] = p[i];// rot[i] * p[0] + rot[i + 3] * p[1] + rot[i + 6] * p[2];
-                p_rot[i] = rot[i] * p[0] + rot[i + 3] * p[1] + rot[i + 6] * p[2];
+                p_rot[i] = rot[i * 3 + 0] * p[0] + rot[i * 3 + 1] * p[1] + rot[i * 3 + 2] * p[2];
             }
 
             T base[16];

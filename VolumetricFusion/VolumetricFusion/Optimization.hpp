@@ -92,7 +92,7 @@ namespace vc::optimization {
                 }
                 for (int j = 0; j < num_rotation_parameters; j++)
                 {
-                    rotations[i * num_rotation_parameters + j] = 0;// (double)pipelines[i]->chArUco->rotation[j];
+                    rotations[i * num_rotation_parameters + j] = (double)pipelines[i]->chArUco->rotation[j];
                 }
                 intrinsics[i * num_intrinsic_parameters + 0] = (double)pipelines[i]->depth_camera->intrinsics.fx;
                 intrinsics[i * num_intrinsic_parameters + 1] = (double)pipelines[i]->depth_camera->intrinsics.fy;
@@ -207,8 +207,8 @@ namespace vc::optimization {
             glm::mat4 baseToMarkerTranslation = getTranslationMatrix(0);
             glm::mat4 baseToMarkerRotation = getRotationMatrix(0);
             //glm::mat4 inverseBaseTransformation = glm::inverse(baseToMarkerTranslation * glm::inverse(baseToMarkerRotation));
-            //glm::mat4 baseTransformation = baseToMarkerTranslation * glm::inverse(baseToMarkerRotation);
-            glm::mat4 baseTransformation = baseToMarkerTranslation * glm::mat4(1.0f);
+            glm::mat4 baseTransformation = baseToMarkerTranslation * glm::inverse(baseToMarkerRotation);
+            //glm::mat4 baseTransformation = baseToMarkerTranslation * glm::mat4(1.0f);
             glm::f32* baseTrans = glm::value_ptr(baseTransformation);
 
             std::map<int, std::vector<glm::vec4>> baseMarkerCorners;
@@ -217,6 +217,8 @@ namespace vc::optimization {
             int o = 0;
             for (int i = 0; i < pipelines.size(); i++) {
                 auto pipe = pipelines[i];
+
+                //glm::mat4 relativeToMarkerRotation = getRotationMatrix(i);
 
                 if (!setPipelineStuff(pipe)) {
                     return false;
@@ -320,8 +322,8 @@ namespace vc::optimization {
 
         void calculateRelativeTransformations(int num_pipelines) {
             glm::mat4 baseToMarkerTranslation = getTranslationMatrix(0);
-            //glm::mat4 baseToMarkerRotation = getRotationMatrix(0);
-            glm::mat4 baseToMarkerRotation = glm::mat4(1.0f);
+            glm::mat4 baseToMarkerRotation = getRotationMatrix(0);
+            //glm::mat4 baseToMarkerRotation = glm::mat4(1.0f);
             glm::mat4 baseTransformation = baseToMarkerTranslation * glm::inverse(baseToMarkerRotation);
 
             //glm::mat4 baseTransformation = ((baseToMarkerRotation) * (baseToMarkerTranslation));
@@ -337,8 +339,8 @@ namespace vc::optimization {
                 }
 
                 glm::mat4 markerToRelativeTranslation = getTranslationMatrix(i);
-                //glm::mat4 markerToRelativeRotation = getRotationMatrix(i);
-                glm::mat4 markerToRelativeRotation = glm::mat4(1.0f);
+                glm::mat4 markerToRelativeRotation = getRotationMatrix(i);
+                //glm::mat4 markerToRelativeRotation = glm::mat4(1.0f);
 
                 glm::mat4 relativeTransformation = (
                     //glm::mat4(1.0f)
