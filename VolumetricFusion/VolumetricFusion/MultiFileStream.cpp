@@ -1,3 +1,9 @@
+#define _ENABLE_EXTENDED_ALIGNED_STORAGE
+
+//#define GLOG_NO_ABBREVIATED_SEVERITIES
+#define _CRT_NONSTDC_NO_DEPRECATE
+#define _SILENCE_CXX17_NEGATORS_DEPRECATION_WARNING
+
 #pragma region Includes
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
@@ -24,8 +30,8 @@
 #include <filesystem>
 
 
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
+//#include "imgui.h"
+//#include "imgui_impl_glfw.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -210,6 +216,9 @@ int main(int argc, char* argv[]) try {
 		}
 	}
 	else if (state.captureState == CaptureState::PLAYING) {
+
+		//std::cout << folderSettings.recordingsFolder << std::endl;
+
 		std::vector<std::string> filenames = vc::file_access::listFilesInFolder(folderSettings.recordingsFolder);
 
 		for (int i = 0; i < filenames.size() && i < 4; i++)
