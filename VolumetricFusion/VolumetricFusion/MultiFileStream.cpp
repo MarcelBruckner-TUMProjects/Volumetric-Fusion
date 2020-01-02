@@ -54,6 +54,8 @@ using namespace vc::enums;
 #include "camera.hpp"
 #include "shader.hpp"
 #include <VolumetricFusion\Voxelgrid.hpp>
+#include <VolumetricFusion\Mesh.h>
+#include <VolumetricFusion\happly.h>
 //#include <io.h>
 
 #pragma endregion
@@ -413,8 +415,38 @@ int main(int argc, char* argv[]) try {
 			voxelgrid->renderField(model, view, projection);
 			if (renderVoxelgrid) {
 				voxelgrid->renderGrid(model, view, projection);
+				std::cout << "Here!" << std::endl;
 			}
 		}
+		if (state.renderState == RenderState::MESH) {
+			happly::PLYData plyIn("bunny.PLY");
+
+			// Get mesh-style data from the object
+			std::vector<std::array<double, 3>> vPos = plyIn.getVertexPositions();
+			std::vector<std::vector<size_t>> fInd = plyIn.getFaceIndices<size_t>();
+
+			std::vector<Vertex> vertices;
+			std::vector<unsigned int> indices;
+
+			for (int i = 0; i < vPos.size(); i++) {
+				Vertex vert;
+				vert.Position.x = vPos[i][0];
+				vert.Position.y = vPos[i][1];
+				vert.Position.z = vPos[i][2];
+
+				vertices.push_back(vert);
+			}
+
+			for (int i = 0; i < fInd.size(); i++) {
+				for (int j = 0; j < fInd[i].size(); j++) {
+					indices.push_back(fInd[i][j]);
+				}
+			}
+
+			Mesh mesh(vertices, indices);
+			mesh.renderMesh(model, view, projection);
+		}
+
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
 		glfwSwapBuffers(window);
@@ -529,6 +561,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_5: {
 			state.renderState = RenderState::VOXELGRID;
+			break;
+		}
+		case GLFW_KEY_6: {
+			state.renderState = RenderState::MESH;
 			break;
 		}
 		case GLFW_KEY_V: {

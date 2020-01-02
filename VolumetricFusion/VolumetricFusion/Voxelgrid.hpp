@@ -66,6 +66,8 @@ namespace vc::fusion {
 
 		std::map<int, std::vector<int>> integratedFramesPerPipeline;
 
+		std::ofstream outfile;
+
 	public:
 		Voxelgrid(const float resolution = 0.1, const glm::vec3 size = glm::vec3(5.0f), const glm::vec3 origin = glm::vec3(0.0f)) {
 			this->resolution = resolution;
@@ -97,6 +99,8 @@ namespace vc::fusion {
 			reset();
 
 			initializeOpenGL();
+
+			outfile.open("scene.xyz", std::ios_base::app); // append instead of overwrite
 		}
 
 		void initializeOpenGL() {
@@ -284,7 +288,9 @@ namespace vc::fusion {
 				totalMin[2] = MIN(totalMin[2], transformedVertex.z);
 				totalMax[2] = MAX(totalMax[2], transformedVertex.z);
 
-				//std::cout << "(" << transformedVertex.x << "," << transformedVertex.y << "," << transformedVertex.z << ")" << std::endl;
+				// std::cout << "(" << transformedVertex.x << "," << transformedVertex.y << "," << transformedVertex.z << ")" << std::endl;
+
+				outfile << transformedVertex.x << " " << transformedVertex.y << " " << transformedVertex.z << "\n";				
 			}
 
 			integratedFrames++;

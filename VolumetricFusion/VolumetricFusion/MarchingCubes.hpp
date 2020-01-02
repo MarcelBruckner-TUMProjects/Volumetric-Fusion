@@ -425,118 +425,6 @@ namespace vc::fusion {
 		return model;
 	}
 
-	void drawUnitaryBox() {
-		glPushMatrix();
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
-
-		glTranslatef(0.5, 0.5, 0.5);
-		glColor3f(0.0, 0.0, 1.0);
-
-		//glutWireCube(1.0);
-		glPopMatrix();
-	}
-
-	void perspectiveGL(GLdouble fovY, GLdouble aspect, GLdouble zNear, GLdouble zFar)
-	{
-		const GLdouble pi = 3.1415926535897932384626433832795;
-		GLdouble fW, fH;
-
-		//fH = tan( (fovY / 2) / 180 * pi ) * zNear;
-		fH = tan(fovY / 360 * pi) * zNear;
-		fW = fH * aspect;
-
-		glFrustum(-fW, fW, -fH, fH, zNear, zFar);
-	}
-
-	void setupCamera() {
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		perspectiveGL(10.0f, ratio, 0.1, 10.0);
-		//gluLookAt(2.5, 2, 8, 0.45, 0.45, 0.4, 0, 1, 0);
-	}
-
-	void draw() {
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		drawUnitaryBox();
-
-		glColor3f(1.0, 1.0, 1.0);
-		if (pointCloudVisualization) {
-			glPushMatrix();
-			glMatrixMode(GL_MODELVIEW);
-			glLoadIdentity();
-
-			glEnableClientState(GL_VERTEX_ARRAY);
-			glVertexPointer(3, GL_DOUBLE, 0, model->vertexArray);
-			glDrawArrays(GL_POINTS, 0, model->listSize);
-			glDisableClientState(GL_VERTEX_ARRAY);
-
-			glPopMatrix();
-		}
-		else {
-			printf("MCM: %d faces e %d vértices.\n", mcm->facesCount / 3, mcm->vertexCount / 3);
-
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-			glEnable(GL_POLYGON_OFFSET_FILL);
-			glPolygonOffset(1, 1);
-
-			glPushMatrix();
-			glMatrixMode(GL_MODELVIEW);
-			glLoadIdentity();
-
-			glEnableClientState(GL_VERTEX_ARRAY);
-			glVertexPointer(3, GL_DOUBLE, 0, mcm->vertexArray);
-			glDrawElements(GL_TRIANGLES, mcm->facesCount, GL_UNSIGNED_INT, mcm->faces);
-			glDisableClientState(GL_VERTEX_ARRAY);
-			glPopMatrix();
-
-			glDisable(GL_POLYGON_OFFSET_FILL);
-			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-			glColor3f(0.3, 0.3, 0.3);
-			glPushMatrix();
-			glMatrixMode(GL_MODELVIEW);
-			glLoadIdentity();
-
-			glEnableClientState(GL_VERTEX_ARRAY);
-			glVertexPointer(3, GL_DOUBLE, 0, mcm->vertexArray);
-			glDrawElements(GL_TRIANGLES, mcm->facesCount, GL_UNSIGNED_INT, mcm->faces);
-			glDisableClientState(GL_VERTEX_ARRAY);
-			glPopMatrix();
-		}
-		//glutSwapBuffers();
-	}
-
-	void reshape(int w, int h) {
-		ratio = (float)w / h;
-		glViewport(0, 0, (GLsizei)w, (GLsizei)h);
-
-		setupCamera();
-
-		//glutPostRedisplay();
-	}
-
-	void initScene() {
-		glMatrixMode(GL_MODELVIEW);
-		glClearColor(0.0, 0.0, 0.0, 0.0);
-		glOrtho(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
-
-		glEnable(GL_DEPTH_TEST);
-	}
-
-	void keyboard(unsigned char key, int x, int y) {
-		if (key == 'm' || key == 'M') {
-			pointCloudVisualization = !pointCloudVisualization;
-			//glutPostRedisplay();
-		}
-		else if (key == 's' || key == 'S') {
-			printf("Salvando malha em output.PLY\n");
-			generatePLY(mcm, "output.PLY");
-			printf("A malha foi salva em output.PLY\n");
-		}
-	}
-
 	void freeMemory() {
 		freeMCM(&mcm);
 		freeXYZ(&model);
@@ -546,42 +434,12 @@ namespace vc::fusion {
 	void marchingCubes(vc::fusion::Voxelgrid* voxelgrid) {
 
 		atexit(freeMemory);
-		//glutInit(&argc, argv);
-		//glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB | GLUT_DEPTH);
-
-		// glutInitWindowPosition((glutGet(GLUT_SCREEN_WIDTH) - RES_W) / 2, (glutGet(GLUT_SCREEN_HEIGHT) - RES_H) / 2);
-		//glutInitWindowPosition(0, 0);
-		//glutInitWindowSize(RES_W, RES_W);
-
-		glfwInit();
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-		GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
-		if (window == NULL)
-		{
-			std::cout << "Failed to create GLFW window" << std::endl;
-			glfwTerminate();
-			//return -1;
-		}
-		glfwMakeContextCurrent(window);
-		glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-		//glutCreateWindow("CG - Marching Cubes!");
-		//glutKeyboardFunc(keyboard);
-		//glutDisplayFunc(draw);
-		//glutReshapeFunc(reshape);
-
-		initScene();
-		initHash(&hash);
-
 		int cubeSize = 0.02;
 
 		model = readXYZFile("bunny.xyz");
 		mcm = generateMeshFromXYZ(model, cubeSize, "lut.txt");
-
-		//glutMainLoop();
+		printf("Saving file output.PLY\n");
+		generatePLY(mcm, "output.ply");
 	}
 }
 
