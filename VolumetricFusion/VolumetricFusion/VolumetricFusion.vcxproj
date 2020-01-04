@@ -23,6 +23,7 @@
     <ClCompile Include="MultiFileStream.cpp" />
     <ClCompile Include="ReprojectionError.hpp" />
     <ClCompile Include="std_image.cpp" />
+    <ClCompile Include="Structs.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -65,6 +66,7 @@
     <ClInclude Include="Settings.hpp" />
     <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="Tables.hpp" />
     <ClInclude Include="Utils.hpp" />
     <ClInclude Include="Voxelgrid.hpp" />
   </ItemGroup>

@@ -56,6 +56,7 @@ using namespace vc::enums;
 #include <VolumetricFusion\Voxelgrid.hpp>
 //#include <io.h>
 
+#include "MarchingCubes.hpp"
 #include "Optimization.hpp"
 #include "glog/logging.h"
 
@@ -122,6 +123,10 @@ vc::optimization::BAProblem bundleAdjustment = vc::optimization::BAProblem();
 
 int main(int argc, char* argv[]) try {
 	
+	//vc::fusion::testSingleCellMarchingCubes();
+	vc::fusion::testFourCellMarchingCubes();
+	return 0;
+
 	//vc::optimization::testFunc();
 
 	google::InitGoogleLogging("Bundle Adjustment");
@@ -326,9 +331,6 @@ int main(int argc, char* argv[]) try {
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
 		vc::rendering::startFrame(window);
 
-		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-			voxelgrid->renderGrid(model, view, projection);
-		}
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
 			int x = i % 2;
@@ -340,15 +342,19 @@ int main(int argc, char* argv[]) try {
 				pipelines[i]->renderDepth(x, y, aspect, width, height);
 			}
 			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
+				pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
 				if (renderVoxelgrid) {
 					voxelgrid->renderGrid(model, view, projection);
 				}
-				pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
 			}
 			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 				pipelines[i]->renderAllPointclouds(model, view, projection, width, height, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
 			}
 		}
+		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+			voxelgrid->renderGrid(model, view, projection);
+		}
+
 		/*if (state.renderState == RenderState::VOXELGRID) {
 			voxelgrid->renderField(model, view, projection);
 		}*/

@@ -8,7 +8,7 @@
 #include <VolumetricFusion\shader.hpp>
 #include <unordered_map>
 #include "Utils.hpp"
-
+#include "Structs.hpp"
 
 namespace vc::fusion {
 	const float cube_vertices[] = {
@@ -38,27 +38,12 @@ namespace vc::fusion {
 
 	class Voxelgrid {
 	private:
-		float resolution;
-		glm::vec3 size;
-		glm::vec3 sizeNormalized;
-		glm::vec3 sizeHalf;
-		glm::vec3 origin;
-
-		std::vector<float> points;
 		unsigned int VBOs[4], VAO;
 		vc::rendering::Shader* gridShader;
 
 		GLuint VBO_cubes[4], VAO_cubes, EBO;
 		vc::rendering::Shader* cubeShader;
-		
-		//const float voxel_size = 0.005f;
-		//const float trunc_margin = voxel_size * 5;
-	/*	float* voxel_grid_tsdf = nullptr;
-		float* voxel_grid_weight = nullptr;*/
 
-		float* tsdf;
-		float* weights;
-		float* isSet;
 		int integratedFrames = 0;
 
 		glm::vec3 totalMin = glm::vec3((float)INT_MAX);
@@ -66,10 +51,28 @@ namespace vc::fusion {
 
 		std::map<int, std::vector<int>> integratedFramesPerPipeline;
 
-		int num_gridPoints;
 
 	public:
-		Voxelgrid(const float resolution = 0.05f, const glm::vec3 size = glm::vec3(2.0f), const glm::vec3 origin = glm::vec3(0.0f, 0.0f, 1.0f)) 
+		float resolution;
+		glm::vec3 size;
+		glm::vec3 sizeNormalized;
+		glm::vec3 sizeHalf;
+		glm::vec3 origin;
+
+		float* tsdf;
+		float* weights;
+		float* isSet;
+
+		int num_gridPoints;
+
+		std::vector<float> points;
+
+		int hashFunc(int x, int y, int z) {
+			std::cout << z * sizeNormalized.y * sizeNormalized.x + y * sizeNormalized.x + x << std::endl;
+			return z * sizeNormalized.y * sizeNormalized.x + y * sizeNormalized.x + x;
+		}
+
+		Voxelgrid(const float resolution = 0.05f, const glm::vec3 size = glm::vec3(2.0f), const glm::vec3 origin = glm::vec3(0.0f, 0.0f, 1.0f), bool initializeShader = true)
 			: resolution(resolution), origin(origin), size(size), sizeHalf(size / 2.0f), sizeNormalized((size / resolution) + glm::vec3(1.0f)), num_gridPoints((sizeNormalized.x* sizeNormalized.y* sizeNormalized.z))
 		{
 			reset();
@@ -84,7 +87,7 @@ namespace vc::fusion {
 						std::stringstream ss;
 						glm::vec3 voxelPosition = getVoxelPosition(x, y, z);
 
-						int hash = z * sizeNormalized.y * sizeNormalized.x + y * sizeNormalized.x + x;
+						int hash = this->hashFunc(x, y, z);
 
 						//int hash = hashFunc(voxelPosition);
 						//std::cout << hash << std::endl;
@@ -135,8 +138,9 @@ namespace vc::fusion {
 			//	}
 			//}
 
-
-			initializeOpenGL();
+			if (initializeShader) {
+				initializeOpenGL();
+			}
 		}
 
 		void initializeOpenGL() {
@@ -150,8 +154,8 @@ namespace vc::fusion {
 			glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(float), points.data(), GL_STATIC_DRAW);
 
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-			glEnableVertexAttribArray(0);			
-			
+			glEnableVertexAttribArray(0);
+
 			//setTSDF();
 
 
@@ -214,7 +218,7 @@ namespace vc::fusion {
 			gridShader->setMat4("model", model);
 			gridShader->setMat4("view", view);
 			gridShader->setMat4("projection", projection);
-			
+
 			//for (int i = 0; i < num_gridPoints; i++) {
 			//	float value = tsdf[i];
 			//	std::cout << value << std::endl;
@@ -243,16 +247,6 @@ namespace vc::fusion {
 
 			glDrawArrays(GL_POINTS, 0, num_gridPoints);
 			glBindVertexArray(0);
-		}
-
-		int hashFunc(glm::vec3 v) {
-			glm::vec3 vv = v - origin;
-			vv += sizeHalf;
-			vv /= resolution;
-
-			double hash = std::round(vv.z * sizeNormalized.x * sizeNormalized.y + vv.y * sizeNormalized.x + vv.x);
-			//std::cout << vc::utils::toString(v) << ": " << hash << std::endl;
-			return (int)hash;
 		}
 
 		//void renderField(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
@@ -341,7 +335,7 @@ namespace vc::fusion {
 
 		void integrateFrameCPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, glm::mat4 relativeTransformation, const int pipelineId, const int frameId) {
 			std::cout << "Integrating " << pipelineId << " - Frame: " << frameId << std::endl;
-			
+
 			if (integratedFramesPerPipeline.count(pipelineId) <= 0) {
 				integratedFramesPerPipeline[pipelineId] = std::vector<int>();
 			}
@@ -381,7 +375,7 @@ namespace vc::fusion {
 						std::stringstream ss;
 						glm::vec3 voxelPosition = getVoxelPosition(x, y, z);
 
-						int hash = z * sizeNormalized.y * sizeNormalized.x + y * sizeNormalized.x + x;
+						int hash = this->hashFunc(x, y, z);
 
 						//int hash = hashFunc(voxelPosition);
 						//std::cout << hash << std::endl;
@@ -423,7 +417,7 @@ namespace vc::fusion {
 						float clamped_tsdf_value = std::clamp(tsdf_value, -1.0f, 1.0f);
 
 						ss << " (" << clamped_tsdf_value << ")";
-						
+
 						float old_tsdf = tsdf[hash];
 						int old_weight = weights[hash];
 						weights[hash] += 1;
@@ -436,7 +430,7 @@ namespace vc::fusion {
 			}
 			std::cout << i << std::endl;
 
- 			//for (int i = 0; i < num_gridPoints; i++) {
+			//for (int i = 0; i < num_gridPoints; i++) {
 				//glm::vec3 pt_base = hashFuncInv(i);
 				//std::cout << voxel.x << ", " << voxel.y << ", " << voxel.z << std::endl;
 
@@ -480,6 +474,115 @@ namespace vc::fusion {
 			integratedFrames++;
 
 			std::cout << std::endl;*/
+		}
+
+		vc::fusion::GridCell getGridCell(int x, int y, int z) {
+			vc::fusion::GridCell cell;
+
+			cell.p[0] = getVoxelPosition(x - 1, y - 1, z);
+			cell.p[1] = getVoxelPosition(x, y - 1, z);
+			cell.p[2] = getVoxelPosition(x, y - 1, z - 1);
+			cell.p[3] = getVoxelPosition(x - 1, y - 1, z - 1);
+
+			cell.p[4] = getVoxelPosition(x - 1, y, z);
+			cell.p[5] = getVoxelPosition(x, y, z);
+			cell.p[6] = getVoxelPosition(x, y, z - 1);
+			cell.p[7] = getVoxelPosition(x - 1, y, z - 1);
+
+			cell.val[0] = tsdf[hashFunc(x - 1, y - 1, z)];
+			cell.val[1] = tsdf[hashFunc(x, y - 1, z)];
+			cell.val[2] = tsdf[hashFunc(x, y - 1, z - 1)];
+			cell.val[3] = tsdf[hashFunc(x - 1, y - 1, z - 1)];
+
+			cell.val[4] = tsdf[hashFunc(x - 1, y, z)];
+			cell.val[5] = tsdf[hashFunc(x, y, z)];
+			cell.val[6] = tsdf[hashFunc(x, y, z - 1)];
+			cell.val[7] = tsdf[hashFunc(x - 1, y, z - 1)];
+
+			return cell;
+		}
+
+		glm::vec3* getVoxelCorners(int x, int y, int z) {
+			glm::vec3* voxelCorners = new glm::vec3[8];
+
+			for (int zz = 0; zz < 2; zz++)
+			{
+				for (int yy = 0; yy < 2; yy++)
+				{
+					for (int xx = 0; xx < 2; xx++)
+					{
+						voxelCorners[zz * 4 + yy * 2 + xx] = getVoxelPosition(x + xx, y + yy, z + zz);
+					}
+				}
+			}
+			return voxelCorners;
+		}
+
+		float* getTSDFValues(int x, int y, int z) {
+			float* tsdfs = new float[8];
+
+			for (int zz = 0; zz < 2; zz++)
+			{
+				for (int yy = 0; yy < 2; yy++)
+				{
+					for (int xx = 0; xx < 2; xx++)
+					{
+						tsdfs[zz * 4 + yy * 2 + xx] = tsdf[hashFunc(x + xx, y + yy, z + zz)];
+					}
+				}
+			}
+			return tsdfs;
+		}
+	};
+
+	class SingleCellMockVoxelGrid : public Voxelgrid {
+	public:
+		SingleCellMockVoxelGrid() : Voxelgrid(1.0f, glm::vec3(1.0f), glm::vec3(0.0f, 0.0f, 0.0f), false)
+		{
+			tsdf[0] = 1.0f;
+			tsdf[1] = 1.0f;
+			tsdf[2] = 1.0f;
+			tsdf[3] = -1.0f;
+			tsdf[4] = 1.0f;
+			tsdf[5] = 1.0f;
+			tsdf[6] = 1.0f;
+			tsdf[7] = 1.0f;
+		}
+	};
+
+	class FourCellMockVoxelGrid : public Voxelgrid {
+	public:
+		FourCellMockVoxelGrid() : Voxelgrid(1.0f, glm::vec3(2.0f), glm::vec3(0.0f, 0.0f, 0.0f), false)
+		{
+			tsdf[0] = 1.0f;
+			tsdf[1] = 1.0f;
+			tsdf[2] = 1.0f;
+			tsdf[3] = 1.0f;
+			tsdf[4] = -1.0f;
+			tsdf[5] = 1.0f;
+			tsdf[6] = 1.0f;
+			tsdf[7] = 1.0f;
+			tsdf[8] = 1.0f;
+
+			tsdf[0 + 9] = 1.0f;
+			tsdf[1 + 9] = -1.0f;
+			tsdf[2 + 9] = 1.0f;
+			tsdf[3 + 9] = -1.0f;
+			tsdf[4 + 9] = 1.0f;
+			tsdf[5 + 9] = -1.0f;
+			tsdf[6 + 9] = 1.0f;
+			tsdf[7 + 9] = -1.0f;
+			tsdf[8 + 9] = 1.0f;
+
+			tsdf[0 + 9 + 9] = 1.0f;
+			tsdf[1 + 9 + 9] = 1.0f;
+			tsdf[2 + 9 + 9] = 1.0f;
+			tsdf[3 + 9 + 9] = 1.0f;
+			tsdf[4 + 9 + 9] = -1.0f;
+			tsdf[5 + 9 + 9] = 1.0f;
+			tsdf[6 + 9 + 9] = 1.0f;
+			tsdf[7 + 9 + 9] = 1.0f;
+			tsdf[8 + 9 + 9] = 1.0f;
 		}
 	};
 }

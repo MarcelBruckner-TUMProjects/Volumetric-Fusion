@@ -7,6 +7,9 @@
     <ClCompile Include="ReprojectionError.hpp">
       <Filter>OptimizationMethods</Filter>
     </ClCompile>
+    <ClCompile Include="Structs.hpp">
+      <Filter>MarchingCubes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.hpp" />
@@ -18,7 +21,6 @@
     <ClInclude Include="glad\include\glad\glad.h" />
     <ClInclude Include="glad\include\KHR\khrplatform.h" />
     <ClInclude Include="ImGuiHelpers.hpp" />
-    <ClInclude Include="MarchingCubes.hpp" />
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />
@@ -30,11 +32,16 @@
       <Filter>OptimizationMethods</Filter>
     </ClInclude>
     <ClInclude Include="Utils.hpp" />
+    <ClInclude Include="Tables.hpp">
+      <Filter>MarchingCubes</Filter>
+    </ClInclude>
+    <ClInclude Include="MarchingCubes.hpp">
+      <Filter>MarchingCubes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="readme.md" />
-    <None Include="shader\compute_shader.comp" />
     <None Include="shader\texture.vs">
       <Filter>Shader</Filter>
     </None>
@@ -74,6 +81,9 @@
     <None Include="shader\voxelgrid.frag">
       <Filter>Shader</Filter>
     </None>
+    <None Include="shader\compute_shader.comp">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Shader">
@@ -81,6 +91,9 @@
     </Filter>
     <Filter Include="OptimizationMethods">
       <UniqueIdentifier>{4fca5f87-8acd-40b3-9188-9f595e9eca06}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MarchingCubes">
+      <UniqueIdentifier>{d3232733-ff98-4d43-8039-45e184cc344a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
