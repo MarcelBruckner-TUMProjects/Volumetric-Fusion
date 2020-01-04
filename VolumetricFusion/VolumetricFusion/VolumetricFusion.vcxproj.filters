@@ -29,6 +29,7 @@
     <ClInclude Include="PointCorrespondenceError.hpp">
       <Filter>OptimizationMethods</Filter>
     </ClInclude>
+    <ClInclude Include="Utils.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -52,12 +53,6 @@
     <None Include="shader\voxelgrid_cube.fs">
       <Filter>Shader</Filter>
     </None>
-    <None Include="shader\voxelgrid.vs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\voxelgrid.fs">
-      <Filter>Shader</Filter>
-    </None>
     <None Include="shader\pointcloud.vs">
       <Filter>Shader</Filter>
     </None>
@@ -71,6 +66,12 @@
       <Filter>Shader</Filter>
     </None>
     <None Include="shader\pointcloud.frag">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\voxelgrid.vert">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\voxelgrid.frag">
       <Filter>Shader</Filter>
     </None>
   </ItemGroup>

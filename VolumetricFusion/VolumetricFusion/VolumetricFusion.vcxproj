@@ -35,8 +35,8 @@
     <None Include="shader\pointcloud_new.vert" />
     <None Include="shader\texture.fs" />
     <None Include="shader\texture.vs" />
-    <None Include="shader\voxelgrid.fs" />
-    <None Include="shader\voxelgrid.vs" />
+    <None Include="shader\voxelgrid.frag" />
+    <None Include="shader\voxelgrid.vert" />
     <None Include="shader\voxelgrid_cube.fs" />
     <None Include="shader\voxelgrid_cube.vs" />
     <None Include="shader\voxelgrid_trippy.fs" />
@@ -65,6 +65,7 @@
     <ClInclude Include="Settings.hpp" />
     <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="Utils.hpp" />
     <ClInclude Include="Voxelgrid.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

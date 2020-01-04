@@ -219,6 +219,7 @@ namespace vc::rendering {
 
             glDrawArrays(GL_POINTS, 0, num_vertices);
             glBindVertexArray(0);
+            glDisable(GL_DEPTH_TEST);
         }
     
         //void renderPointcloud(const rs2::points points, const rs2::frame texture, glm::mat4 model, glm::mat4 view, glm::mat4 projection,

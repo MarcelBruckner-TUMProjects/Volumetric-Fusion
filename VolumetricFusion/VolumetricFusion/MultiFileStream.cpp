@@ -274,39 +274,27 @@ int main(int argc, char* argv[]) try {
 		}
 	});
 #pragma endregion
+	   
+#pragma region Fusion Thread
+	fusionThread = std::thread([&stopped, &programState]() {
+		const int maxIntegrations = 10;
+		int integrations = 0;
+		while (!stopped) {
+			if (calibrateCameras || !fuseFrames) {
+				continue;
+			}
+			
+			voxelgrid->integrateFramesCPU(pipelines, bundleAdjustment.relativeTransformations);
 
-
-
-//#pragma region Fusion Thread
-//	fusionThread = std::thread([&stopped, &programState, &relativeTransformations]() {
-//		const int maxIntegrations = 10;
-//		int integrations = 0;
-//		while (!stopped) {
-//			if (calibrateCameras || !fuseFrames) {
-//				continue;
-//			}
-//
-//			for (int i = 0; i < pipelines.size(); i++) {
-//				// Only integrate frames with a valid transformation
-//				if (relativeTransformations.count(i) <= 0 || !pipelines[i]->data->points) {
-//					continue;
-//				}
-//
-//				const rs2::vertex* vertices = pipelines[i]->data->points.get_vertices();
-//
-//				auto pip = pipelines[i]->processing;
-//				voxelgrid->integrateFrameCPU(pipelines[i], relativeTransformations[i], i, pip->frameId);
-//			}
-//
-//			integrations++;
-//			if (integrations >= maxIntegrations) {
-//				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
-//				fuseFrames.store(false);
-//				break;
-//			}
-//		}
-//		});
-//#pragma endregion
+			integrations++;
+			if (integrations >= maxIntegrations) {
+				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
+				fuseFrames.store(false);
+				break;
+			}
+		}
+		});
+#pragma endregion
 
 #pragma region Main loop
 
@@ -321,14 +309,14 @@ int main(int argc, char* argv[]) try {
 
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
-		
+
 		// Retina display (Mac OS) have double the pixel density
 		int w2, h2;
 		glfwGetFramebufferSize(window, &w2, &h2);
 		const bool isRetinaDisplay = w2 == width * 2 && h2 == width * 2;
 
 		const float aspect = 1.0f * width / height;
-		
+
 		// -------------------------------------------------------------------------------
 		processInput(window);
 
@@ -338,33 +326,32 @@ int main(int argc, char* argv[]) try {
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
 		vc::rendering::startFrame(window);
 
+		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+			voxelgrid->renderGrid(model, view, projection);
+		}
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
 			int x = i % 2;
 			int y = floor(i / 2);
-				if (state.renderState == RenderState::ONLY_COLOR) {
-					pipelines[i]->renderColor(x, y, aspect, width, height);
-				}
-				else if (state.renderState == RenderState::ONLY_DEPTH) {
-					pipelines[i]->renderDepth(x, y, aspect, width, height);
-				}
+			if (state.renderState == RenderState::ONLY_COLOR) {
+				pipelines[i]->renderColor(x, y, aspect, width, height);
+			}
+			else if (state.renderState == RenderState::ONLY_DEPTH) {
+				pipelines[i]->renderDepth(x, y, aspect, width, height);
+			}
 			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
-					if (renderVoxelgrid) {
-						voxelgrid->renderGrid(model, view, projection);
-					}
+				if (renderVoxelgrid) {
+					voxelgrid->renderGrid(model, view, projection);
 				}
+				pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
+			}
 			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
-				}
+				pipelines[i]->renderAllPointclouds(model, view, projection, width, height, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
+			}
 		}
-		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-			voxelgrid->renderGrid(model, view, projection);
-		}
-		if (state.renderState == RenderState::VOXELGRID) {
+		/*if (state.renderState == RenderState::VOXELGRID) {
 			voxelgrid->renderField(model, view, projection);
-			
-		}
+		}*/
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
 		glfwSwapBuffers(window);

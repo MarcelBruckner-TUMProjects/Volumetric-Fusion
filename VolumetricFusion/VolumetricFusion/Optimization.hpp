@@ -120,7 +120,7 @@ namespace vc::optimization {
                 return false;
             }
 
-            if (reprojectionError) {
+           /* if (reprojectionError) {
                 solveReprojectionError(pipelines);
             }
             else {
@@ -128,7 +128,7 @@ namespace vc::optimization {
                     return false;
                 }
             }
-            calculateRelativeTransformations(pipelines.size());
+            calculateRelativeTransformations(pipelines.size());*/
 
             return true;
         }
