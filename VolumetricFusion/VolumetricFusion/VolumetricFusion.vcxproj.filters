@@ -40,6 +40,12 @@
     <None Include="shader\voxelgrid_cube.vs" />
     <None Include="shader\voxelgrid_trippy.fs" />
     <None Include="shader\voxelgrid_trippy.vs" />
+    <None Include="shader\mesh.fs">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\mesh.vs">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">
@@ -92,10 +98,16 @@
     <ClInclude Include="Voxelgrid.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MarchingCubes.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="glad\include\glad\glad.h" />
     <ClInclude Include="glad\include\KHR\khrplatform.h" />
+    <ClInclude Include="happly.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Mesh.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MarchingCubes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

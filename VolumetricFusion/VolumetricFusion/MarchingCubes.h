@@ -1,47 +1,48 @@
-#ifndef _MARCHING_CUBES_HEADER_
-#define _MARCHING_CUBES_HEADER_
+#ifndef MARCHING_CUBES_H
+#define MARCHING_CUBES_H
 
 #define max(X, Y) ((X > Y) ? X : Y)
 #define min(X, Y) ((X < Y) ? X : Y)
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include "stb_image.h"
+//#include "stb_image.h"
 
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
+//#include <glm/glm.hpp>
+//#include <glm/gtc/matrix_transform.hpp>
+//#include <glm/gtc/type_ptr.hpp>
 
-#include <VolumetricFusion\Voxelgrid.hpp>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <math.h>
+
+//#include <VolumetricFusion\Voxelgrid.hpp>
 
 #define INF (1 << 29)
 #define HASH_SIZE 2048
 
 namespace vc::fusion {
 
-	const int SCR_WIDTH = 680;
-	const int SCR_HEIGHT = 680;
-
-	XYZ* model = NULL;
-	MCM* mcm = NULL;
-	Hash* hash = NULL;
+	//const int SCR_WIDTH = 680;
+	//const int SCR_HEIGHT = 680;
 
 	int pointCloudVisualization = 1;
 	double cubeSize = 0.3;
 	float ratio = 0.0;
 
-	void processInput(GLFWwindow* window)
-	{
-		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-			glfwSetWindowShouldClose(window, true);
-	}
+	//void processInput(GLFWwindow* window)
+	//{
+	//	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+	//		glfwSetWindowShouldClose(window, true);
+	//}
 
-	void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-	{
-		// make sure the viewport matches the new window dimensions; note that width and 
-		// height will be significantly larger than specified on retina displays.
-		glViewport(0, 0, width, height);
-	}
+	//void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+	//{
+	//	// make sure the viewport matches the new window dimensions; note that width and 
+	//	// height will be significantly larger than specified on retina displays.
+	//	glViewport(0, 0, width, height);
+	//}
 
 	typedef struct XYZ {
 		GLdouble* vertexArray;
@@ -64,6 +65,10 @@ namespace vc::fusion {
 		List** hashList;
 		int count;
 	} Hash;
+
+	XYZ* model = NULL;
+	MCM* mcm = NULL;
+	Hash* hash = NULL;
 
 	void initList(List** l, double x, double y, double z, unsigned int index) {
 		*l = (List*)malloc(sizeof(List));
@@ -344,29 +349,29 @@ namespace vc::fusion {
 		return mcm;
 	}
 
-	void generatePLY(MCM* mcm, char fileName[]) {
-		FILE* file = fopen(fileName, "w");
-		if (file != NULL) {
-			fprintf(file, "ply\n");
-			fprintf(file, "format ascii 1.0\n");
-			fprintf(file, "element vertex %d\n", mcm->vertexCount / 3);
-			fprintf(file, "property float x\n");
-			fprintf(file, "property float y\n");
-			fprintf(file, "property float z\n");
-			fprintf(file, "element face %d\n", mcm->facesCount / 3);
-			fprintf(file, "property list uchar int vertex_index\n");
-			fprintf(file, "end_header\n");
+	//void generatePLY(MCM* mcm, char fileName[]) {
+	//	FILE* file = fopen(fileName, "w");
+	//	if (file != NULL) {
+	//		fprintf(file, "ply\n");
+	//		fprintf(file, "format ascii 1.0\n");
+	//		fprintf(file, "element vertex %d\n", mcm->vertexCount / 3);
+	//		fprintf(file, "property float x\n");
+	//		fprintf(file, "property float y\n");
+	//		fprintf(file, "property float z\n");
+	//		fprintf(file, "element face %d\n", mcm->facesCount / 3);
+	//		fprintf(file, "property list uchar int vertex_index\n");
+	//		fprintf(file, "end_header\n");
 
-			int i;
-			for (i = 0; i < mcm->vertexCount; i += 3)
-				fprintf(file, "%lf %lf %lf\n", mcm->vertexArray[i], mcm->vertexArray[i + 1], mcm->vertexArray[i + 2]);
+	//		int i;
+	//		for (i = 0; i < mcm->vertexCount; i += 3)
+	//			fprintf(file, "%lf %lf %lf\n", mcm->vertexArray[i], mcm->vertexArray[i + 1], mcm->vertexArray[i + 2]);
 
-			for (i = 0; i < mcm->facesCount; i += 3)
-				fprintf(file, "3 %d %d %d\n", mcm->faces[i], mcm->faces[i + 1], mcm->faces[i + 2]);
+	//		for (i = 0; i < mcm->facesCount; i += 3)
+	//			fprintf(file, "3 %d %d %d\n", mcm->faces[i], mcm->faces[i + 1], mcm->faces[i + 2]);
 
-			fclose(file);
-		}
-	}
+	//		fclose(file);
+	//	}
+	//}
 
 	int lineCount(char fileName[]) {
 
@@ -432,15 +437,16 @@ namespace vc::fusion {
 	}
 
 	void marchingCubes(vc::fusion::Voxelgrid* voxelgrid) {
+	}
 
+	MCM* marchingCubes(char* fileName) {
 		atexit(freeMemory);
 		int cubeSize = 0.02;
-
-		model = readXYZFile("bunny.xyz");
+		model = readXYZFile(fileName);
 		mcm = generateMeshFromXYZ(model, cubeSize, "lut.txt");
-		printf("Saving file output.PLY\n");
-		generatePLY(mcm, "output.ply");
+		//printf("Saving file output.PLY\n");
+		//generatePLY(mcm, "output.ply");
+		return mcm;
 	}
 }
-
 #endif

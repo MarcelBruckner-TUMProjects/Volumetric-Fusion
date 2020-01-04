@@ -28,6 +28,8 @@
     <None Include="readme.md" />
     <None Include="shader\coordinate.fs" />
     <None Include="shader\coordinate.vs" />
+    <None Include="shader\mesh.fs" />
+    <None Include="shader\mesh.vs" />
     <None Include="shader\pointcloud.fs" />
     <None Include="shader\pointcloud.vs" />
     <None Include="shader\texture.fs" />
@@ -52,8 +54,10 @@
     <ClInclude Include="FileAccess.hpp" />
     <ClInclude Include="glad\include\glad\glad.h" />
     <ClInclude Include="glad\include\KHR\khrplatform.h" />
+    <ClInclude Include="happly.h" />
     <ClInclude Include="ImGuiHelpers.hpp" />
-    <ClInclude Include="MarchingCubes.hpp" />
+    <ClInclude Include="MarchingCubes.h" />
+    <ClInclude Include="Mesh.hpp" />
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />

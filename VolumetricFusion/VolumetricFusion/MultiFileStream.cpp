@@ -54,8 +54,9 @@ using namespace vc::enums;
 #include "camera.hpp"
 #include "shader.hpp"
 #include <VolumetricFusion\Voxelgrid.hpp>
-#include <VolumetricFusion\Mesh.h>
-#include <VolumetricFusion\happly.h>
+#include <VolumetricFusion\MarchingCubes.h>
+#include <VolumetricFusion\Mesh.hpp>
+//#include <VolumetricFusion\happly.h>
 //#include <io.h>
 
 #pragma endregion
@@ -419,31 +420,50 @@ int main(int argc, char* argv[]) try {
 			}
 		}
 		if (state.renderState == RenderState::MESH) {
-			happly::PLYData plyIn("bunny.PLY");
+			//happly::PLYData plyIn("bunny.PLY");
 
-			// Get mesh-style data from the object
-			std::vector<std::array<double, 3>> vPos = plyIn.getVertexPositions();
-			std::vector<std::vector<size_t>> fInd = plyIn.getFaceIndices<size_t>();
+			//// Get mesh-style data from the object
+			//std::vector<std::array<double, 3>> vPos = plyIn.getVertexPositions();
+			//std::vector<std::vector<size_t>> fInd = plyIn.getFaceIndices<size_t>();
 
-			std::vector<Vertex> vertices;
+			//for (int i = 0; i < vPos.size(); i++) {
+			//	vc::fusion::Vertex vert;
+			//	vert.Position.x = vPos[i][0];
+			//	vert.Position.y = vPos[i][1];
+			//	vert.Position.z = vPos[i][2];
+
+			//	vertices.push_back(vert);
+			//}
+
+			//for (int i = 0; i < fInd.size(); i++) {
+			//	for (int j = 0; j < fInd[i].size(); j++) {
+			//		indices.push_back(fInd[i][j]);
+			//	}
+			//}
+
+			vc::fusion::MCM* mcm = vc::fusion::marchingCubes("bunny.xyz");
+
+			std::vector<vc::fusion::Vertex> vertices;
 			std::vector<unsigned int> indices;
 
-			for (int i = 0; i < vPos.size(); i++) {
-				Vertex vert;
-				vert.Position.x = vPos[i][0];
-				vert.Position.y = vPos[i][1];
-				vert.Position.z = vPos[i][2];
+			std::cout << mcm->vertexCount << " " << mcm->facesCount << std::endl;
+
+			for (int i = 0; i < mcm->vertexCount; i+=3) {
+				vc::fusion::Vertex vert;
+				vert.Position.x = mcm->vertexArray[i];
+				vert.Position.y = mcm->vertexArray[i+1];
+				vert.Position.z = mcm->vertexArray[i+2];
 
 				vertices.push_back(vert);
 			}
 
-			for (int i = 0; i < fInd.size(); i++) {
-				for (int j = 0; j < fInd[i].size(); j++) {
-					indices.push_back(fInd[i][j]);
-				}
+			for (int i = 0; i < mcm->facesCount; i+=3) {
+				indices.push_back(mcm->faces[i]);
+				indices.push_back(mcm->faces[i+1]);
+				indices.push_back(mcm->faces[i+2]);
 			}
 
-			Mesh mesh(vertices, indices);
+			vc::fusion::Mesh mesh(vertices, indices);
 			mesh.renderMesh(model, view, projection);
 		}
 
