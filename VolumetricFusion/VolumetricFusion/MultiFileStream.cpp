@@ -122,7 +122,8 @@ vc::optimization::BAProblem bundleAdjustment = vc::optimization::BAProblem();
 
 int main(int argc, char* argv[]) try {
 	
-	//vc::optimization::testFunc();
+	bundleAdjustment.test();
+	return 0;
 
 	google::InitGoogleLogging("Bundle Adjustment");
 	ceres::Solver::Summary summary;

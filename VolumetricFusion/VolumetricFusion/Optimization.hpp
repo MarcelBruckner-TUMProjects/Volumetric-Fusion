@@ -11,6 +11,7 @@
 #include <iostream>
 #include "ceres/ceres.h"
 #include "ceres/rotation.h"
+#include <sstream>
 
 #include "PointCorrespondenceError.hpp"
 #include "ReprojectionError.hpp"
@@ -44,7 +45,7 @@ namespace vc::optimization {
         double* rotations;
         double* intrinsics;
         double* distCoeffs;
-        
+
         bool hasSolution = false;
 
         std::vector<glm::mat4> relativeTransformations = {
@@ -62,7 +63,7 @@ namespace vc::optimization {
         }
 
         ~BAProblem() {
-            deinit();
+            //deinit();
         }
 
         void deinit() {
@@ -70,6 +71,95 @@ namespace vc::optimization {
             delete[] rotations;
             delete[] intrinsics;
             delete[] distCoeffs;
+        }
+
+        void test() {
+            glm::vec3 relativeTranslationVector = glm::vec3(0.0f, 0.0f, 3.0f);
+            glm::mat4 relativeTranslation = glm::translate(glm::mat4(1.0f), relativeTranslationVector);
+            glm::vec3 relativeAxis = glm::vec3(0.0f, 1.0f, 0.0f);
+            relativeAxis = glm::normalize(relativeAxis);
+            float relativeAngle = glm::radians(90.0f);
+            glm::mat4 relativeRotation = glm::rotate(glm::mat4(1.0f), relativeAngle, relativeAxis);
+            glm::mat4 relativeTransformation = relativeTranslation * relativeRotation;
+            relativeAxis *= relativeAngle;
+
+            glm::vec3 baseTranslationVector = glm::vec3(0.0f, 0.0f, 1.0f);
+            glm::mat4 baseTranslation = glm::translate(glm::mat4(1.0f), baseTranslationVector);
+            glm::vec3 baseAxis = glm::vec3(0.0f, 1.0f, 0.0f);
+            baseAxis = glm::normalize(baseAxis);
+            float baseAngle = glm::radians(00.0f);
+            glm::mat4 baseRotation = glm::rotate(glm::mat4(1.0f), baseAngle, baseAxis);
+            glm::mat4 baseTransformation = baseTranslation * baseRotation;
+            baseAxis *= baseAngle;
+            
+            double* expectedTranslations = new double[6] { baseTranslationVector.x, baseTranslationVector.y, baseTranslationVector.z, relativeTranslationVector.x, relativeTranslationVector.y, relativeTranslationVector.z};
+            double* expectedRotations = new double[6] { baseAxis.x, baseAxis.y, baseAxis.z, relativeAxis.x, relativeAxis.y, relativeAxis.z };
+
+            translations = new double[6]{ baseTranslationVector.x, baseTranslationVector.y, baseTranslationVector.z, relativeTranslationVector.x, relativeTranslationVector.y, relativeTranslationVector.z };
+            rotations = new double[6] { baseAxis.x, baseAxis.y, baseAxis.z, relativeAxis.x, relativeAxis.y, relativeAxis.z };
+
+            std::stringstream ss;
+            ss << "Initial:" << std::endl;
+            ss << "Translation: ";
+            for (int i = 0; i < 6; i++)
+            {
+                ss << translations[i] << ", ";
+            }
+            ss << " - Rotations: ";
+            for (int i = 0; i < 6; i++)
+            {
+                ss << rotations[i] << ", ";
+            }
+            ss << std::endl;
+
+            std::vector<glm::vec4> points;
+            points.emplace_back(glm::vec4(1.0f, 1.0f, 0.0f, 1.0f));
+            //points.emplace_back(glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+            points.emplace_back(glm::vec4(1.0f, -1.0f, 0.0f, 1.0f));
+            points.emplace_back(glm::vec4(-1.0f, 1.0f, 0.0f, 1.0f));
+            points.emplace_back(glm::vec4(-1.0f, -1.0f, 0.0f, 1.0f));
+            //points.emplace_back(glm::vec4(0.5f, 0.5f, 0.0f, 1.0f));
+            //points.emplace_back(glm::vec4(0.5f, -0.5f, 0.0f, 1.0f));
+            //points.emplace_back(glm::vec4(-0.5f, 0.5f, 0.0f, 1.0f));
+            //points.emplace_back(glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f));
+
+
+            std::vector<glm::vec4> baseFramePoints;
+            std::vector<glm::vec4> relativeFramePoints;
+            for (int i = 0; i < points.size(); i++)
+            {
+                baseFramePoints.emplace_back(baseTransformation * points[i]);
+                relativeFramePoints.emplace_back(relativeTransformation * points[i]);
+
+            }
+
+            mockOptimize(baseFramePoints, relativeFramePoints, glm::inverse(baseTranslation) * glm::inverse(baseRotation), ss.str());
+
+            std::cout << "Expected:" << std::endl;
+            std::cout << "Translation: ";
+            for (int i = 0; i < 6; i++)
+            {
+                std::cout << expectedTranslations[i] << ", ";
+            }
+            std::cout << " - Rotations: ";
+            for (int i = 0; i < 6; i++)
+            {
+                std::cout << expectedRotations[i] << ", ";
+            }
+            std::cout << std::endl;
+
+            std::cout << "Final:" << std::endl;
+            std::cout << "Translation: ";
+            for (int i = 0; i < 6; i++)
+            {
+                std::cout << translations[i] << ", ";
+            }
+            std::cout << " - Rotations: ";
+            for (int i = 0; i < 6; i++)
+            {
+                std::cout << rotations[i] << ", ";
+            }
+            std::cout << std::endl;
         }
 
         bool init(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
@@ -107,6 +197,27 @@ namespace vc::optimization {
             hasSolution = true;
 
             calculateRelativeTransformations(pipelines.size());
+            return true;
+        }
+
+        bool mockOptimize(std::vector<glm::vec4> baseFramePoints, std::vector<glm::vec4> relativeFramePoints, glm::mat4 baseTransformation, std::string ss) {
+            // Create residuals for each observation in the bundle adjustment problem. The
+            // parameters for cameras and points are added automatically.
+            ceres::Problem problem;
+
+            int o = 0;
+            for (int i = 0; i < baseFramePoints.size(); i++)
+            {
+                ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
+                    o++, 0, relativeFramePoints[i], baseFramePoints[i], glm::value_ptr(baseTransformation)
+                );
+                problem.AddResidualBlock(cost_function, NULL,
+                    &translations[1 * num_translation_parameters],
+                    &rotations[1 * num_rotation_parameters]
+                );
+            }
+
+            solveProblem(&problem, ss);
             return true;
         }
 
@@ -192,15 +303,23 @@ namespace vc::optimization {
             }
         }
 
-        void solveProblem(ceres::Problem* problem) {
+        
+        void solveProblem(ceres::Problem* problem, std::string message) {
             ceres::Solver::Options options;
-            options.num_threads = 8;
+            options.num_threads = 1;
             options.linear_solver_type = ceres::DENSE_QR;
             options.minimizer_progress_to_stdout = true;
-            options.max_num_iterations = 5;
+            options.max_num_iterations = 500;
             ceres::Solver::Summary summary;
             ceres::Solve(options, problem, &summary);
             std::cout << summary.FullReport() << "\n";
+
+            std::cout << std::endl;
+            std::cout << message;
+        }
+
+        void solveProblem(ceres::Problem* problem) {
+            solveProblem(problem, "");
         }
 
         bool solvePointCorrespondenceError(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
