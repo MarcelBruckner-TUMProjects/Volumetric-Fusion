@@ -6,11 +6,6 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-//#include "stb_image.h"
-
-//#include <glm/glm.hpp>
-//#include <glm/gtc/matrix_transform.hpp>
-//#include <glm/gtc/type_ptr.hpp>
 
 #include <stdlib.h>
 #include <string.h>
@@ -293,10 +288,6 @@ namespace vc::fusion {
 		if (data == NULL)
 			return NULL;
 
-		printf("\n%d", (int)pow(cubesPerDimension, 3));
-		printf("\n%d", sizeof(data) / sizeof(int));
-		//printf("\n%d", data[158494]);
-
 		int lut[256][16];
 		int i, j, k;
 		for (i = 0; i < model->listSize; i++) {
@@ -313,6 +304,7 @@ namespace vc::fusion {
 
 		MCM* mcm = initMCM();
 		loadLookUpTable(lut, lutFileName);
+
 		for (i = 0; i < cubesPerDimension - 1; i++) {
 			for (j = 0; j < cubesPerDimension - 1; j++) {
 				for (k = 0; k < cubesPerDimension - 1; k++) {
@@ -340,8 +332,9 @@ namespace vc::fusion {
 
 					if (get3DValue(data, i, j + 1, k + 1, cubesPerDimension))
 						cubeID |= 128;
-
+					
 					generateAndInsertTriangles(&mcm, i, j, k, lut[cubeID], cubeSize);
+					
 				}
 			}
 		}
@@ -439,11 +432,17 @@ namespace vc::fusion {
 	void marchingCubes(vc::fusion::Voxelgrid* voxelgrid) {
 	}
 
-	MCM* marchingCubes(char* fileName) {
+	MCM* marchingCubes() {
 		atexit(freeMemory);
-		int cubeSize = 0.02;
+		initHash(&hash);
+
+		char* fileName = "bunny.xyz";
+		double cubeSize = 0.02;
+		char* lutFileName = "lut.txt";
+
+		//printf(fileName);
 		model = readXYZFile(fileName);
-		mcm = generateMeshFromXYZ(model, cubeSize, "lut.txt");
+		mcm = generateMeshFromXYZ(model, cubeSize, lutFileName);
 		//printf("Saving file output.PLY\n");
 		//generatePLY(mcm, "output.ply");
 		return mcm;

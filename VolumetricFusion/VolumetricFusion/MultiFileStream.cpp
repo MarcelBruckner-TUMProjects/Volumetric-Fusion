@@ -416,7 +416,7 @@ int main(int argc, char* argv[]) try {
 			voxelgrid->renderField(model, view, projection);
 			if (renderVoxelgrid) {
 				voxelgrid->renderGrid(model, view, projection);
-				std::cout << "Here!" << std::endl;
+				//std::cout << "Here!" << std::endl;
 			}
 		}
 		if (state.renderState == RenderState::MESH) {
@@ -441,7 +441,7 @@ int main(int argc, char* argv[]) try {
 			//	}
 			//}
 
-			vc::fusion::MCM* mcm = vc::fusion::marchingCubes("bunny.xyz");
+			vc::fusion::MCM* mcm = vc::fusion::marchingCubes();
 
 			std::vector<vc::fusion::Vertex> vertices;
 			std::vector<unsigned int> indices;
