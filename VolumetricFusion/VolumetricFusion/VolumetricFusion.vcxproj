@@ -65,6 +65,7 @@
     <ClInclude Include="Settings.hpp" />
     <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="Utils.hpp" />
     <ClInclude Include="Voxelgrid.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

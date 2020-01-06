@@ -29,6 +29,7 @@
     <ClInclude Include="PointCorrespondenceError.hpp">
       <Filter>OptimizationMethods</Filter>
     </ClInclude>
+    <ClInclude Include="Utils.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

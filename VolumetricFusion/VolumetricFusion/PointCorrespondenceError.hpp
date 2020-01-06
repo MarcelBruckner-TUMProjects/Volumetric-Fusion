@@ -143,7 +143,7 @@ namespace vc::optimization {
             if (base_frame_point.x == 1.0f && base_frame_point.y == 1.0f && base_frame_point.z == 1.0f) {
                 ss << "";
             }
-            std::cout << ss.str();
+            //std::cout << ss.str();
             return true;
         }
 
@@ -155,9 +155,9 @@ namespace vc::optimization {
 
         // Factory to hide the construction of the CostFunction object from
         // the client code.
-        static ceres::CostFunction* Create(int id, int j, glm::vec4 observed_point, glm::vec4 expected_point, glm::f32* baseTransformation) {
+        static ceres::CostFunction* Create(int id, int j, glm::vec4 relativeFramePoint, glm::vec4 baseFramePoint, glm::f32* baseTransformation) {
             return (new ceres::AutoDiffCostFunction<PointCorrespondenceError, 3, 3, 3>(
-                new PointCorrespondenceError(id, j, observed_point, expected_point, baseTransformation)));
+                new PointCorrespondenceError(id, j, relativeFramePoint, baseFramePoint, baseTransformation)));
         }
     };
 }

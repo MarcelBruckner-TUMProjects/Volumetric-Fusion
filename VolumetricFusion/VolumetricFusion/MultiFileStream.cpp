@@ -87,6 +87,8 @@ const unsigned int SCR_HEIGHT = 600 * 2 ;
 std::vector<int> DEFAULT_COLOR_STREAM = { 640, 480 };
 std::vector<int> DEFAULT_DEPTH_STREAM = { 640, 480 };
 
+//std::vector<int> CALIBRATION_COLOR_STREAM = { 640, 480 };
+//std::vector<int> CALIBRATION_DEPTH_STREAM = { 640, 480 };
 std::vector<int> CALIBRATION_COLOR_STREAM = { 1920, 1080 };
 std::vector<int> CALIBRATION_DEPTH_STREAM = { 1280, 720 };
 
@@ -122,8 +124,8 @@ vc::optimization::BAProblem bundleAdjustment = vc::optimization::BAProblem();
 
 int main(int argc, char* argv[]) try {
 	
-	bundleAdjustment.test();
-	return 0;
+	//bundleAdjustment.test();
+	//return 0;
 
 	google::InitGoogleLogging("Bundle Adjustment");
 	ceres::Solver::Summary summary;
@@ -266,6 +268,7 @@ int main(int argc, char* argv[]) try {
 			
 
 			//if (programState.allMarkersDetected) 
+			if(false)
 			{
 				setCalibration(false);
 				// start fusion thread logic
@@ -589,4 +592,4 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 	camera.ProcessMouseScroll(yoffset);
 }
 
-#pragma endregion
+#pragma endregion 
