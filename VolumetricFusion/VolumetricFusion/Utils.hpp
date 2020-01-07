@@ -7,7 +7,19 @@
 #include <string>
 #include <sstream>
 
+#include <iostream>
+#include <chrono>
+#include <thread>
+
 namespace vc::utils {
+	void sleepFor(std::string message, unsigned long milliseconds) {
+		using namespace std::chrono_literals;
+		std::cout << message << std::endl;
+		std::cout << "Sleeping" << std::endl;
+		std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
+		std::cout << "Awaken" << std::endl;
+	}
+
 	std::string toString(glm::vec4 vec) {
 		return std::to_string(vec.x) + ", " + std::to_string(vec.y) + ", " + std::to_string(vec.z) + ", " + std::to_string(vec.w);
 	}

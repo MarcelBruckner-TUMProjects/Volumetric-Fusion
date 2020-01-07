@@ -102,6 +102,8 @@ namespace vc::optimization {
                 rotations.emplace_back(rotation);
             }
 
+            //translations[1][0] += 1;
+
             hasSolution = true;
 
             calculateRelativeTransformations(pipelines.size());
@@ -118,6 +120,7 @@ namespace vc::optimization {
                 return false;
             }
 
+
             if (reprojectionError) {
                 solveReprojectionError(pipelines);
             }
@@ -126,7 +129,10 @@ namespace vc::optimization {
                     return false;
                 }
             }
+
+            vc::utils::sleepFor("Pre recalculation after optimization", 4000);
             calculateRelativeTransformations(pipelines.size());
+            vc::utils::sleepFor("After recalculation after optimization", 4000);
 
             return true;
         }
@@ -248,7 +254,7 @@ namespace vc::optimization {
             auto initialRotations = rotations;
             
             ceres::Solver::Options options;
-            options.num_threads = 1;
+            options.num_threads = 8;
             options.linear_solver_type = ceres::DENSE_QR;
             options.minimizer_progress_to_stdout = true;
             options.max_num_iterations = 500;
@@ -316,7 +322,7 @@ namespace vc::optimization {
                                 continue;
                             }
                             auto baseFramePoint = baseMarkerCorners[markerId][cornerId];
-                            std::cout << vc::utils::toString(baseFramePoint, relativeFramePoint);
+                            //std::cout << vc::utils::toString(baseFramePoint, relativeFramePoint);
                             ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
                                 markerId, cornerId, relativeFramePoint, baseFramePoint, baseTrans
                             );
@@ -343,7 +349,7 @@ namespace vc::optimization {
                             continue;
                         }
                         auto baseFramePoint = baseCharucoCorners[charucoId];
-                        std::cout << vc::utils::toString(baseFramePoint, relativeFramePoint);
+                        //std::cout << vc::utils::toString(baseFramePoint, relativeFramePoint);
                         ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
                             charucoId, -1, relativeFramePoint, baseFramePoint, baseTrans
                         );

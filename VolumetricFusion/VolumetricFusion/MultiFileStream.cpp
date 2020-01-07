@@ -265,7 +265,7 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
-			
+			vc::utils::sleepFor("After optimization", 2000);
 
 			//if (programState.allMarkersDetected) 
 			if(false)
