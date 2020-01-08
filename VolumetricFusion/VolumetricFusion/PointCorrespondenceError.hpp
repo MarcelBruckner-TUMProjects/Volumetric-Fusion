@@ -31,133 +31,85 @@ namespace vc::optimization {
     ///
     /// </summary>
     struct PointCorrespondenceError {
-        PointCorrespondenceError(int id, int j, glm::vec4 relative_frame_point, glm::vec4 base_frame_point, glm::f32* baseTransformation)
-            : id(id), j(j), relative_frame_point(relative_frame_point), base_frame_point(base_frame_point), baseTransformation(baseTransformation) {}
+        PointCorrespondenceError(int id, int j, ceres::Vector relative_frame_point, ceres::Vector base_frame_point, ceres::Matrix inverse_base_rotation, ceres::Matrix inverse_base_translation)
+            : id(id), j(j), relative_frame_point(relative_frame_point), base_frame_point(base_frame_point), inverse_base_rotation(inverse_base_rotation), inverse_base_translation(inverse_base_translation) {}
+               
+        std::string asHeader(std::string name) const {
+            return "*************************************  " + name + "  *************************************";
+        }
 
         template <typename T>
         bool operator()(const T* const markerToRelativeTranslation, const T* const markerToRelativeRotation,
             //const T* intrinsics, const T* const distortion, 
             T* residuals) const {
-
+                        
             std::stringstream ss;
+            
+            Eigen::Matrix<T, 4, 1> transformedPoint = Eigen::Matrix<T, 4, 1>(base_frame_point.cast<T>());
+            ss << asHeader("b") << std::endl << transformedPoint << std::endl;
 
-            ss << "**************************************************" << std::endl;
-            T point_baseFrame[3];
-            point_baseFrame[0] = T(base_frame_point.x);
-            point_baseFrame[1] = T(base_frame_point.y);
-            point_baseFrame[2] = T(base_frame_point.z);
-            ss << base_frame_point.x << ", " << base_frame_point.y << ", " << base_frame_point.z << " --> " << relative_frame_point.x << ", " << relative_frame_point.y << ", " << relative_frame_point.z << std::endl;
+            transformedPoint = Eigen::Matrix<T, 4, 1>(inverse_base_translation.cast<T>() * transformedPoint);
+            ss << asHeader("T0^-1 * b") << std::endl << transformedPoint << std::endl;
 
-            // *********************************************************************************
-            // baseTransformation * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) * point
+            transformedPoint = Eigen::Matrix<T, 4, 1>(inverse_base_rotation.cast<T>() * transformedPoint);
+            ss << asHeader("R0^-1 * (T0^-1 * b)") << std::endl << transformedPoint << std::endl;
 
-            // baseTransformation
-            T inverseBaseTransformation[16];
-            for (int i = 0; i < 16; i++)
-            {
-                inverseBaseTransformation[i] = T(baseTransformation[i]);
-            }
-            T point_noFrame[3];
-            // baseTransformation * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) * point
-            for (int i = 0; i < 3; i++)
-            {
-                point_noFrame[i] = point_baseFrame[i] + inverseBaseTransformation[i + 12];
-            }
-            ss << "T_0^-1: " << point_noFrame[0] << ", " << point_noFrame[1] << ", " << point_noFrame[2] << std::endl;
+            // Rodriguez
+            T* rot = new T[9];
+            ceres::AngleAxisToRotationMatrix(markerToRelativeRotation, rot);                        
 
-            for (int i = 0; i < 3; i++)
-            {
-                point_noFrame[i] = inverseBaseTransformation[i] * point_noFrame[0] + inverseBaseTransformation[i + 4] * point_noFrame[1] + inverseBaseTransformation[i + 8] * point_noFrame[2];
-            }
-            ss << "R_0^-1: " << point_noFrame[0] << ", " << point_noFrame[1] << ", " << point_noFrame[2] << std::endl;
+            Eigen::Matrix<T, 4, 4> relativeRotation;
+            relativeRotation <<
+                rot[0], rot[3], rot[6], T(0),
+                rot[1], rot[4], rot[7], T(0),
+                rot[2], rot[5], rot[8], T(0),
+                T(0), T(0), T(0), T(1);
 
+            ss << asHeader("R1") << std::endl << relativeRotation << std::endl;
 
-            // *********************************************************************************
-            // (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) * point
+            transformedPoint = Eigen::Matrix<T, 4, 1>(relativeRotation * transformedPoint);
+            ss << asHeader("R1 * (R0^-1 * (T0^-1 * b))") << std::endl << transformedPoint << std::endl;
 
-            // markerToRelativeRotation
-            T m2rR[3];
-            for (int i = 0; i < 3; i++) {
-                m2rR[i] = markerToRelativeRotation[i];
-            }
+            Eigen::Matrix<T, 4, 4> relativeTranslation;
+            relativeTranslation <<
+                T(1), T(0), T(0), markerToRelativeTranslation[0],
+                T(0), T(1), T(0), markerToRelativeTranslation[1],
+                T(0), T(0), T(1), markerToRelativeTranslation[2],
+                T(0), T(0), T(0), T(1);
 
-            T point_relativeFrame[3];
-            bool rowMajor = false;
-            if (rowMajor) {
-                // Row major
-                T rot[9];
-                // Rodriguez
-                ceres::AngleAxisToRotationMatrix(m2rR, rot);
+            ss << asHeader("T1") << std::endl << relativeTranslation << std::endl;
 
-                // (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) * point
-                for (int i = 0; i < 3; i++) {
-                    point_relativeFrame[i] = rot[i * 3 + 0] * point_noFrame[0] + rot[i * 3 + 1] * point_noFrame[1] + rot[i * 3 + 2] * point_noFrame[2];
-                }
-                ss << "R_1: " << point_relativeFrame[0] << ", " << point_relativeFrame[1] << ", " << point_relativeFrame[2] << std::endl;
-            }
-            else {
-                // Row major
-                T rot[9];
-                // Rodriguez
-                ceres::AngleAxisToRotationMatrix(m2rR, rot);
-
-                // (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) * point
-                for (int i = 0; i < 3; i++) {
-                    point_relativeFrame[i] = rot[i] * point_noFrame[0] + rot[i + 3] * point_noFrame[1] + rot[i + 6] * point_noFrame[2];
-                }
-                ss << "R_1: " << point_relativeFrame[0] << ", " << point_relativeFrame[1] << ", " << point_relativeFrame[2] << std::endl;
-
-            }
-            // *********************************************************************************
-            // glm::inverse(markerToRelativeTranslation) * point
-
-            // markerToRelativeTranslation
-            T m2rT[3];
-
-            for (int i = 0; i < 3; i++) {
-                m2rT[i] = markerToRelativeTranslation[i];
-                // glm::inverse(markerToRelativeTranslation) * point
-                point_relativeFrame[i] += m2rT[i];
-            }
-            ss << "T_1: " << point_relativeFrame[0] << ", " << point_relativeFrame[1] << ", " << point_relativeFrame[2] << std::endl;
-
+            transformedPoint = Eigen::Matrix<T, 4, 1>(relativeTranslation * transformedPoint);
+            ss << asHeader("T1 * (R1 * (R0^-1 * (T0^-1 * b)))") << std::endl << transformedPoint << std::endl;
+            
             // *********************************************************************************
             // Final cost evaluation
-            T expected[3];
-            expected[0] = T(relative_frame_point.x);
-            expected[1] = T(relative_frame_point.y);
-            expected[2] = T(relative_frame_point.z);
+            Eigen::Matrix<T, 4, 1> error = Eigen::Matrix<T, 4, 1>(relative_frame_point - transformedPoint);
 
-            ss << "Residuals:" << std::endl;
-
-            for (int i = 0; i < 3; i++) {
-                residuals[i] = point_relativeFrame[i] - expected[i];
-                ss << residuals[i] << std::endl;
+            for (int i = 0; i < 3; i++)
+            {
+                residuals[i] = error[i];
             }
-            ss << "**************************************************" << std::endl;
 
-            /*  std::stringstream ss;
-              ss << "Residuals (" << id << ", " << j << "): " << residuals[0] << ", " << residuals[1] << ", " << residuals[2] << std::endl;
-              ss << ss.str();*/
+            ss << asHeader("Residuals") << std::endl << error << std::endl;
 
-            if (base_frame_point.x == 1.0f && base_frame_point.y == 1.0f && base_frame_point.z == 1.0f) {
-                ss << "";
-            }
-            //std::cout << ss.str();
+            //std::cout << ss.str() << "************************************************************************************************************" << std::endl;
+
             return true;
         }
 
         int j;
         int id;
-        glm::vec4 relative_frame_point;
-        glm::vec4 base_frame_point;
-        glm::f32* baseTransformation;
+        ceres::Vector relative_frame_point;
+        ceres::Vector base_frame_point;
+        ceres::Matrix inverse_base_rotation;
+        ceres::Matrix inverse_base_translation;
 
         // Factory to hide the construction of the CostFunction object from
         // the client code.
-        static ceres::CostFunction* Create(int id, int j, glm::vec4 relativeFramePoint, glm::vec4 baseFramePoint, glm::f32* baseTransformation) {
+        static ceres::CostFunction* Create(int id, int j, ceres::Vector relativeFramePoint, ceres::Vector baseFramePoint, ceres::Matrix inverse_base_rotation, ceres::Matrix inverse_base_transformation) {
             return (new ceres::AutoDiffCostFunction<PointCorrespondenceError, 3, 3, 3>(
-                new PointCorrespondenceError(id, j, relativeFramePoint, baseFramePoint, baseTransformation)));
+                new PointCorrespondenceError(id, j, relativeFramePoint, baseFramePoint, inverse_base_rotation, inverse_base_transformation)));
         }
     };
 }

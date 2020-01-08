@@ -75,7 +75,7 @@ namespace vc::fusion {
 			this->sizeNormalized = size / resolution;
 			this->sizeNormalized += glm::vec3(1.0f);
 
-			this->num_gridPoints = (sizeNormalized.x * sizeNormalized.y * sizeNormalized.z);
+			this->num_gridPoints = (int)(sizeNormalized.x * sizeNormalized.y * sizeNormalized.z);
 					   
 			for (float i = -size.x / 2.0f; i <= size.x / 2.0f; i += resolution)
 			{
@@ -146,7 +146,7 @@ namespace vc::fusion {
 			gridShader->setMat4("view", view);
 			gridShader->setMat4("projection", projection);
 			glBindVertexArray(VAO);
-			glDrawArrays(GL_POINTS, 0, points.size());
+			glDrawArrays(GL_POINTS, 0, (GLsizei)points.size());
 			glBindVertexArray(0);
 		}
 
@@ -182,7 +182,7 @@ namespace vc::fusion {
 			cubeShader->setMat4("view", view);
 			cubeShader->setMat4("projection", projection);
 			
-			glDrawArrays(GL_POINTS, 0, points.size());
+			glDrawArrays(GL_POINTS, 0, (GLsizei)points.size());
 
 			//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 			//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -192,8 +192,8 @@ namespace vc::fusion {
 
 		glm::vec3 hashFuncInv(int hash) {
 			int x = hash % (int)sizeNormalized.x;
-			float y = (int)(hash / sizeNormalized.x) % (int)sizeNormalized.y;
-			float z = (int)(hash / (sizeNormalized.x * sizeNormalized.y)) % (int)sizeNormalized.z;
+			int y = (int)(hash / sizeNormalized.x) % (int)sizeNormalized.y;
+			int z = (int)(hash / (sizeNormalized.x * sizeNormalized.y)) % (int)sizeNormalized.z;
 
 			glm::vec3 result = glm::vec3(x, y, z);
 			result -= sizeHalf;

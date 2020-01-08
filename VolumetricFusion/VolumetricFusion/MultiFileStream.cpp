@@ -95,16 +95,16 @@ std::vector<int> CALIBRATION_DEPTH_STREAM = { 1280, 720 };
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
 //Camera camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.f);
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
+double lastX = SCR_WIDTH / 2.0f;
+double lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
-float MouseSensitivity = 0.1;
+float MouseSensitivity = 0.1f;
 float Yaw = 0;
 float Pitch = 0;
 
 // timing
-float deltaTime = 0.0f;	// time between current frame and last frame
-float lastFrame = 0.0f;
+double deltaTime = 0.0;	// time between current frame and last frame
+double lastFrame = 0.0;
 
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
@@ -124,8 +124,8 @@ vc::optimization::BAProblem bundleAdjustment = vc::optimization::BAProblem();
 
 int main(int argc, char* argv[]) try {
 	
-	//bundleAdjustment.test();
-	//return 0;
+	bundleAdjustment.test();
+	return 0;
 
 	google::InitGoogleLogging("Bundle Adjustment");
 	ceres::Solver::Summary summary;
@@ -265,7 +265,7 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
-			vc::utils::sleepFor("After optimization", 2000);
+			//vc::utils::sleepFor("After optimization", 2000);
 
 			//if (programState.allMarkersDetected) 
 			if(false)
@@ -319,7 +319,7 @@ int main(int argc, char* argv[]) try {
 	{
 		// per-frame time logic
 		// --------------------
-		float currentFrame = glfwGetTime();
+		double currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 
@@ -345,7 +345,7 @@ int main(int argc, char* argv[]) try {
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
 			int x = i % 2;
-			int y = floor(i / 2);
+			int y = (int)floor(i / 2);
 				if (state.renderState == RenderState::ONLY_COLOR) {
 					pipelines[i]->renderColor(x, y, aspect, width, height);
 				}
@@ -450,16 +450,16 @@ bool isKeyPressed(GLFWwindow* window, int key) {
 void processInput(GLFWwindow* window)
 {
 	if (isKeyPressed(window, GLFW_KEY_W)) {
-		camera.ProcessKeyboard(FORWARD, deltaTime);
+		camera.ProcessKeyboard(Camera_Movement::FORWARD, deltaTime);
 	}
 	if (isKeyPressed(window, GLFW_KEY_S)) {
-		camera.ProcessKeyboard(BACKWARD, deltaTime);
+		camera.ProcessKeyboard(Camera_Movement::BACKWARD, deltaTime);
 	}
 	if (isKeyPressed(window, GLFW_KEY_A)) {
-		camera.ProcessKeyboard(LEFT, deltaTime);
+		camera.ProcessKeyboard(Camera_Movement::LEFT, deltaTime);
 	}
 	if (isKeyPressed(window, GLFW_KEY_D)) {
-		camera.ProcessKeyboard(RIGHT, deltaTime);
+		camera.ProcessKeyboard(Camera_Movement::RIGHT, deltaTime);
 	}
 }
 
@@ -545,8 +545,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 			firstMouse = false;
 		}
 
-		float xoffset = lastX - xpos;
-		float yoffset = ypos - lastY; // reversed since y-coordinates go from bottom to top
+		float xoffset = (float)(lastX - xpos);
+		float yoffset = (float)(ypos - lastY); // reversed since y-coordinates go from bottom to top
 		//float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
 
 		lastX = xpos;

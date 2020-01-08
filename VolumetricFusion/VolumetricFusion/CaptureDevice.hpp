@@ -76,13 +76,13 @@ namespace vc::capture {
 			this->calibrateCameras->store(calibrate);
 		}
 
-		void renderColor(const float pos_x, const float pos_y, const float aspect, const int viewport_width, const int viewport_height) {
+		void renderColor(int pos_x,  int pos_y, const float aspect, const int viewport_width, const int viewport_height) {
 			if (data->filteredColorFrames) {
 				this->rendering->renderTexture(data->filteredColorFrames, pos_x, pos_y, aspect, viewport_width, viewport_height);
 			}
 		}
 
-		void renderDepth(const float pos_x, const float pos_y, const float aspect, const int viewport_width, const int viewport_height) {
+		void renderDepth(int pos_x, int pos_y, const float aspect, const int viewport_width, const int viewport_height) {
 			if (data->colorizedDepthFrames) {
 				this->rendering->renderTexture(data->colorizedDepthFrames, pos_x, pos_y, aspect, viewport_width, viewport_height);
 			}

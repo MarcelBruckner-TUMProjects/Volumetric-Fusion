@@ -209,7 +209,7 @@ namespace vc::rendering {
 
             POINTCLOUD_new_shader->setMat3("cam2World", depth_camera->cam2world);
             POINTCLOUD_new_shader->setFloat("depth_scale", depth_camera->depthScale);
-            POINTCLOUD_new_shader->setVec2("depth_resolution", depth_width, depth_height);
+            POINTCLOUD_new_shader->setVec2("depth_resolution", (float)depth_width, (float)depth_height);
 
             POINTCLOUD_new_shader->setMat4("relativeTransformation", relativeTransformation);
             POINTCLOUD_new_shader->setMat4("correction", COORDINATE_CORRECTION);
@@ -280,7 +280,7 @@ namespace vc::rendering {
         //    glBindVertexArray(0);
         //}
 
-        void renderTexture(rs2::frame color_image, const float pos_x, const float pos_y, const float aspect, const int viewport_width, const int viewport_height) {
+        void renderTexture(rs2::frame color_image, const int pos_x, const int pos_y, const float aspect, const int viewport_width, const int viewport_height) {
             setViewport(viewport_width, viewport_height, pos_x, pos_y);
 
             const int width = color_image.as<rs2::video_frame>().get_width();
