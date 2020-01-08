@@ -1,0 +1,26 @@
+https://maskor.fh-aachen.de/images/Tutorials/PCLonWIN/
+
+pkg:
+	https://stackoverflow.com/questions/1710922/how-to-install-pkg-config-in-windows
+
+vtk 8 from source
+
+download vcpkg:
+	https://github.com/microsoft/vcpkg
+	.\vcpkg instll lz4
+compile flann:
+	Add: LZ4_LIBRARIES with value "C:\dev\vcpkg\packages\lz4_x64-windows\lib\lz4.lib"
+
+PCL:
+	without openni
+	with openni2
+	QHULL_LIBRARY_DEBUG: C:/dev/qhull/lib/qhullstatic.lib
+	QHULL_LIBRARY: C:/dev/qhull/lib/qhullstatic_d.lib
+	without qhull
+	without png
+OpenNI:
+	Include/XnPlatform
+Qhull:
+
+
+_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS	

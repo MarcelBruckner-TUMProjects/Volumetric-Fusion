@@ -181,6 +181,18 @@ namespace vc::fusion {
 			//glEnable(GL_STENCIL_TEST);
 		}
 
+		std::vector<float> *getPoints() {
+			return &points;
+		}
+
+		float* getTSDFValues() {
+			return tsdf;
+		}
+
+		float* getWeights() {
+			return weights;
+		}
+
 		void renderGrid(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
 			gridShader->use();
 			gridShader->setVec3("size", size);
