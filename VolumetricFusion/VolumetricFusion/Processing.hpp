@@ -95,9 +95,7 @@ namespace vc::processing {
 		// buffer <frame_id, value>
 		bool visualize = false;
 		bool hasMarkersDetected = false;
-
-		unsigned long long frameId;
-
+		
 		std::vector<int> ids;
 		std::vector<std::vector<cv::Point2f>> markerCorners;
 
@@ -111,7 +109,6 @@ namespace vc::processing {
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
 
-				this->frameId = frameId;
 				cv::aruco::detectMarkers(image, dictionary, markerCorners, ids);
 
 				/*int i = 0;

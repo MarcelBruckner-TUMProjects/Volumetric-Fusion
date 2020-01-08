@@ -181,6 +181,7 @@ namespace vc::capture {
 						colorFrame = chArUco->charucoProcessingQueues.wait_for_frame();
 					}
 
+					data->frameId = frameset.get_color_frame().get_frame_number();
 					data->filteredColorFrames = colorFrame;
 
 					// Apply filters.
