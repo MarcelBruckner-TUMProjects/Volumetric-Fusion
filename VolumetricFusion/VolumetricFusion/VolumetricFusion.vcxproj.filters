@@ -4,6 +4,12 @@
     <ClCompile Include="glad\src\glad.c" />
     <ClCompile Include="MultiFileStream.cpp" />
     <ClCompile Include="std_image.cpp" />
+    <ClCompile Include="ReprojectionError.hpp">
+      <Filter>OptimizationMethods</Filter>
+    </ClCompile>
+    <ClCompile Include="Structs.hpp">
+      <Filter>MarchingCubes</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.hpp" />
@@ -15,7 +21,6 @@
     <ClInclude Include="glad\include\glad\glad.h" />
     <ClInclude Include="glad\include\KHR\khrplatform.h" />
     <ClInclude Include="ImGuiHelpers.hpp" />
-    <ClInclude Include="MarchingCubes.hpp" />
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />
@@ -23,11 +28,20 @@
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Voxelgrid.hpp" />
     <ClInclude Include="Optimization.hpp" />
+    <ClInclude Include="PointCorrespondenceError.hpp">
+      <Filter>OptimizationMethods</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils.hpp" />
+    <ClInclude Include="Tables.hpp">
+      <Filter>MarchingCubes</Filter>
+    </ClInclude>
+    <ClInclude Include="MarchingCubes.hpp">
+      <Filter>MarchingCubes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="readme.md" />
-    <None Include="shader\compute_shader.comp" />
     <None Include="shader\texture.vs">
       <Filter>Shader</Filter>
     </None>
@@ -46,12 +60,6 @@
     <None Include="shader\voxelgrid_cube.fs">
       <Filter>Shader</Filter>
     </None>
-    <None Include="shader\voxelgrid.vs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\voxelgrid.fs">
-      <Filter>Shader</Filter>
-    </None>
     <None Include="shader\pointcloud.vs">
       <Filter>Shader</Filter>
     </None>
@@ -67,10 +75,25 @@
     <None Include="shader\pointcloud.frag">
       <Filter>Shader</Filter>
     </None>
+    <None Include="shader\voxelgrid.vert">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\voxelgrid.frag">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\compute_shader.comp">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Shader">
       <UniqueIdentifier>{0756d57a-0053-4b05-9f92-a9a0ee2a40e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="OptimizationMethods">
+      <UniqueIdentifier>{4fca5f87-8acd-40b3-9188-9f595e9eca06}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MarchingCubes">
+      <UniqueIdentifier>{d3232733-ff98-4d43-8039-45e184cc344a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

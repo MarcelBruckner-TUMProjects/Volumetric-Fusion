@@ -62,6 +62,7 @@ using namespace vc::enums;
 #include <VolumetricFusion\Voxelgrid.hpp>
 //#include <io.h>
 
+#include "MarchingCubes.hpp"
 #include "Optimization.hpp"
 #include "glog/logging.h"
 
@@ -98,6 +99,7 @@ std::vector<int> CALIBRATION_DEPTH_STREAM = { 1280, 720 };
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
+//Camera camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.f);
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -127,6 +129,10 @@ vc::optimization::BAProblem bundleAdjustment = vc::optimization::BAProblem();
 
 int main(int argc, char* argv[]) try {
 	
+	//vc::fusion::testSingleCellMarchingCubes();
+	vc::fusion::testFourCellMarchingCubes();
+	return 0;
+
 	//vc::optimization::testFunc();
 
 	google::InitGoogleLogging("Bundle Adjustment");
@@ -266,8 +272,7 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
-			bundleAdjustment.optimize(pipelines);
-			if (!bundleAdjustment.hasSolution) {
+			if (!bundleAdjustment.optimize(pipelines) || !bundleAdjustment.hasSolution) {
 				continue;
 			}
 
@@ -283,39 +288,27 @@ int main(int argc, char* argv[]) try {
 		}
 	});
 #pragma endregion
+	   
+#pragma region Fusion Thread
+	fusionThread = std::thread([&stopped, &programState]() {
+		const int maxIntegrations = 10;
+		int integrations = 0;
+		while (!stopped) {
+			if (calibrateCameras || !fuseFrames) {
+				continue;
+			}
+			
+			voxelgrid->integrateFramesCPU(pipelines, bundleAdjustment.relativeTransformations);
 
-
-
-//#pragma region Fusion Thread
-//	fusionThread = std::thread([&stopped, &programState, &relativeTransformations]() {
-//		const int maxIntegrations = 10;
-//		int integrations = 0;
-//		while (!stopped) {
-//			if (calibrateCameras || !fuseFrames) {
-//				continue;
-//			}
-//
-//			for (int i = 0; i < pipelines.size(); i++) {
-//				// Only integrate frames with a valid transformation
-//				if (relativeTransformations.count(i) <= 0 || !pipelines[i]->data->points) {
-//					continue;
-//				}
-//
-//				const rs2::vertex* vertices = pipelines[i]->data->points.get_vertices();
-//
-//				auto pip = pipelines[i]->processing;
-//				voxelgrid->integrateFrameCPU(pipelines[i], relativeTransformations[i], i, pip->frameId);
-//			}
-//
-//			integrations++;
-//			if (integrations >= maxIntegrations) {
-//				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
-//				fuseFrames.store(false);
-//				break;
-//			}
-//		}
-//		});
-//#pragma endregion
+			integrations++;
+			if (integrations >= maxIntegrations) {
+				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
+				fuseFrames.store(false);
+				break;
+			}
+		}
+		});
+#pragma endregion
 
 #pragma region Main loop
 
@@ -330,14 +323,14 @@ int main(int argc, char* argv[]) try {
 
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
-		
+
 		// Retina display (Mac OS) have double the pixel density
 		int w2, h2;
 		glfwGetFramebufferSize(window, &w2, &h2);
 		const bool isRetinaDisplay = w2 == width * 2 && h2 == width * 2;
 
 		const float aspect = 1.0f * width / height;
-		
+
 		// -------------------------------------------------------------------------------
 		processInput(window);
 
@@ -351,29 +344,29 @@ int main(int argc, char* argv[]) try {
 		{
 			int x = i % 2;
 			int y = floor(i / 2);
-				if (state.renderState == RenderState::ONLY_COLOR) {
-					pipelines[i]->renderColor(x, y, aspect, width, height);
-				}
-				else if (state.renderState == RenderState::ONLY_DEPTH) {
-					pipelines[i]->renderDepth(x, y, aspect, width, height);
-				}
+			if (state.renderState == RenderState::ONLY_COLOR) {
+				pipelines[i]->renderColor(x, y, aspect, width, height);
+			}
+			else if (state.renderState == RenderState::ONLY_DEPTH) {
+				pipelines[i]->renderDepth(x, y, aspect, width, height);
+			}
 			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
-					if (renderVoxelgrid) {
-						voxelgrid->renderGrid(model, view, projection);
-					}
+				pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
+				if (renderVoxelgrid) {
+					voxelgrid->renderGrid(model, view, projection);
 				}
+			}
 			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
-				}
+				pipelines[i]->renderAllPointclouds(model, view, projection, width, height, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
+			}
 		}
 		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 			voxelgrid->renderGrid(model, view, projection);
 		}
-		if (state.renderState == RenderState::VOXELGRID) {
+
+		/*if (state.renderState == RenderState::VOXELGRID) {
 			voxelgrid->renderField(model, view, projection);
-			
-		}
+		}*/
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
 		glfwSwapBuffers(window);
