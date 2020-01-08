@@ -52,7 +52,7 @@ namespace vc::fusion{
 			/*  Functions    */
 			void setupMesh() {
 
-				meshShader = new vc::rendering::Shader("shader/mesh.vs", "shader/mesh.fs");
+				meshShader = new vc::rendering::VertexFragmentShader("shader/mesh.vs", "shader/mesh.fs");
 
 				// create buffers/arrays
 				glGenVertexArrays(1, &VAO);

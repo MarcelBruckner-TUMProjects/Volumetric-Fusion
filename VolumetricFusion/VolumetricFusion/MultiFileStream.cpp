@@ -65,6 +65,7 @@ using namespace vc::enums;
 //#include <VolumetricFusion\happly.h>
 //#include <io.h>
 
+#include "MarchingCubes.hpp"
 #include "Optimization.hpp"
 #include "glog/logging.h"
 
@@ -130,6 +131,10 @@ vc::optimization::BAProblem bundleAdjustment = vc::optimization::BAProblem();
 
 int main(int argc, char* argv[]) try {
 	
+	//vc::fusion::testSingleCellMarchingCubes();
+	vc::fusion::testFourCellMarchingCubes();
+	return 0;
+
 	//vc::optimization::testFunc();
 
 	google::InitGoogleLogging("Bundle Adjustment");
@@ -551,7 +556,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			break;
 		}
 		case GLFW_KEY_5: {
-			//state.renderState = RenderState::VOXELGRID;
+			state.renderState = RenderState::VOXELGRID;
 			break;
 		}
 		case GLFW_KEY_6: {
