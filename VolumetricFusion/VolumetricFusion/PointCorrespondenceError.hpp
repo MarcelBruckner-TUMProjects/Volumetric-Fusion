@@ -35,7 +35,21 @@ namespace vc::optimization {
             : id(id), j(j), relative_frame_point(relative_frame_point), base_frame_point(base_frame_point), inverse_base_rotation(inverse_base_rotation), inverse_base_translation(inverse_base_translation) {}
                
         std::string asHeader(std::string name) const {
-            return "*************************************  " + name + "  *************************************";
+            std::stringstream ss;
+            ss << "*************************************  ";
+            ss << name;
+            ss << "  *************************************";
+            ss << std::endl;
+            return ss.str();
+        }
+
+        std::string twoVectorsAside(ceres::Vector a, ceres::Vector b) const {
+            std::stringstream ss;
+            for (int i = 0; i < 4; i++)
+            {
+                ss << a[i] << " ---> " << b[i] << std::endl;
+            }
+            return ss.str();
         }
 
         template <typename T>
@@ -44,15 +58,18 @@ namespace vc::optimization {
             T* residuals) const {
                         
             std::stringstream ss;
+
+            ss << asHeader("Base --> Relative");
+            ss << twoVectorsAside(base_frame_point, relative_frame_point);
             
             Eigen::Matrix<T, 4, 1> transformedPoint = Eigen::Matrix<T, 4, 1>(base_frame_point.cast<T>());
-            ss << asHeader("b") << std::endl << transformedPoint << std::endl;
+            ss << asHeader("b") << transformedPoint << std::endl;
 
             transformedPoint = Eigen::Matrix<T, 4, 1>(inverse_base_translation.cast<T>() * transformedPoint);
-            ss << asHeader("T0^-1 * b") << std::endl << transformedPoint << std::endl;
+            ss << asHeader("T0^-1 * b") << transformedPoint << std::endl;
 
             transformedPoint = Eigen::Matrix<T, 4, 1>(inverse_base_rotation.cast<T>() * transformedPoint);
-            ss << asHeader("R0^-1 * (T0^-1 * b)") << std::endl << transformedPoint << std::endl;
+            ss << asHeader("R0^-1 * (T0^-1 * b)") << transformedPoint << std::endl;
 
             // Rodriguez
             T* rot = new T[9];
@@ -65,10 +82,10 @@ namespace vc::optimization {
                 rot[2], rot[5], rot[8], T(0),
                 T(0), T(0), T(0), T(1);
 
-            ss << asHeader("R1") << std::endl << relativeRotation << std::endl;
+            ss << asHeader("R1") << relativeRotation << std::endl;
 
             transformedPoint = Eigen::Matrix<T, 4, 1>(relativeRotation * transformedPoint);
-            ss << asHeader("R1 * (R0^-1 * (T0^-1 * b))") << std::endl << transformedPoint << std::endl;
+            ss << asHeader("R1 * (R0^-1 * (T0^-1 * b))") << transformedPoint << std::endl;
 
             Eigen::Matrix<T, 4, 4> relativeTranslation;
             relativeTranslation <<
@@ -77,10 +94,10 @@ namespace vc::optimization {
                 T(0), T(0), T(1), markerToRelativeTranslation[2],
                 T(0), T(0), T(0), T(1);
 
-            ss << asHeader("T1") << std::endl << relativeTranslation << std::endl;
+            ss << asHeader("T1") << relativeTranslation << std::endl;
 
             transformedPoint = Eigen::Matrix<T, 4, 1>(relativeTranslation * transformedPoint);
-            ss << asHeader("T1 * (R1 * (R0^-1 * (T0^-1 * b)))") << std::endl << transformedPoint << std::endl;
+            ss << asHeader("T1 * (R1 * (R0^-1 * (T0^-1 * b)))") << transformedPoint << std::endl;
             
             // *********************************************************************************
             // Final cost evaluation
@@ -91,7 +108,7 @@ namespace vc::optimization {
                 residuals[i] = error[i];
             }
 
-            ss << asHeader("Residuals") << std::endl << error << std::endl;
+            ss << asHeader("Residuals") << error << std::endl;
 
             //std::cout << ss.str() << "************************************************************************************************************" << std::endl;
 

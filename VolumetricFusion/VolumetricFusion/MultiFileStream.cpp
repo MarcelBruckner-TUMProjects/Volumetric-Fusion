@@ -124,8 +124,8 @@ vc::optimization::BAProblem bundleAdjustment = vc::optimization::BAProblem();
 
 int main(int argc, char* argv[]) try {
 	
-	bundleAdjustment.test();
-	return 0;
+	//bundleAdjustment.test();
+	//return 0;
 
 	google::InitGoogleLogging("Bundle Adjustment");
 	ceres::Solver::Summary summary;
@@ -261,7 +261,7 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
-			if (!bundleAdjustment.optimize(pipelines) || !bundleAdjustment.hasSolution) {
+			if (!bundleAdjustment.optimize(pipelines, false) || !bundleAdjustment.hasSolution) {
 				continue;
 			}
 
@@ -556,26 +556,6 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 		camera.ProcessMouseMovement(xoffset, yoffset);
 	}
 }
-//
-//void processMouse(float xoffset, float yoffset, GLboolean constrainPitch ) {
-//	xoffset *= MouseSensitivity;
-//	yoffset *= MouseSensitivity;
-//
-//	Yaw += xoffset;
-//	Pitch += yoffset;
-//
-//	// Make sure that when pitch is out of bounds, screen doesn't get flipped
-//	if (constrainPitch)
-//	{
-//		if (Pitch > 89.0f)
-//			Pitch = 89.0f;
-//		if (Pitch < -89.0f)
-//			Pitch = -89.0f;
-//	}
-//	model = glm::mat4(1.0f);
-//	model = glm::rotate(model, glm::radians(Pitch), glm::vec3(1.0f, 0.0f, 0.0f));
-//	model = glm::rotate(model, glm::radians(Yaw), glm::vec3(0.0f, 1.0f, 0.0f));
-//}
 
 void mouse_button_callback(GLFWwindow*, int button, int action, int mods)
 {

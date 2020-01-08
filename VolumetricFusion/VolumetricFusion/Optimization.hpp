@@ -57,7 +57,7 @@ namespace vc::optimization {
         std::vector<std::vector<double>> distCoeffs;
 
         bool hasSolution = false;
-
+        
         std::vector<glm::mat4> relativeTransformations = {
             glm::mat4(1.0f),
             glm::mat4(1.0f),
@@ -98,49 +98,48 @@ namespace vc::optimization {
                     rotation.emplace_back(pipelines[i]->chArUco->rotation[j]);
                 }
 
-                //intrinsics[i * num_intrinsic_parameters + 0] = (double)pipelines[i]->depth_camera->intrinsics.fx;
-                //intrinsics[i * num_intrinsic_parameters + 1] = (double)pipelines[i]->depth_camera->intrinsics.fy;
-                //intrinsics[i * num_intrinsic_parameters + 2] = (double)pipelines[i]->depth_camera->intrinsics.ppx;
-                //intrinsics[i * num_intrinsic_parameters + 3] = (double)pipelines[i]->depth_camera->intrinsics.ppy;
-                //for (int j = 0; j < num_distCoeff_parameters; j++)
-                //{
-                //    distCoeffs[i * num_distCoeff_parameters + j] = (double)pipelines[i]->depth_camera->distCoeffs[j];
-                //}
-
                 translations.emplace_back(translation);
                 rotations.emplace_back(rotation);
             }
 
-            //translations[1][0] += 1;
+            //if (false) 
+            {
+                Eigen::Vector3d randomTranslation = Eigen::Vector3d::Random();
+                translations[1][0] += (double)randomTranslation[0];
+                translations[1][1] += (double)randomTranslation[1];
+                translations[1][2] += (double)randomTranslation[2];
+
+                Eigen::Vector3d randomRotation = Eigen::Vector3d::Random();
+                randomRotation.normalize();
+                double angle = std::rand() % 360;
+                randomRotation *= glm::radians(angle);
+                rotations[1][0] += (double)randomRotation[0];
+                rotations[1][1] += (double)randomRotation[1];
+                rotations[1][2] += (double)randomRotation[2];
+            }
 
             hasSolution = true;
 
-            calculateRelativeTransformations(pipelines.size());
+            calculateRelativeTransformations();
             return true;
         }
 
-        bool optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines, bool reprojectionError = false) {
-            /*  hasSolution = true;
-              return true;*/
-
-
+        bool optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines, bool onlyOpenCV = false) {
             hasSolution = false;
             if (!init(pipelines)) {
                 return false;
             }
 
-
-            if (reprojectionError) {
-                solveReprojectionError(pipelines);
+            if (onlyOpenCV) {
+                return true;
             }
-            else {
-                if (!solvePointCorrespondenceError(pipelines)) {
-                    return false;
-                }
+            
+            if (!solvePointCorrespondenceError(pipelines)) {
+                return false;
             }
 
             vc::utils::sleepFor("Pre recalculation after optimization", 4000);
-            calculateRelativeTransformations(pipelines.size());
+            calculateRelativeTransformations();
             vc::utils::sleepFor("After recalculation after optimization", 4000);
 
             return true;
@@ -150,29 +149,13 @@ namespace vc::optimization {
             if (!hasSolution) {
                 return glm::mat4(1.0f);
             }
-            /*glm::vec3 rotation = glm::vec3(
-                rotations[camera_index][0],
-                rotations[camera_index][1],
-                rotations[camera_index][2]
-            );*/
             cv::Vec3d rotation = cv::Vec3d(
                 rotations[camera_index][0],
                 rotations[camera_index][1],
                 rotations[camera_index][2]
             );
-            //rotation = glm::vec3(0.0f, 1.0f, 0.0f) * glm::radians(90.0f);
-            /*float length = glm::length(rotation);
-            glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), length, glm::normalize(rotation));
-            return rotationMatrix;*/
-            //cv::Vec3d rotation = cv::Vec3d(&rotations[camera_index * num_rotation_parameters]);
             cv::Matx33d tmp;
             cv::Rodrigues(rotation, tmp);
-            //auto finalRotation = glm::mat4(
-            //    tmp.val[0], tmp.val[1], tmp.val[2], 0,
-            //    tmp.val[3], tmp.val[4], tmp.val[5], 0,
-            //    tmp.val[6], tmp.val[7], tmp.val[8], 0,
-            //    0, 0, 0, 1
-            //);
             auto finalRotation = glm::mat4(
                 tmp.val[0], tmp.val[3], tmp.val[6], 0,
                 tmp.val[1], tmp.val[4], tmp.val[7], 0,
@@ -228,36 +211,6 @@ namespace vc::optimization {
             }
         }
 
-        //std::vector<std::vector<double>>  calculateTranslationErrors(std::vector<std::vector<double>> initialTranslations) {
-        //    std::vector<std::vector<double>> errors;
-
-        //    for (int i = 0; i < initialTranslations.size(); i++)
-        //    {
-        //        std::vector<double> error;
-        //        for (int j = 0; j < initialTranslations[i].size(); j++)
-        //        {
-        //            error.emplace_back(initialTranslations[i][j] - translations[i][j]);
-        //        }
-        //        errors.emplace_back(error);
-        //    }
-        //    return errors;
-        //}
-
-        //std::vector<std::vector<double>>  calculateRotationErrors(std::vector<std::vector<double>> initialRotations) {
-        //    std::vector<std::vector<double>> errors;
-
-        //    for (int i = 0; i < initialRotations.size(); i++)
-        //    {
-        //        std::vector<double> error;
-        //        for (int j = 0; j < initialRotations[i].size(); j++)
-        //        {
-        //            error.emplace_back(initialRotations[i][j] - rotations[i][j]);
-        //        }
-        //        errors.emplace_back(error);
-        //    }
-        //    return errors;
-        //}
-
         void solveProblem(ceres::Problem* problem) {
 
             auto initialTranslations = translations;
@@ -274,7 +227,6 @@ namespace vc::optimization {
 
             std::cout << vc::utils::toString("Initial", initialTranslations, initialRotations);
             std::cout << vc::utils::toString("Final", translations, rotations);
-            //std::cout << vc::utils::toString("Error", calculateTranslationErrors(initialTranslations), calculateRotationErrors(initialRotations));
 
             std::cout << std::endl;
         }
@@ -378,51 +330,6 @@ namespace vc::optimization {
             return true;
         }
 
-        void solveReprojectionError(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
-
-            // Create residuals for each observation in the bundle adjustment problem. The
-            // parameters for cameras and points are added automatically.
-            ceres::Problem problem;
-
-            for (int i = 0; i < pipelines.size(); i++) {
-                auto pipe = pipelines[i];
-
-                setPipelineStuff(pipe);
-
-                for (auto markerCorners : pipe->chArUco->markerCorners) {
-                    for (auto observation : markerCorners) {
-                        ceres::Vector point = pixel2Point(observation);
-                        //point = relativeTransformations[i] * point;
-                        //point = vc::rendering::COORDINATE_CORRECTION * relativeTransformations[i] * point;
-
-                        //ceres::CostFunction* cost_function = ReprojectionError::Create(observation, point, intrinsics, distCoeffs);
-                        //problem.AddResidualBlock(cost_function, NULL,
-                        //    translations[i].data(),
-                        //    rotations[i].data()
-                        //    //intrinsics + i * num_intrinsic_parameters,
-                        //    //distCoeffs + i * num_distCoeff_parameters
-                        //);
-                    }
-                }
-
-                for (auto observation : pipe->chArUco->charucoCorners) {
-                    ceres::Vector point = pixel2Point(observation);
-                    //point = relativeTransformations[i] * point;
-                    //point = vc::rendering::COORDINATE_CORRECTION * relativeTransformations[i] * point;
-
-                    //ceres::CostFunction* cost_function = ReprojectionError::Create(observation, point, intrinsics, distCoeffs);
-                    //problem.AddResidualBlock(cost_function, NULL,
-                    //    translations[i].data(),
-                    //    rotations[i].data()
-                    //    //intrinsics + i * num_intrinsic_parameters,
-                    //    //distCoeffs + i * num_distCoeff_parameters
-                    //);
-                }
-            }
-
-            solveProblem(&problem);
-        }
-
         bool checkForAllMarkers(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
             for (auto pipe : pipelines) {
                 if (!pipe->chArUco->hasMarkersDetected) {
@@ -432,15 +339,15 @@ namespace vc::optimization {
             return true;
         }
 
-        void calculateRelativeTransformations(int num_pipelines) {
+        void calculateRelativeTransformations() {
             glm::mat4 baseToMarkerTranslation = getTranslationMatrix(0);
             glm::mat4 baseToMarkerRotation = getRotationMatrix(0);
             //glm::mat4 baseToMarkerRotation = glm::mat4(1.0f);
-            glm::mat4 baseTransformation = baseToMarkerTranslation * glm::inverse(baseToMarkerRotation);
+            //glm::mat4 baseTransformation = baseToMarkerTranslation * glm::inverse(baseToMarkerRotation);
+            
+            glm::mat4 baseTransformation = baseToMarkerTranslation * baseToMarkerRotation;
 
-            //glm::mat4 baseTransformation = ((baseToMarkerRotation) * (baseToMarkerTranslation));
-
-            for (int i = 0; i < num_pipelines; i++) {
+            for (int i = 0; i < translations.size(); i++) {
                 //programState.highestFrameIds[i] = MAX(pipelines[i]->chArUco->frameId, programState.highestFrameIds[i]);
 
                 if (i == 0) {
@@ -457,6 +364,11 @@ namespace vc::optimization {
                 glm::mat4 relativeTransformation = (
                     //glm::mat4(1.0f)
 
+                    //glm::inverse(markerToRelativeTranslation)
+                    //glm::inverse(markerToRelativeRotation)* glm::inverse(markerToRelativeTranslation)
+                    baseTransformation * glm::inverse(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
+                    //baseToMarkerTranslation * baseToMarkerRotation * glm::inverse(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
+
                     //baseToMarkerTranslation * (markerToRelativeRotation) * (baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation)
                     //baseToMarkerTranslation * glm::inverse(markerToRelativeRotation) * (baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation)
                     //baseToMarkerTranslation * (markerToRelativeRotation) * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeTranslation)
@@ -465,7 +377,8 @@ namespace vc::optimization {
                     //baseToMarkerTranslation * (baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
                     //baseToMarkerTranslation * glm::inverse((baseToMarkerRotation) * glm::inverse(markerToRelativeRotation)) * glm::inverse(markerToRelativeTranslation)
                     ///*baseToMarkerTranslation **/ glm::inverse(baseToMarkerRotation)* (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
-                    baseTransformation * (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
+                    //baseTransformation* (markerToRelativeRotation)*glm::inverse(markerToRelativeTranslation) //######################################################################
+                    //baseTransformation * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
                     //baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * (markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation) //######################################################################
                     //baseToMarkerTranslation * glm::inverse(baseToMarkerRotation) * glm::inverse(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
 
