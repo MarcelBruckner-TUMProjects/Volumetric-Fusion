@@ -10,6 +10,8 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/aruco/charuco.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
 
 #include "Data.hpp"
 #include <glm/glm.hpp>
@@ -84,7 +86,7 @@ namespace vc::processing {
 	}
 
 
-	class Processing {
+	class ChArUco {
 	public:
 		rs2::frame_queue charucoProcessingQueues;
 		std::shared_ptr<rs2::processing_block > charucoProcessingBlocks;
@@ -93,55 +95,50 @@ namespace vc::processing {
 		// buffer <frame_id, value>
 		bool visualize = false;
 		bool hasMarkersDetected = false;
-		std::vector<int> charucoIdBuffers;
-		glm::mat4 rotation = glm::mat4(1.0f);
-		glm::mat4 translation = glm::mat4(1.0f);
+
 		unsigned long long frameId;
 
-		void startCharucoProcessing(vc::data::Camera& camera) {
+		std::vector<int> ids;
+		std::vector<std::vector<cv::Point2f>> markerCorners;
+
+		std::vector<cv::Point2f> charucoCorners;
+		std::vector<int> charucoIds;
+
+		cv::Vec3d rotation, translation;
+		
+		void startCharucoProcessing(vc::data::Camera camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
 
 				this->frameId = frameId;
+				cv::aruco::detectMarkers(image, dictionary, markerCorners, ids);
 
-				std::vector<int> ids;
-				std::vector<std::vector<cv::Point2f>> corners;
-				cv::aruco::detectMarkers(image, dictionary, corners, ids);
+				/*int i = 0;
+				for (auto corner_list : markerCorners) {
+					std::cout << ids[i++] << std::endl;
+					for (auto corner : corner_list) {
+						std::cout << corner << std::endl;
+					}
+				}*/
+
 				// if at least one marker detected
 				if (ids.size() > 0) {
 					if (visualize) {
-						cv::aruco::drawDetectedMarkers(image, corners, ids);
+						cv::aruco::drawDetectedMarkers(image, markerCorners, ids);
 					}
-					std::vector<cv::Point2f> charucoCorners;
-					std::vector<int> charucoIds;
-					cv::aruco::interpolateCornersCharuco(corners, ids, image, board, charucoCorners, charucoIds);
+					cv::aruco::interpolateCornersCharuco(markerCorners, ids, image, board, charucoCorners, charucoIds);
 					// if at least one charuco corner detected
 					if (charucoIds.size() > 0) {
 						if (visualize) {
 							cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
 						}
-						cv::Vec3d r, t;
-						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.cameraMatrices, camera.distCoeffs, r, t);
+						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.K, camera.distCoeffs, rotation, translation);
 						// if charuco pose is valid
 						if (valid) {
 							if (visualize) {
-								cv::aruco::drawAxis(image, camera.cameraMatrices, camera.distCoeffs, r, t, 0.1);
+								cv::aruco::drawAxis(image, camera.K, camera.distCoeffs, rotation, translation, 0.1);
 							}
-
-							rotation = glm::mat4(1.0f);
-							translation = glm::mat4(1.0f);
-							charucoIdBuffers = charucoIds;
-							translation = glm::translate(translation, glm::vec3(t[0], t[1], t[2]));
-
-							cv::Matx33d tmp;
-							cv::Rodrigues(r, tmp);
-							rotation = glm::mat4(
-								tmp.val[0], tmp.val[1], tmp.val[2], 0,
-								tmp.val[3], tmp.val[4], tmp.val[5], 0,
-								tmp.val[6], tmp.val[7], tmp.val[8], 0,
-								0, 0, 0, 1
-							);
 
 							hasMarkersDetected = true;
 						}

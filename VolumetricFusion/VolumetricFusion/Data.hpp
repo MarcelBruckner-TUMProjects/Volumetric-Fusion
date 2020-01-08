@@ -35,24 +35,52 @@
 
 #include "Processing.hpp"
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 namespace vc::processing {
-	class Processing;
+	class ChArUco;
 }
 
 namespace vc::data {
-
-#ifndef PI
-	const double PI = 3.14159265358979323846;
-#endif
-	const size_t IMU_FRAME_WIDTH = 1280;
-	const size_t IMU_FRAME_HEIGHT = 720;
-
+	
 	class Camera {
 	public:
 		// Pose estimation camera stuff
 		rs2_intrinsics intrinsics;
-		cv::Matx33f cameraMatrices;
+		cv::Matx33f K;
+		cv::Matx33f world2cam;
+		glm::mat3 cam2world;
 		std::vector<float> distCoeffs;
+
+		float depthScale;
+
+		Camera(rs2_intrinsics intrinsics, float depthScale = 0.0f) {
+			this->depthScale = depthScale;
+			this->intrinsics = intrinsics;
+		
+			K = cv::Matx33f(
+				intrinsics.fx, 0, intrinsics.ppx,
+				0, intrinsics.fy, intrinsics.ppy,
+				0, 0, 1
+			);
+
+			world2cam = cv::Matx33f(
+				1.0f / intrinsics.fx, 0, (-intrinsics.ppx) / intrinsics.fx,
+				0, 1.0f / intrinsics.fy, (-intrinsics.ppy) / intrinsics.fy,
+				0, 0, 1
+			);
+			cam2world = glm::mat3(
+				1.0f / intrinsics.fx, 0, (-intrinsics.ppx) / intrinsics.fx,
+				0, 1.0f / intrinsics.fy, (-intrinsics.ppy) / intrinsics.fy,
+				0, 0, 1
+			);
+
+			for (float c : intrinsics.coeffs) {
+				distCoeffs.push_back(c);
+			}
+		}
 	};
 
 	class Data {
@@ -69,24 +97,10 @@ namespace vc::data {
 		rs2::frame colorizedDepthFrames;
 		rs2::points points;
 		
-		Camera camera;
-		vc::processing::Processing* processing;
+		vc::processing::ChArUco* processing;
 
 		Data() {}
 
-		// TODO maybe more mvvc
-		void setIntrinsics(rs2_intrinsics intrinsics) {
-			camera.intrinsics = intrinsics;
-			camera.cameraMatrices = cv::Matx33f(
-				intrinsics.fx, 0, intrinsics.ppx,
-				0, intrinsics.fy, intrinsics.ppy,
-				0, 0, 1
-			);
-
-			for (float c : intrinsics.coeffs) {
-				camera.distCoeffs.push_back(c);
-			}
-		}
 	};
 }
 #endif // !_DATA_HEADER_

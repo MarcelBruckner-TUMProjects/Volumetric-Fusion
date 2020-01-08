@@ -1,3 +1,15 @@
 [submodule "include/Eigen"]
 	path = include/Eigen
 	url = git@github.com:eigenteam/eigen-git-mirror.git
+[submodule "include/ceres"]
+	path = include/ceres
+	url = https://ceres-solver.googlesource.com/ceres-solver
+[submodule "include/eigen"]
+	path = include/eigen
+	url = https://gitlab.com/libeigen/eigen.git
+[submodule "include/glog"]
+	path = include/glog
+	url = https://github.com/google/glog
+[submodule "include/gflags"]
+	path = include/gflags
+	url = https://github.com/gflags/gflags

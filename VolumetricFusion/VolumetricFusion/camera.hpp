@@ -77,9 +77,9 @@ public:
         if (direction == BACKWARD)
             Position -= Front * velocity;
         if (direction == LEFT)
-            Position -= Right * velocity;
-        if (direction == RIGHT)
             Position += Right * velocity;
+        if (direction == RIGHT)
+            Position -= Right * velocity;
         if (direction == DOWN)
             Position -= Up * velocity;
         if (direction == UP)

@@ -1,27 +1,58 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="MultiFileStream.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="std_image.cpp">
-      <Filter>Header Files</Filter>
-    </ClCompile>
     <ClCompile Include="glad\src\glad.c" />
+    <ClCompile Include="MultiFileStream.cpp" />
+    <ClCompile Include="std_image.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="readme.md" />
+    <ClInclude Include="camera.hpp" />
+    <ClInclude Include="CaptureDevice.hpp" />
+    <ClInclude Include="ComputeShader.hpp" />
+    <ClInclude Include="Data.hpp" />
+    <ClInclude Include="Enums.hpp" />
+    <ClInclude Include="FileAccess.hpp" />
+    <ClInclude Include="glad\include\glad\glad.h" />
+    <ClInclude Include="glad\include\KHR\khrplatform.h" />
+    <ClInclude Include="ImGuiHelpers.hpp" />
+    <ClInclude Include="MarchingCubes.hpp" />
+    <ClInclude Include="Processing.hpp" />
+    <ClInclude Include="Rendering.hpp" />
+    <ClInclude Include="Settings.hpp" />
+    <ClInclude Include="Shader.hpp" />
+    <ClInclude Include="stb_image.h" />
+    <ClInclude Include="Voxelgrid.hpp" />
+    <ClInclude Include="Optimization.hpp" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="packages.config" />
-    <None Include="shader\pointcloud.fs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\pointcloud.vs">
+    <None Include="readme.md" />
+    <None Include="shader\compute_shader.comp" />
+    <None Include="shader\texture.vs">
       <Filter>Shader</Filter>
     </None>
     <None Include="shader\texture.fs">
       <Filter>Shader</Filter>
     </None>
-    <None Include="shader\texture.vs">
+    <None Include="shader\voxelgrid_trippy.vs">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\voxelgrid_trippy.fs">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\voxelgrid_cube.vs">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\voxelgrid_cube.fs">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\voxelgrid.vs">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\voxelgrid.fs">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\pointcloud.vs">
       <Filter>Shader</Filter>
     </None>
     <None Include="shader\coordinate.fs">
@@ -30,10 +61,10 @@
     <None Include="shader\coordinate.vs">
       <Filter>Shader</Filter>
     </None>
-    <None Include="shader\voxelgrid.fs">
+    <None Include="shader\pointcloud_new.vert">
       <Filter>Shader</Filter>
     </None>
-    <None Include="shader\voxelgrid.vs">
+    <None Include="shader\pointcloud.frag">
       <Filter>Shader</Filter>
     </None>
     <None Include="shader\voxelgrid_cube.fs" />
@@ -48,17 +79,8 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{0780a682-020d-4c4d-8295-c9e11eaed300}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{cc4c29ba-d7d5-4c9d-b871-329befd02faa}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Helpers">
-      <UniqueIdentifier>{aa4aeaf4-cc77-441c-950f-28f87aa939f6}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Shader">
-      <UniqueIdentifier>{6356fdff-e131-4be0-a908-c7bb6bae0a00}</UniqueIdentifier>
+      <UniqueIdentifier>{0756d57a-0053-4b05-9f92-a9a0ee2a40e0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
