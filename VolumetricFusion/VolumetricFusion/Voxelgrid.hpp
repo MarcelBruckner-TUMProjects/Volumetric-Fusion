@@ -11,30 +11,30 @@
 #include "Structs.hpp"
 
 namespace vc::fusion {
-	const float cube_vertices[] = {
-		0.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 1.0f,
-		0.0f, 1.0f, 1.0f,
-		0.0f, 1.0f, 0.0f,
-		1.0f, 0.0f, 0.0f,
-		1.0f, 0.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 0.0f
-	};
-	const unsigned int cube_indices[] = {
-		0, 1, 2,
-		0, 2, 3,
-		7, 6, 5,
-		7, 5, 4,
-		0, 4, 5,
-		0, 5, 1,
-		1, 5, 6,
-		1, 6, 2,
-		2, 6, 7,
-		2, 7, 3,
-		3, 7, 4,
-		3, 4, 0,
-	};
+	//const float cube_vertices[] = {
+	//	0.0f, 0.0f, 0.0f,
+	//	0.0f, 0.0f, 1.0f,
+	//	0.0f, 1.0f, 1.0f,
+	//	0.0f, 1.0f, 0.0f,
+	//	1.0f, 0.0f, 0.0f,
+	//	1.0f, 0.0f, 1.0f,
+	//	1.0f, 1.0f, 1.0f,
+	//	1.0f, 1.0f, 0.0f
+	//};
+	//const unsigned int cube_indices[] = {
+	//	0, 1, 2,
+	//	0, 2, 3,
+	//	7, 6, 5,
+	//	7, 5, 4,
+	//	0, 4, 5,
+	//	0, 5, 1,
+	//	1, 5, 6,
+	//	1, 6, 2,
+	//	2, 6, 7,
+	//	2, 7, 3,
+	//	3, 7, 4,
+	//	3, 4, 0,
+	//};
 
 	class Voxelgrid {
 	private:
@@ -51,6 +51,7 @@ namespace vc::fusion {
 
 		std::map<int, std::vector<int>> integratedFramesPerPipeline;
 
+		std::ofstream outFile;
 
 	public:
 		float resolution;
@@ -68,13 +69,59 @@ namespace vc::fusion {
 		std::vector<float> points;
 
 		int hashFunc(int x, int y, int z) {
-			std::cout << z * sizeNormalized.y * sizeNormalized.x + y * sizeNormalized.x + x << std::endl;
+			//std::cout << z * sizeNormalized.y * sizeNormalized.x + y * sizeNormalized.x + x << std::endl;
 			return z * sizeNormalized.y * sizeNormalized.x + y * sizeNormalized.x + x;
 		}
 
-		Voxelgrid(const float resolution = 0.05f, const glm::vec3 size = glm::vec3(2.0f), const glm::vec3 origin = glm::vec3(0.0f, 0.0f, 1.0f), bool initializeShader = true)
+		void unhashFunc() {
+			
+			//int tsdf_value, float& pt_base_x, float& pt_base_y, float& pt_base_z
+
+			std::cout << sizeNormalized.x * sizeNormalized.y * sizeNormalized.z << std::endl;
+			
+			for (int i = 0; i < sizeNormalized.x * sizeNormalized.y * sizeNormalized.z; i++) {
+
+				float tsdf_thresh = 0.8f;
+				float weight_thresh = 0.0f;
+
+				float tsdf_value = tsdf[i];
+				float voxel_weight = weights[i];
+
+				if (std::abs(tsdf_value) < tsdf_thresh && voxel_weight > weight_thresh) {
+					
+					int z = floor(i / (sizeNormalized.x * sizeNormalized.y));
+					int y = floor((i - (z * sizeNormalized.x * sizeNormalized.y)) / sizeNormalized.x);
+					int x = i - (z * sizeNormalized.x * sizeNormalized.y) - (y * sizeNormalized.x);
+
+					//int x = floor(i / (sizeNormalized.y * sizeNormalized.z));
+					//int y = floor((i - (x * sizeNormalized.y * sizeNormalized.z)) / sizeNormalized.z);
+					//int z = i - (x * sizeNormalized.y * sizeNormalized.z) - (y * sizeNormalized.z);
+
+					//float pt_base_x = origin.x + (float)x * voxel_size;
+					//float pt_base_y = origin.y + (float)y * voxel_size;
+					//float pt_base_z = origin.z + (float)z * voxel_size;
+
+					glm::vec3 voxelPosition = getVoxelPosition(x, y, z);
+
+					float pt_base_x = voxelPosition.x;
+					float pt_base_y = voxelPosition.y;
+					float pt_base_z = voxelPosition.z;
+
+					//std::cout << pt_base_x << " " << pt_base_y << " " << pt_base_z << std::endl;
+					outFile << pt_base_x << " " << pt_base_y << " " << pt_base_z << std::endl;
+					//outFile << x << " " << y << " " << z << std::endl;
+				}
+			}
+
+			outFile.close();
+		}
+
+		Voxelgrid(const float resolution = 0.038f, const glm::vec3 size = glm::vec3(2.0f), const glm::vec3 origin = glm::vec3(0.0f, 0.0f, 1.0f), bool initializeShader = true)
 			: resolution(resolution), origin(origin), size(size), sizeHalf(size / 2.0f), sizeNormalized((size / resolution) + glm::vec3(1.0f)), num_gridPoints((sizeNormalized.x* sizeNormalized.y* sizeNormalized.z))
 		{
+			remove("scene.xyz");
+			outFile.open("scene.xyz", std::ios_base::app);
+
 			reset();
 
 			int i = 0;
@@ -93,6 +140,7 @@ namespace vc::fusion {
 						//std::cout << hash << std::endl;
 
 						tsdf[hash] = (1.0f * i++ / num_gridPoints) * 2.0f - 1.0f;
+						//tsdf[hash] = 1.0f;
 
 						ss << vc::utils::toString(&voxelPosition) << " (" << hash << ") --> " << tsdf[hash];
 						//std::cout << ss.str() << std::endl;
@@ -365,7 +413,7 @@ namespace vc::fusion {
 
 			integratedFramesPerPipeline[pipelineId].push_back(frameId);
 
-			int i = 0;
+			//int i = 0;
 			for (int z = 0; z < sizeNormalized.z; z++)
 			{
 				for (int y = 0; y < sizeNormalized.y; y++)
@@ -410,11 +458,18 @@ namespace vc::fusion {
 						float real_depth = depth_frame->get_distance(pixelCoordinate.x, pixelCoordinate.y);
 						ss << " --- Voxel depth: " << z << " - Real depth: " << real_depth;
 
-						float tsdf_value = z - real_depth;
+						//float tsdf_value = z - real_depth;
+						float tsdf_value = real_depth - z;
+
+						//float trunc_margin = 0.03;
+
+						//if (tsdf_value <= -trunc_margin)
+						//	continue;
 
 						ss << " ==> TSDF value: " << tsdf_value;
 
 						float clamped_tsdf_value = std::clamp(tsdf_value, -1.0f, 1.0f);
+						//float clamped_tsdf_value = fmin(1.0f, tsdf_value / trunc_margin);
 
 						ss << " (" << clamped_tsdf_value << ")";
 
@@ -424,11 +479,13 @@ namespace vc::fusion {
 						tsdf[hash] = (old_tsdf * old_weight + clamped_tsdf_value) / weights[hash];
 						isSet[hash] = 7;
 
-						std::cout << ss.str() << std::endl;
+						//outFile << projectedVoxelCenter.x << " " << projectedVoxelCenter.y << " " << clamped_tsdf_value << std::endl;
+
+						//std::cout << ss.str() << std::endl;
 					}
 				}
 			}
-			std::cout << i << std::endl;
+			//std::cout << i << std::endl;
 
 			//for (int i = 0; i < num_gridPoints; i++) {
 				//glm::vec3 pt_base = hashFuncInv(i);

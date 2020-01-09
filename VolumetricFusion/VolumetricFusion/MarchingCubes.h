@@ -429,10 +429,10 @@ namespace vc::fusion {
 		freeHash(&hash);
 	}
 
-	void marchingCubes(vc::fusion::Voxelgrid* voxelgrid) {
-	}
+	//void marchingCubes(vc::fusion::Voxelgrid* voxelgrid) {
+	//}
 
-	MCM* marchingCubes() {
+	MCM* marchingCubes2() {
 		atexit(freeMemory);
 		initHash(&hash);
 

@@ -1,9 +1,3 @@
-#define _ENABLE_EXTENDED_ALIGNED_STORAGE
-
-//#define GLOG_NO_ABBREVIATED_SEVERITIES
-#define _CRT_NONSTDC_NO_DEPRECATE
-#define _SILENCE_CXX17_NEGATORS_DEPRECATION_WARNING
-
 #pragma region Includes
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
@@ -133,8 +127,8 @@ vc::optimization::BAProblem bundleAdjustment = vc::optimization::BAProblem();
 int main(int argc, char* argv[]) try {
 	
 	//vc::fusion::testSingleCellMarchingCubes();
-	vc::fusion::testFourCellMarchingCubes();
-	return 0;
+	//vc::fusion::testFourCellMarchingCubes();
+	//return 0;
 
 	//vc::optimization::testFunc();
 
@@ -306,6 +300,10 @@ int main(int argc, char* argv[]) try {
 			integrations++;
 			if (integrations >= maxIntegrations) {
 				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
+				//vc::fusion::marchingCubes(voxelgrid);
+				voxelgrid->unhashFunc();
+				std::cout << "Done" << std::endl;
+				//std::cout << "Marching cubes finished!" << std::endl;
 				fuseFrames.store(false);
 				break;
 			}

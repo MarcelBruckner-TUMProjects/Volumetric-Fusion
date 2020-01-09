@@ -3,13 +3,9 @@
   <ItemGroup>
     <ClCompile Include="glad\src\glad.c" />
     <ClCompile Include="MultiFileStream.cpp" />
+    <ClCompile Include="ReprojectionError.hpp" />
     <ClCompile Include="std_image.cpp" />
-    <ClCompile Include="ReprojectionError.hpp">
-      <Filter>OptimizationMethods</Filter>
-    </ClCompile>
-    <ClCompile Include="Structs.hpp">
-      <Filter>MarchingCubes</Filter>
-    </ClCompile>
+    <ClCompile Include="Structs.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.hpp" />
@@ -20,133 +16,41 @@
     <ClInclude Include="FileAccess.hpp" />
     <ClInclude Include="glad\include\glad\glad.h" />
     <ClInclude Include="glad\include\KHR\khrplatform.h" />
+    <ClInclude Include="happly.h" />
     <ClInclude Include="ImGuiHelpers.hpp" />
+    <ClInclude Include="MarchingCubes.h" />
+    <ClInclude Include="Mesh.hpp" />
+    <ClInclude Include="MarchingCubes.hpp" />
+    <ClInclude Include="Optimization.hpp" />
+    <ClInclude Include="PointCorrespondenceError.hpp" />
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />
     <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
-    <ClInclude Include="Voxelgrid.hpp" />
-    <ClInclude Include="Optimization.hpp" />
-    <ClInclude Include="PointCorrespondenceError.hpp">
-      <Filter>OptimizationMethods</Filter>
-    </ClInclude>
+    <ClInclude Include="Tables.hpp" />
     <ClInclude Include="Utils.hpp" />
-    <ClInclude Include="Tables.hpp">
-      <Filter>MarchingCubes</Filter>
-    </ClInclude>
-    <ClInclude Include="MarchingCubes.hpp">
-      <Filter>MarchingCubes</Filter>
-    </ClInclude>
+    <ClInclude Include="Voxelgrid.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="readme.md" />
-    <None Include="shader\texture.vs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\texture.fs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\voxelgrid_trippy.vs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\voxelgrid_trippy.fs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\voxelgrid_cube.vs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\voxelgrid_cube.fs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\pointcloud.vs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\coordinate.fs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\coordinate.vs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\pointcloud_new.vert">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\pointcloud.frag">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\mesh.fs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\mesh.vs">
-    <None Include="shader\voxelgrid.vert">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\voxelgrid.frag">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\compute_shader.comp">
-      <Filter>Shader</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Filter Include="Shader">
-      <UniqueIdentifier>{0756d57a-0053-4b05-9f92-a9a0ee2a40e0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="OptimizationMethods">
-      <UniqueIdentifier>{4fca5f87-8acd-40b3-9188-9f595e9eca06}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="MarchingCubes">
-      <UniqueIdentifier>{d3232733-ff98-4d43-8039-45e184cc344a}</UniqueIdentifier>
-    </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="FileAccess.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelpers.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Enums.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Settings.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Data.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="CaptureDevice.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Processing.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Rendering.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="camera.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="shader.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="stb_image.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Voxelgrid.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="glad\include\glad\glad.h" />
-    <ClInclude Include="glad\include\KHR\khrplatform.h" />
-    <ClInclude Include="happly.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Mesh.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MarchingCubes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
+    <None Include="shader\compute_shader.comp" />
+    <None Include="shader\coordinate.fs" />
+    <None Include="shader\coordinate.vs" />
+    <None Include="shader\mesh.fs" />
+    <None Include="shader\mesh.vs" />
+    <None Include="shader\pointcloud.fs" />
+    <None Include="shader\pointcloud.frag" />
+    <None Include="shader\pointcloud.vs" />
+    <None Include="shader\pointcloud_new.vert" />
+    <None Include="shader\texture.fs" />
+    <None Include="shader\texture.vs" />
+    <None Include="shader\voxelgrid.frag" />
+    <None Include="shader\voxelgrid.vert" />
+    <None Include="shader\voxelgrid_cube.fs" />
+    <None Include="shader\voxelgrid_cube.vs" />
+    <None Include="shader\voxelgrid_trippy.fs" />
+    <None Include="shader\voxelgrid_trippy.vs" />
   </ItemGroup>
 </Project>

@@ -44,9 +44,11 @@ namespace vc::fusion {
                     for (int i = 0; i < num_new_triangles; i++)
                     {
                         triangles.emplace_back(new_triangles[i]);
+						ss << new_triangles[i].p->x << " " << new_triangles[i].p->y << " " << new_triangles[i].p->z;
+						std::cout << ss.str() << std::endl;
                     }
 
-                    std::cout << ss.str() << std::endl;
+                    
                 }
             }
         }
