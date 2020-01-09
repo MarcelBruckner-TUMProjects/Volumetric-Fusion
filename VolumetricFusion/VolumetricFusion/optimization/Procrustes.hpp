@@ -22,7 +22,7 @@
 namespace vc::optimization {
 	class Procrustes : public vc::optimization::OptimizationProblem {
 
-        bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+        bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) {
            
             return true;
         }

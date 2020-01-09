@@ -113,7 +113,7 @@ namespace vc::optimization {
 
     class MockBundleAdjustment : public ABundleAdjustment {
     public:
-        bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+        bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) {
             glm::vec3 baseTranslationVector = glm::vec3(0.0f, 0.0f, 1.0f);
             translations[0] = (std::vector<double>{ baseTranslationVector.x, baseTranslationVector.y, baseTranslationVector.z });
             glm::mat4 baseTranslation = getTranslationMatrix(0);
@@ -164,17 +164,17 @@ namespace vc::optimization {
             std::vector<ceres::Vector> baseFramePoints;
             std::vector<ceres::Vector> relativeFramePoints;
 
-            std::vector<ACharacteristicPoints> characteristicPoints;
-            characteristicPoints.emplace_back(MockCharacteristicPoints());
-            characteristicPoints.emplace_back(MockCharacteristicPoints());
+            std::vector<ACharacteristicPoints> mockCharacteristicPoints;
+            mockCharacteristicPoints.emplace_back(MockCharacteristicPoints());
+            mockCharacteristicPoints.emplace_back(MockCharacteristicPoints());
 
             for (int i = 0; i < points.size(); i++)
             {
-                characteristicPoints[0].markerCorners[0].emplace_back(baseTransformation * points[i]);
-                characteristicPoints[1].markerCorners[0].emplace_back(relativeTransformation * points[i]);
+                mockCharacteristicPoints[0].markerCorners[0].emplace_back(baseTransformation * points[i]);
+                mockCharacteristicPoints[1].markerCorners[0].emplace_back(relativeTransformation * points[i]);
             }
 
-            ABundleAdjustment::solvePointCorrespondenceError(characteristicPoints);
+            ABundleAdjustment::solvePointCorrespondenceError(mockCharacteristicPoints);
 
             std::cout << vc::utils::toString("Expected", expectedTranslations, expectedRotations);
 
@@ -186,10 +186,10 @@ namespace vc::optimization {
 
     class BundleAdjustment : public ABundleAdjustment {
     public:
-        bool specific_optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+        bool specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) {
             //vc::utils::sleepFor("Pre recalculation after optimization", 4000);
 
-            if (!solvePointCorrespondenceError(pipelines)) {
+            if (!solvePointCorrespondenceError(characteristicPoints)) {
                 return false;
             }
             //vc::utils::sleepFor("After recalculation after optimization", 4000);
@@ -198,18 +198,7 @@ namespace vc::optimization {
         }
 
     private:
-        std::vector<ACharacteristicPoints> getCharacteristicPoints(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
-            std::vector<ACharacteristicPoints> characteristicPoints;
-            for (int i = 0; i < pipelines.size(); i++)
-            {
-                characteristicPoints.emplace_back(CharacteristicPoints(pipelines[i]));
-            }
-            return characteristicPoints;
-        }
-
-        bool solvePointCorrespondenceError(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
-            std::vector<ACharacteristicPoints> characteristicPoints = getCharacteristicPoints(pipelines);
-
+        bool solvePointCorrespondenceError(std::vector<ACharacteristicPoints> characteristicPoints) {
             ABundleAdjustment::solvePointCorrespondenceError(characteristicPoints);
 
             return true;

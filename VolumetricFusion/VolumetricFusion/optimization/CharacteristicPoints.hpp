@@ -74,7 +74,7 @@ namespace vc::optimization {
                 int markerId = ids[j];
 
                 for (int cornerId = 0; cornerId < markerCorners[j].size(); cornerId++) {
-                    this->markerCorners[markerId].emplace_back(pixel2Point(markerCorners[j][cornerId]));
+                        this->markerCorners[markerId].emplace_back(pixel2Point(markerCorners[j][cornerId]));
                 }
             }
 
@@ -82,20 +82,25 @@ namespace vc::optimization {
             {
                 int charucoId = charucoIds[j];
 
-                this->charucoCorners[charucoId] = pixel2Point(charucoCorners[j]);
+                    this->charucoCorners[charucoId] = pixel2Point(charucoCorners[j]);
             }
         }
 
         ceres::Vector pixel2Point(cv::Point2f observation) {
-            int x = observation.x * color2DepthWidth;
-            int y = observation.y * color2DepthHeight;
+            try {
+                int x = observation.x * color2DepthWidth;
+                int y = observation.y * color2DepthHeight;
 
-            glm::vec3 point = glm::vec3(x, y, 1.0f);
-            point = point * cam2World;
-            point *= depth_frame->get_distance(x, y);
+                glm::vec3 point = glm::vec3(x, y, 1.0f);
+                point = point * cam2World;
+                point *= depth_frame->get_distance(x, y);
 
-            Eigen::Vector4d v(point.x, point.y, point.z, 1.0f);
-            return v;
+                Eigen::Vector4d v(point.x, point.y, point.z, 1.0f);
+                return v;
+            }
+            catch (rs2::error&) {
+                return Eigen::Vector4d(0.0, 0.0, 0.0, 0.0);
+            }
         }
 
         bool setPipelineStuff(std::shared_ptr<vc::capture::CaptureDevice> pipe) {

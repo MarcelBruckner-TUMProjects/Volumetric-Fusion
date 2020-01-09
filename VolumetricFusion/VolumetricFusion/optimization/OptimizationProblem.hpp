@@ -13,6 +13,7 @@
 #include "ceres/rotation.h"
 #include <sstream>
 
+#include "CharacteristicPoints.hpp"
 #include "PointCorrespondenceError.hpp"
 #include "ReprojectionError.hpp"
 #include "../Utils.hpp"
@@ -216,6 +217,15 @@ namespace vc::optimization {
             return relativeTransformations[camera_index];
         }
 
+        std::vector<ACharacteristicPoints> getCharacteristicPoints(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+            std::vector<ACharacteristicPoints> characteristicPoints;
+            for (int i = 0; i < pipelines.size(); i++)
+            {
+                characteristicPoints.emplace_back(CharacteristicPoints(pipelines[i]));
+            }
+            return characteristicPoints;
+        }
+
         bool vc::optimization::OptimizationProblem::optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines, bool onlyOpenCV = false) {
             if (!init(pipelines)) {
                 return false;
@@ -224,15 +234,15 @@ namespace vc::optimization {
                 return true;
             }
 
-            return specific_optimize(pipelines);
+            return specific_optimize(getCharacteristicPoints(pipelines));
         }
 
-        virtual bool specific_optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) = 0; 
+        virtual bool specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) = 0;
     };
 
     class MockOptimizationProblem : public OptimizationProblem {
     public:
-        bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+        bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) {
             long milliseconds = 1000;
             vc::utils::sleepFor(milliseconds);
             return true;

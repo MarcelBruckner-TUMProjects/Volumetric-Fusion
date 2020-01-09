@@ -122,7 +122,7 @@ std::atomic_bool calibrateCameras = true;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
-vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::MockBundleAdjustment();
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::MockOptimizationProblem();
 
 int main(int argc, char* argv[]) try {
 	
