@@ -12,6 +12,11 @@
 #include <thread>
 
 namespace vc::utils {
+	void sleepFor(unsigned long milliseconds) {
+		using namespace std::chrono_literals;
+		std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
+	}
+	
 	void sleepFor(std::string message, unsigned long milliseconds) {
 		using namespace std::chrono_literals;
 		std::cout << message << std::endl;

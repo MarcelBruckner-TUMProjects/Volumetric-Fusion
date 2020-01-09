@@ -21,7 +21,6 @@
   <ItemGroup>
     <ClCompile Include="glad\src\glad.c" />
     <ClCompile Include="MultiFileStream.cpp" />
-    <ClCompile Include="ReprojectionError.hpp" />
     <ClCompile Include="std_image.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -59,7 +58,12 @@
     <ClInclude Include="ImGuiHelpers.hpp" />
     <ClInclude Include="MarchingCubes.hpp" />
     <ClInclude Include="Optimization.hpp" />
-    <ClInclude Include="PointCorrespondenceError.hpp" />
+    <ClInclude Include="optimization\BundleAdjustment.hpp" />
+    <ClInclude Include="optimization\CharacteristicPoints.hpp" />
+    <ClInclude Include="optimization\OptimizationProblem.hpp" />
+    <ClInclude Include="optimization\PointCorrespondenceError.hpp" />
+    <ClInclude Include="optimization\Procrustes.hpp" />
+    <ClInclude Include="optimization\ReprojectionError.hpp" />
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />

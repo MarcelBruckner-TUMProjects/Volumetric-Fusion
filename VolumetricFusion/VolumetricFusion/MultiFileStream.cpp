@@ -56,7 +56,9 @@ using namespace vc::enums;
 #include <VolumetricFusion\Voxelgrid.hpp>
 //#include <io.h>
 
-#include "Optimization.hpp"
+#include "optimization/optimizationProblem.hpp"
+#include "optimization/BundleAdjustment.hpp"
+#include "optimization/Procrustes.hpp"
 #include "glog/logging.h"
 
 #pragma endregion
@@ -80,9 +82,9 @@ void processInput(GLFWwindow* window);
 void setCalibration(bool calibrate);
 
 // settings
-const unsigned int SCR_WIDTH = 800 * 2;
-const unsigned int TOP_BAR_HEIGHT = 0;
-const unsigned int SCR_HEIGHT = 600 * 2 ;
+int SCR_WIDTH = 800 * 2;
+int TOP_BAR_HEIGHT = 0;
+int SCR_HEIGHT = 600 * 2 ;
 
 std::vector<int> DEFAULT_COLOR_STREAM = { 640, 480 };
 std::vector<int> DEFAULT_DEPTH_STREAM = { 640, 480 };
@@ -120,11 +122,11 @@ std::atomic_bool calibrateCameras = true;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
-vc::optimization::BAProblem bundleAdjustment = vc::optimization::BAProblem();
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::MockBundleAdjustment();
 
 int main(int argc, char* argv[]) try {
 	
-	//bundleAdjustment.test();
+	//vc::optimization::MockBundleAdjustment().optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>>(), false);
 	//return 0;
 
 	google::InitGoogleLogging("Bundle Adjustment");
@@ -261,7 +263,7 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
-			if (!bundleAdjustment.optimize(pipelines, false) || !bundleAdjustment.hasSolution) {
+			if (!optimizationProblem->optimize(pipelines, false)) {
 				continue;
 			}
 
@@ -340,9 +342,9 @@ int main(int argc, char* argv[]) try {
 		glm::mat4 view = camera.GetViewMatrix();
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
-		bundleAdjustment.calculateRelativeTransformations();
 
 		vc::rendering::startFrame(window);
+		optimizationProblem->calculateRelativeTransformations();
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
@@ -355,13 +357,13 @@ int main(int argc, char* argv[]) try {
 					pipelines[i]->renderDepth(x, y, aspect, width, height);
 				}
 			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
+					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, optimizationProblem->getRelativeTransformation(i), renderCoordinateSystem);
 					if (renderVoxelgrid) {
 						voxelgrid->renderGrid(model, view, projection);
 					}
 				}
 			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
+					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, optimizationProblem->getRelativeTransformation(i), renderCoordinateSystem);
 				}
 		}
 		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
@@ -532,6 +534,8 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	// height will be significantly larger than specified on retina displays.
 	glfwMakeContextCurrent(window);
 	glViewport(0, 0, width, height - 50);
+	SCR_HEIGHT = height;
+	SCR_WIDTH = width;
 }
 
 
