@@ -340,6 +340,8 @@ int main(int argc, char* argv[]) try {
 		glm::mat4 view = camera.GetViewMatrix();
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
+		bundleAdjustment.calculateRelativeTransformations();
+
 		vc::rendering::startFrame(window);
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)

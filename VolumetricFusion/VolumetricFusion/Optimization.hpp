@@ -18,7 +18,7 @@
 #include "Utils.hpp"
 
 namespace vc::optimization {
-        
+    
     ceres::Matrix glmToCeresMatrix(glm::mat4 matrix, bool verbose = false, std::string name = "") {
         Eigen::Matrix4d final_matrix = Eigen::Map<Eigen::Matrix<glm::f32, 4, 4>>(glm::value_ptr(matrix)).cast<double>();
 
@@ -133,12 +133,13 @@ namespace vc::optimization {
             if (onlyOpenCV) {
                 return true;
             }
-            
+
+            vc::utils::sleepFor("Pre recalculation after optimization", 4000);
+
             if (!solvePointCorrespondenceError(pipelines)) {
                 return false;
             }
 
-            vc::utils::sleepFor("Pre recalculation after optimization", 4000);
             calculateRelativeTransformations();
             vc::utils::sleepFor("After recalculation after optimization", 4000);
 
@@ -217,10 +218,12 @@ namespace vc::optimization {
             auto initialRotations = rotations;
             
             ceres::Solver::Options options;
-            options.num_threads = 1;
+            options.num_threads = 4;
             options.linear_solver_type = ceres::DENSE_QR;
             options.minimizer_progress_to_stdout = true;
             options.max_num_iterations = 500;
+            options.update_state_every_iteration = true;
+            //options.callbacks.emplace_back(new LoggingCallback(this));
             ceres::Solver::Summary summary;
             ceres::Solve(options, problem, &summary);
             std::cout << summary.FullReport() << "\n";
@@ -500,5 +503,4 @@ namespace vc::optimization {
         }
     };
 }
-
 #endif
