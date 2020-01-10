@@ -12,6 +12,17 @@
 #include <thread>
 
 namespace vc::utils {
+	std::string asHeader(std::string header) {
+		std::stringstream ss;
+
+		ss << std::endl;
+		ss << "*****************************************************************************************************" << std::endl;
+		ss << header << std::endl;
+		ss << "*****************************************************************************************************" << std::endl;
+
+		return ss.str();
+	}
+
 	void sleepFor(unsigned long milliseconds) {
 		using namespace std::chrono_literals;
 		std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
@@ -24,19 +35,11 @@ namespace vc::utils {
 		std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
 		std::cout << "Awaken" << std::endl;
 	}
-
-	std::string toString(glm::vec4 vec) {
-		return std::to_string(vec.x) + ", " + std::to_string(vec.y) + ", " + std::to_string(vec.z) + ", " + std::to_string(vec.w) + "\n";
-	}
-
-	std::string toString(glm::vec4 baseFramePoint, glm::vec4 relativeFramePoint) {
-		return toString(baseFramePoint) + " (base)\n" + toString(relativeFramePoint) + " (relative)\n";
-	}
-
+	
 	template <typename T>
 	std::string toString(std::string header, std::vector<std::vector<T>> translations, std::vector<std::vector<T>> rotations) {
 		std::stringstream ss;
-		ss << header << std::endl;
+		ss << asHeader(header) << std::endl;
 
 		ss << "Translations: " << toString(translations) << std::endl;
 		ss << "   Rotations: " << toString(rotations) << std::endl;
@@ -45,7 +48,6 @@ namespace vc::utils {
 
 		return ss.str();
 	}
-
 
 	template <typename T>
 	std::string toString(std::vector<T> v, std::string valueDelimiter = ", ") {
@@ -78,19 +80,28 @@ namespace vc::utils {
 
 	std::string toString(std::string header, std::vector<Eigen::Matrix4d> b) {
 		std::stringstream ss;
-		ss << header << std::endl;
-		
-		for(auto & m : b)
+		ss << asHeader(header) << std::endl;
+
+		for (auto& m : b)
 		{
 			ss << m << std::endl << std::endl;
 		}
-		
+
 		return ss.str();
 	}
 
 	std::string toString(std::string header, Eigen::Matrix4d b) {
 		std::stringstream ss;
-		ss << header << std::endl;
+		ss << asHeader(header) << std::endl;
+
+		ss << b << std::endl << std::endl;
+
+		return ss.str();
+	}
+
+	std::string toString(std::string header, Eigen::Vector4d b) {
+		std::stringstream ss;
+		ss << asHeader(header) << std::endl;
 
 		ss << b << std::endl << std::endl;
 

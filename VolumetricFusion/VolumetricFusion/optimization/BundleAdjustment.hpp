@@ -40,7 +40,7 @@ namespace vc::optimization {
             if (needsRecalculation) {
                 calculateTransformations();
             }
-            return relativeTransformations[camera_index];
+            return transformations[camera_index];
         }
 
         void randomize() {
@@ -126,7 +126,7 @@ namespace vc::optimization {
     public:
         void calculateTransformations() {
             for (int i = 0; i < translations.size(); i++) {
-                relativeTransformations[i] = getTranslationMatrix(i) * getRotationMatrix(i);
+                transformations[i] = getTranslationMatrix(i) * getRotationMatrix(i);
             }
 
             needsRecalculation = false;
@@ -156,7 +156,7 @@ namespace vc::optimization {
         }
         
         void solveProblem(ceres::Problem* problem) {
-            std::vector<Eigen::Matrix4d> initialTransformations = relativeTransformations;
+            std::vector<Eigen::Matrix4d> initialTransformations = transformations;
             
             ceres::Solver::Options options;
             options.num_threads = 4;
@@ -172,7 +172,7 @@ namespace vc::optimization {
             calculateTransformations();
 
             std::cout << vc::utils::toString("Initial", initialTransformations);
-            std::cout << vc::utils::toString("Final", relativeTransformations);
+            std::cout << vc::utils::toString("Final", transformations);
 
             std::cout << std::endl;
         }
@@ -252,11 +252,11 @@ namespace vc::optimization {
     class MockBundleAdjustment : public BundleAdjustment, public MockOptimizationProblem {
     private:
         void setup() {
-            for (int i = 0; i < expectedTransformations.size(); i++)
+            for (int i = 0; i < transformations.size(); i++)
             {
-                Eigen::Vector3d translation = expectedTransformations[i].block<3, 1>(0, 3);
-                double angle = Eigen::AngleAxisd(expectedTransformations[i].block<3, 3>(0, 0)).angle();
-                Eigen::Vector3d rotation = Eigen::AngleAxisd(expectedTransformations[i].block<3, 3>(0, 0)).axis().normalized();
+                Eigen::Vector3d translation = transformations[i].block<3, 1>(0, 3);
+                double angle = Eigen::AngleAxisd(transformations[i].block<3, 3>(0, 0)).angle();
+                Eigen::Vector3d rotation = Eigen::AngleAxisd(transformations[i].block<3, 3>(0, 0)).axis().normalized();
                 rotation *= angle;
 
                 for (int j = 0; j < 3; j++)
@@ -276,8 +276,6 @@ namespace vc::optimization {
             randomize();
 
             BundleAdjustment::specific_optimize(mockCharacteristicPoints);
-
-            std::cout << vc::utils::toString("Expected transformation", expectedTransformations);
 
             return true;
         }

@@ -23,7 +23,7 @@ namespace vc::optimization {
 	class Procrustes : virtual public OptimizationProblem {
     public:
         Eigen::Matrix4d getRelativeTransformation(int camera_index) {
-            return relativeTransformations[camera_index];
+            return transformations[camera_index];
         }
 
         bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) {
@@ -39,20 +39,29 @@ namespace vc::optimization {
                 distances[i] = characteristicPoints[i].getAverageDistance();
             }
 
+            transformations[0] = Eigen::Matrix4d::Identity();
+
             for (int i = 1; i < characteristicPoints.size(); i++)
             {
-                rotations[i] = characteristicPoints[i].estimateRotation(characteristicPoints[0].getFlattenedPoints(), centers[0]);
+                rotations[i] = characteristicPoints[i].estimateRotation(characteristicPoints[0].getFlattenedPoints(), centers[0]).inverse();
 
-                Eigen::Matrix4d relativeTranslation = Eigen::Matrix4d::Identity();
 
-                auto r = centers[0] - rotations[i] * centers[i];
-                relativeTranslation.block<3, 1>(0, 3) = (r).block<3, 1>(0, 0);
+                //std::cout << vc::utils::toString("centers[0]", centers[0]);
+                //std::cout << vc::utils::toString("centers[1]", centers[1]);
 
-                auto finalTransformation = relativeTranslation * rotations[i];
+                Eigen::Vector4d translation = centers[0] - rotations[i] * centers[i];
+
+                //std::cout << vc::utils::toString("Translation", translation);
+
+                Eigen::Matrix4d finalTrans = generateTransformationMatrix(translation, 0);
+
+                //std::cout << vc::utils::toString("Translation", finalTrans);
+
+                auto finalTransformation = (finalTrans * rotations[i]).inverse();
                 
-                std::cout << "Final transformation" << std::endl << finalTransformation << std::endl;
+                //std::cout << "Final transformation" << std::endl << finalTransformation << std::endl;
                 
-                relativeTransformations[i] = finalTransformation;
+                transformations[i] = finalTransformation;
             }
 
             return true;
@@ -69,8 +78,6 @@ namespace vc::optimization {
             setupMock();
 
             Procrustes::specific_optimize(mockCharacteristicPoints);
-
-            std::cout << vc::utils::toString("Expected", expectedTransformations);
 
             return true;
         }

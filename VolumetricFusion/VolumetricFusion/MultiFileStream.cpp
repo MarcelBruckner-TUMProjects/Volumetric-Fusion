@@ -122,13 +122,13 @@ std::atomic_bool calibrateCameras = true;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
-vc::optimization::BundleAdjustment* optimizationProblem = new vc::optimization::BundleAdjustment();
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::Procrustes();
 
 int main(int argc, char* argv[]) try {
 	
-	////vc::optimization::MockProcrustes().optimize();
+	vc::optimization::MockProcrustes().optimize();
 	//vc::optimization::MockBundleAdjustment().optimize();
-	//return 0;
+	return 0;
 
 	google::InitGoogleLogging("Bundle Adjustment");
 	ceres::Solver::Summary summary;
@@ -346,7 +346,7 @@ int main(int argc, char* argv[]) try {
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
 
 		vc::rendering::startFrame(window);
-		optimizationProblem->calculateTransformations();
+		//optimizationProblem->calculateTransformations();
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{

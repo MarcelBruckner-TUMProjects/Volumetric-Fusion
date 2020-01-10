@@ -56,7 +56,7 @@ namespace vc::optimization {
             glm::vec3(1.0f, 1.0f, 0.0f)
         };
 
-        std::vector<Eigen::Matrix4d> relativeTransformations = {
+        std::vector<Eigen::Matrix4d> transformations = {
             Eigen::Matrix4d::Identity(),
             Eigen::Matrix4d::Identity(),
             Eigen::Matrix4d::Identity(),
@@ -64,7 +64,7 @@ namespace vc::optimization {
         };
 
         void clear() {
-            relativeTransformations = {
+            transformations = {
                 Eigen::Matrix4d::Identity(),
                 Eigen::Matrix4d::Identity(),
                 Eigen::Matrix4d::Identity(),
@@ -76,6 +76,14 @@ namespace vc::optimization {
 
         OptimizationProblem() {
             clear();
+        }
+
+        Eigen::Matrix4d generateTransformationMatrix(Eigen::Vector3d angleAxis) {
+            return generateTransformationMatrix(0, 0, 0, angleAxis.norm(), angleAxis.normalized());
+        }
+
+        Eigen::Matrix4d generateTransformationMatrix(Eigen::Vector4d translation, double radians, Eigen::Vector3d axis = Eigen::Vector3d::Identity()) {
+            return generateTransformationMatrix(translation[0], translation[1], translation[2], radians, axis);
         }
 
         Eigen::Matrix4d generateTransformationMatrix(double tx, double ty, double tz, double radians, Eigen::Vector3d axis) {
@@ -118,7 +126,7 @@ namespace vc::optimization {
         }
         
         virtual Eigen::Matrix4d getTransformation(int camera_index) {
-            return relativeTransformations[camera_index];
+            return transformations[camera_index];
         }
 
         Eigen::Matrix4d getRelativeTransformation(int from, int to) {
@@ -162,10 +170,17 @@ namespace vc::optimization {
 
     class MockOptimizationProblem : virtual public OptimizationProblem {
     protected:
-        std::vector<Eigen::Matrix4d> expectedTransformations;
+        //std::vector<Eigen::Matrix4d> expectedTransformations;
         std::vector<ACharacteristicPoints> mockCharacteristicPoints;
 
+        Eigen::Matrix4d expectedRelativeTransformation;
+
     public:
+        ~MockOptimizationProblem() {
+            std::cout << vc::utils::toString("Final total expected:", expectedRelativeTransformation);
+            std::cout << vc::utils::toString("Final total:", Eigen::Matrix4d(getRelativeTransformation(1, 0)));
+        }
+
         void clear() {
             mockCharacteristicPoints.clear();
         }
@@ -219,8 +234,10 @@ namespace vc::optimization {
                 mockCharacteristicPoints[1].markerCorners[0].emplace_back(relativeTransformation * points[i]);
             }
 
-            expectedTransformations.emplace_back(baseTransformation);
-            expectedTransformations.emplace_back(relativeTransformation);
+            transformations[0] = baseTransformation;
+            transformations[1] = relativeTransformation;
+
+            expectedRelativeTransformation = baseTransformation * relativeTransformation.inverse();
         }
 
         bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) {

@@ -168,10 +168,10 @@ namespace vc::optimization {
             std::cout << "Mean centered Relative points:" << std::endl << vc::utils::toString(meanCenteredSourcePoints, "\n\n") << std::endl << std::endl;
             std::cout << "Mean centered Base points:" << std::endl << vc::utils::toString(meanCenteredTargetPoints, "\n\n");
 
-            Eigen::Matrix4d A = Eigen::Matrix4d();
-            A << meanCenteredSourcePoints[4] - meanCenteredSourcePoints[0], meanCenteredSourcePoints[3] - meanCenteredSourcePoints[0], meanCenteredSourcePoints[2] - meanCenteredSourcePoints[0], meanCenteredSourcePoints[1] - meanCenteredSourcePoints[0];
             Eigen::Matrix4d B = Eigen::Matrix4d();
-            B << meanCenteredTargetPoints[4] - meanCenteredTargetPoints[0], meanCenteredTargetPoints[3] - meanCenteredTargetPoints[0], meanCenteredTargetPoints[2] - meanCenteredTargetPoints[0], meanCenteredTargetPoints[1] - meanCenteredTargetPoints[0];
+            B << meanCenteredSourcePoints[4] - meanCenteredSourcePoints[0], meanCenteredSourcePoints[3] - meanCenteredSourcePoints[0], meanCenteredSourcePoints[2] - meanCenteredSourcePoints[0], meanCenteredSourcePoints[1] - meanCenteredSourcePoints[0];
+            Eigen::Matrix4d A = Eigen::Matrix4d();
+            A << meanCenteredTargetPoints[4] - meanCenteredTargetPoints[0], meanCenteredTargetPoints[3] - meanCenteredTargetPoints[0], meanCenteredTargetPoints[2] - meanCenteredTargetPoints[0], meanCenteredTargetPoints[1] - meanCenteredTargetPoints[0];
 
             Eigen::JacobiSVD<Eigen::Matrix4d> svd = Eigen::JacobiSVD<Eigen::Matrix4d>(B * A.transpose(), Eigen::ComputeFullU | Eigen::ComputeFullV);
 
