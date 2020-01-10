@@ -31,8 +31,8 @@ namespace vc::optimization {
     ///
     /// </summary>
     struct PointCorrespondenceError {
-        PointCorrespondenceError(int id, int j, ceres::Vector relative_frame_point, ceres::Vector base_frame_point, ceres::Matrix inverse_base_rotation, ceres::Matrix inverse_base_translation)
-            : id(id), j(j), relative_frame_point(relative_frame_point), base_frame_point(base_frame_point), inverse_base_rotation(inverse_base_rotation), inverse_base_translation(inverse_base_translation) {}
+        PointCorrespondenceError(int id, int j, ceres::Vector relative_frame_point, ceres::Vector base_frame_point, ceres::Matrix inverse_base_transformation)
+            : id(id), j(j), relative_frame_point(relative_frame_point), base_frame_point(base_frame_point), inverse_base_transformation(inverse_base_transformation) {}
                
         std::string asHeader(std::string name) const {
             std::stringstream ss;
@@ -65,10 +65,10 @@ namespace vc::optimization {
             Eigen::Matrix<T, 4, 1> transformedPoint = Eigen::Matrix<T, 4, 1>(base_frame_point.cast<T>());
             ss << asHeader("b") << transformedPoint << std::endl;
 
-            transformedPoint = Eigen::Matrix<T, 4, 1>(inverse_base_translation.cast<T>() * transformedPoint);
-            ss << asHeader("T0^-1 * b") << transformedPoint << std::endl;
+            //transformedPoint = Eigen::Matrix<T, 4, 1>(inverse_base_translation.cast<T>() * transformedPoint);
+            //ss << asHeader("T0^-1 * b") << transformedPoint << std::endl;
 
-            transformedPoint = Eigen::Matrix<T, 4, 1>(inverse_base_rotation.cast<T>() * transformedPoint);
+            transformedPoint = Eigen::Matrix<T, 4, 1>(inverse_base_transformation.cast<T>() * transformedPoint);
             ss << asHeader("R0^-1 * (T0^-1 * b)") << transformedPoint << std::endl;
 
             // Rodriguez
@@ -119,14 +119,14 @@ namespace vc::optimization {
         int id;
         ceres::Vector relative_frame_point;
         ceres::Vector base_frame_point;
-        ceres::Matrix inverse_base_rotation;
+        ceres::Matrix inverse_base_transformation;
         ceres::Matrix inverse_base_translation;
 
         // Factory to hide the construction of the CostFunction object from
         // the client code.
-        static ceres::CostFunction* Create(int id, int j, ceres::Vector relativeFramePoint, ceres::Vector baseFramePoint, ceres::Matrix inverse_base_rotation, ceres::Matrix inverse_base_transformation) {
+        static ceres::CostFunction* Create(int id, int j, ceres::Vector relativeFramePoint, ceres::Vector baseFramePoint, Eigen::Matrix4d inverseBaseTransformation) {
             return (new ceres::AutoDiffCostFunction<PointCorrespondenceError, 3, 3, 3>(
-                new PointCorrespondenceError(id, j, relativeFramePoint, baseFramePoint, inverse_base_rotation, inverse_base_transformation)));
+                new PointCorrespondenceError(id, j, relativeFramePoint, baseFramePoint, inverseBaseTransformation)));
         }
     };
 }

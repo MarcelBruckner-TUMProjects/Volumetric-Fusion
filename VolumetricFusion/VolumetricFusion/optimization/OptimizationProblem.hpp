@@ -22,7 +22,7 @@
 
 namespace vc::optimization {
     
-    ceres::Matrix glmToCeresMatrix(glm::mat4 matrix, bool verbose = false, std::string name = "") {
+    Eigen::Matrix4d glmToEigenMatrix(glm::mat4 matrix, bool verbose = false, std::string name = "") {
         Eigen::Matrix4d final_matrix = Eigen::Map<Eigen::Matrix<glm::f32, 4, 4>>(glm::value_ptr(matrix)).cast<double>();
 
         if (verbose) {
@@ -33,83 +33,68 @@ namespace vc::optimization {
         return final_matrix;
     }
 
+    glm::mat4 eigenToGlmMatrix(Eigen::Matrix4d matrix, bool verbose = false, std::string name = "") {
+        glm::mat4 final_matrix = glm::make_mat4(matrix.data());
+
+        if (verbose) {
+            std::cout << name << std::endl;
+            //std::cout << final_matrix;
+        }
+
+        return final_matrix;
+    }
+
     class OptimizationProblem {
     protected:
-        bool needsRecalculation = true;
+        std::vector<ACharacteristicPoints> characteristicPoints;
+        std::vector<CharacteristicPointsRenderer> characteristicPointsRenderers;
 
-        const int num_translation_parameters = 3;
-        const int num_rotation_parameters = 3;
-        const int num_intrinsic_parameters = 4;
-        const int num_distCoeff_parameters = 4;
+        std::vector<glm::vec3> colors{
+            glm::vec3(1.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f),
+            glm::vec3(0.0f, 0.0f, 1.0f),
+            glm::vec3(1.0f, 1.0f, 0.0f)
+        };
 
-        std::vector<std::vector<double>> translations;
-        std::vector<std::vector<double>> rotations;
-        std::vector<std::vector<double>> intrinsics;
-        std::vector<std::vector<double>> distCoeffs;
-
-        std::vector<glm::mat4> relativeTransformations = {
-            glm::mat4(1.0f),
-            glm::mat4(1.0f),
-            glm::mat4(1.0f),
-            glm::mat4(1.0f)
+        std::vector<Eigen::Matrix4d> relativeTransformations = {
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity()
         };
 
         void clear() {
-            needsRecalculation = true;
-            
-            for (int i = 0; i < 4; i++)
-            {
-                translations[i] = (std::vector<double> { 0.0, 0.0, 0.0 });
-                rotations[i] = (std::vector<double> { 0.0, 0.0, 0.0 });
-                intrinsics[i] = (std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
-                distCoeffs[i] = (std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
-            }
+            relativeTransformations = {
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity()
+            };
         }
 
     public:
-        void calculateRelativeTransformations() {
-            glm::mat4 baseToMarkerTranslation = getTranslationMatrix(0);
-            glm::mat4 baseToMarkerRotation = getRotationMatrix(0);
-            //glm::mat4 baseToMarkerRotation = glm::mat4(1.0f);
-            //glm::mat4 baseTransformation = baseToMarkerTranslation * glm::inverse(baseToMarkerRotation);
-
-            glm::mat4 baseTransformation = baseToMarkerTranslation * baseToMarkerRotation;
-
-            for (int i = 0; i < translations.size(); i++) {
-                //programState.highestFrameIds[i] = MAX(pipelines[i]->chArUco->frameId, programState.highestFrameIds[i]);
-
-                if (i == 0) {
-                    //relativeTransformations[i] = glm::inverse(baseToMarkerTranslation);
-                    //relativeTransformations[i] = glm::inverse(baseTransformation);
-                    relativeTransformations[i] = glm::mat4(1.0f);
-                    continue;
-                }
-
-                glm::mat4 markerToRelativeTranslation = getTranslationMatrix(i);
-                glm::mat4 markerToRelativeRotation = getRotationMatrix(i);
-                //glm::mat4 markerToRelativeRotation = glm::mat4(1.0f);
-
-                glm::mat4 relativeTransformation = (
-                    //glm::mat4(1.0f)
-                    baseTransformation * glm::inverse(markerToRelativeRotation) * glm::inverse(markerToRelativeTranslation)
-                    );
-
-                relativeTransformations[i] = relativeTransformation;
-            }
-
-            needsRecalculation = false;
-        }
 
         OptimizationProblem() {
+            clear();
+        }
+
+        Eigen::Matrix4d generateTransformationMatrix(double tx, double ty, double tz, double radians, Eigen::Vector3d axis) {
+            Eigen::Matrix3d R = Eigen::AngleAxisd(radians, axis.normalized()).matrix();
+            // Find your Rotation Matrix
+            Eigen::Vector3d T = Eigen::Vector3d(tx, ty, tz);
+            // Find your translation Vector
+            Eigen::Matrix4d Trans; // Your Transformation Matrix
+            Trans.setIdentity();   // Set to Identity to make bottom row of Matrix 0,0,0,1
+            Trans.block<3, 3>(0, 0) = R;
+            Trans.block<3, 1>(0, 3) = T;
+            return Trans;
+        }
+
+        void setupOpenGL() {
             for (int i = 0; i < 4; i++)
             {
-                translations.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
-                rotations.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
-                intrinsics.push_back(std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
-                distCoeffs.push_back(std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
+                characteristicPointsRenderers.emplace_back(CharacteristicPointsRenderer());
             }
-
-            clear();
         }
 
         bool checkForAllMarkers(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
@@ -122,103 +107,26 @@ namespace vc::optimization {
             return true;
         }
 
-        bool init(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+        virtual bool init(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
             clear();
-
+            
             if (!checkForAllMarkers(pipelines)) {
                 return false;
             }
 
-            for (int i = 0; i < pipelines.size(); i++) {
-                std::vector<double> translation;
-                for (int j = 0; j < num_translation_parameters; j++)
-                {
-                    translation.emplace_back(pipelines[i]->chArUco->translation[j]);
-                }
-
-                std::vector<double> rotation;
-                for (int j = 0; j < num_rotation_parameters; j++)
-                {
-                    rotation.emplace_back(pipelines[i]->chArUco->rotation[j]);
-                }
-
-                translations[i] = (translation);
-                rotations[i] = (rotation);
-            }
-
-            if (false) 
-            {
-                Eigen::Vector3d randomTranslation = Eigen::Vector3d::Random();
-                translations[1][0] += (double)randomTranslation[0];
-                translations[1][1] += (double)randomTranslation[1];
-                translations[1][2] += (double)randomTranslation[2];
-
-                Eigen::Vector3d randomRotation = Eigen::Vector3d::Random();
-                randomRotation.normalize();
-                double angle = std::rand() % 360;
-                randomRotation *= glm::radians(angle);
-                rotations[1][0] += (double)randomRotation[0];
-                rotations[1][1] += (double)randomRotation[1];
-                rotations[1][2] += (double)randomRotation[2];
-            }
-
-            needsRecalculation = true;
-
-            //calculateRelativeTransformations();
             return true;
         }
-
-        glm::mat4 getRotationMatrix(int camera_index) {
-            try {
-                cv::Vec3d rotation = cv::Vec3d(
-                    rotations.at(camera_index).at(0),
-                    rotations.at(camera_index).at(1),
-                    rotations.at(camera_index).at(2)
-                );
-                cv::Matx33d tmp;
-                cv::Rodrigues(rotation, tmp);
-                auto finalRotation = glm::mat4(
-                    tmp.val[0], tmp.val[3], tmp.val[6], 0,
-                    tmp.val[1], tmp.val[4], tmp.val[7], 0,
-                    tmp.val[2], tmp.val[5], tmp.val[8], 0,
-                    0, 0, 0, 1
-                );
-
-                return finalRotation;
-            }
-            catch (std::out_of_range&) {
-                return glm::mat4(1.0f);
-            }
-            catch (std::exception&) {
-                return glm::mat4(1.0f);
-            }
-        }
-
-        glm::mat4 getTranslationMatrix(int camera_index) {
-            try {
-                return glm::translate(glm::mat4(1.0f), glm::vec3(
-                    translations.at(camera_index).at(0),
-                    translations.at(camera_index).at(1),
-                    translations.at(camera_index).at(2)
-                ));
-            }
-            catch (std::out_of_range&) {
-                return glm::mat4(1.0f);
-            }
-            catch (std::exception&) {
-                return glm::mat4(1.0f);
-            }
-        }
-
-        glm::mat4 getRelativeTransformation(int camera_index) {
-            if (needsRecalculation) {
-                calculateRelativeTransformations();
-            }
+        
+        virtual Eigen::Matrix4d getTransformation(int camera_index) {
             return relativeTransformations[camera_index];
         }
 
+        Eigen::Matrix4d getRelativeTransformation(int from, int to) {
+            return getTransformation(to) * getTransformation(from).inverse();
+        }
+
         std::vector<ACharacteristicPoints> getCharacteristicPoints(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
-            std::vector<ACharacteristicPoints> characteristicPoints;
+            characteristicPoints.clear();
             for (int i = 0; i < pipelines.size(); i++)
             {
                 characteristicPoints.emplace_back(CharacteristicPoints(pipelines[i]));
@@ -226,7 +134,7 @@ namespace vc::optimization {
             return characteristicPoints;
         }
 
-        bool vc::optimization::OptimizationProblem::optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines, bool onlyOpenCV = false) {
+        bool vc::optimization::OptimizationProblem::optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines = std::vector<std::shared_ptr<vc::capture::CaptureDevice>>(), bool onlyOpenCV = false) {
             if (!init(pipelines)) {
                 return false;
             }
@@ -234,14 +142,87 @@ namespace vc::optimization {
                 return true;
             }
 
-            return specific_optimize(getCharacteristicPoints(pipelines));
+            //vc::utils::sleepFor("Pre recalculation after optimization", 4000);
+
+            auto success = specific_optimize(getCharacteristicPoints(pipelines));
+
+            //vc::utils::sleepFor("After recalculation after optimization", 4000);
+            return success;
         }
 
         virtual bool specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) = 0;
+
+        void render(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
+            for (int i = 0; i < characteristicPoints.size(); i++)
+            {
+                //characteristicPointsRenderers[i].render(&characteristicPoints[i], model, view, projection, getTransformation(i), colors[i]);
+            }
+        }
     };
 
-    class MockOptimizationProblem : public OptimizationProblem {
+    class MockOptimizationProblem : virtual public OptimizationProblem {
+    protected:
+        std::vector<Eigen::Matrix4d> expectedTransformations;
+        std::vector<ACharacteristicPoints> mockCharacteristicPoints;
+
     public:
+        void clear() {
+            mockCharacteristicPoints.clear();
+        }
+        
+        void calculateFinalError() {
+            auto relativeTransformation = getTransformation(1);
+
+            auto basePoints = mockCharacteristicPoints[0].getFlattenedPoints();
+            auto relativePoints = mockCharacteristicPoints[1].getFlattenedPoints();
+
+            double error = 0;
+            for (int i = 0; i < basePoints.size(); i++)
+            {
+                auto basePoint = basePoints[i];
+                auto relativePoint = relativePoints[i];
+                auto transformed = relativeTransformation * relativePoint;
+                std::cout << "Base: " << std::endl << basePoint << std::endl;
+                std::cout << "Relative: " << std::endl << relativePoint << std::endl;
+                std::cout << "Transformed: " << std::endl << transformed << std::endl;
+
+                error += (basePoint - transformed).norm();
+            }
+            std::cout << std::endl << std::endl << "****************************************************************************************************************" << std::endl;
+            std::cout << "Final error: " << error << std::endl;
+        }
+
+        void setupMock() {
+            clear();
+
+            Eigen::Matrix4d baseTransformation = generateTransformationMatrix(0, 0, 1, 0, Eigen::Vector3d(0, 1, 0));
+            Eigen::Matrix4d relativeTransformation = generateTransformationMatrix(0, 0, 3, M_PI / 2.0, Eigen::Vector3d(0, 1, 0));
+
+            std::vector<Eigen::Vector4d> points{
+                Eigen::Vector4d(1.0f, 1.0f, 0.0f, 1.0f) ,
+                Eigen::Vector4d(1.0f, 1.0f, 1.0f, 1.0f) ,
+                Eigen::Vector4d(1.0f, -1.0f, 0.0f, 1.0f),
+                Eigen::Vector4d(-1.0f, 1.0f, 0.0f, 1.0f),
+                Eigen::Vector4d(-1.0f, -1.0f, 0.0f, 1.0f),
+                //Eigen::Vector4d(0.5f, 0.5f, 0.0f, 1.0f),
+                //Eigen::Vector4d(0.5f, -0.5f, 0.0f, 1.0f),
+                //Eigen::Vector4d(-0.5f, 0.5f, 0.0f, 1.0f),
+                //Eigen::Vector4d(-0.5f, -0.5f, 0.0f, 1.0f)
+            };
+            
+            mockCharacteristicPoints.emplace_back(MockCharacteristicPoints());
+            mockCharacteristicPoints.emplace_back(MockCharacteristicPoints());
+
+            for (int i = 0; i < points.size(); i++)
+            {
+                mockCharacteristicPoints[0].markerCorners[0].emplace_back(baseTransformation * points[i]);
+                mockCharacteristicPoints[1].markerCorners[0].emplace_back(relativeTransformation * points[i]);
+            }
+
+            expectedTransformations.emplace_back(baseTransformation);
+            expectedTransformations.emplace_back(relativeTransformation);
+        }
+
         bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) {
             long milliseconds = 1000;
             vc::utils::sleepFor(milliseconds);

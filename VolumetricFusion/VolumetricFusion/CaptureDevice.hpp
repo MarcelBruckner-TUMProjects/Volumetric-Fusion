@@ -14,6 +14,9 @@
 #include "processing.hpp"
 #include "Rendering.hpp"
 
+#include "ceres/problem.h"
+#include "ceres/solver.h"
+
 namespace vc::capture {
 	/// <summary>
 	/// Base class for capturing devices
@@ -89,12 +92,12 @@ namespace vc::capture {
 		}
 		
 		void renderAllPointclouds(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
-			const int viewport_width, const int viewport_height, glm::mat4 relativeTransformation, bool renderCoordinateSystem = false) {
+			const int viewport_width, const int viewport_height, Eigen::Matrix4d relativeTransformation = Eigen::Matrix4d::Identity(), bool renderCoordinateSystem = false) {
 			renderPointcloud(model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, renderCoordinateSystem);
 		}
 
 		void renderPointcloud(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
-			const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, glm::mat4 relativeTransformation = glm::mat4(1.0f), bool renderCoordinateSystem = false) {
+			const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, Eigen::Matrix4d relativeTransformation = Eigen::Matrix4d::Identity(), bool renderCoordinateSystem = false) {
 			if (data->filteredDepthFrames && data->filteredColorFrames) {
 				rendering->renderPointcloud(data->filteredDepthFrames, data->filteredColorFrames, depth_camera, rgb_camera, model, view, projection,
 					viewport_width, viewport_height, pos_x, pos_y, relativeTransformation, renderCoordinateSystem);

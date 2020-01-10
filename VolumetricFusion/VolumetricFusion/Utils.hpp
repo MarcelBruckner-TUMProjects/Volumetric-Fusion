@@ -25,62 +25,6 @@ namespace vc::utils {
 		std::cout << "Awaken" << std::endl;
 	}
 
-	template <typename T>
-	std::string toString(T* matrix, int rows = 4, int columns = 4, std::string name = "") {
-		std::stringstream ss;
-		std::string delimiter = " ";
-
-		for (int row = 0; row < rows; row++)
-		{
-			ss << name << ": ";
-			for (int column = 0; column < columns; column++)
-			{
-				auto m = matrix[row + column * rows];
-				ss << m << delimiter;
-			}
-			std::string intermediate = ss.str();
-			intermediate.erase(intermediate.length() - delimiter.length(), intermediate.length());
-
-			ss = std::stringstream();
-			ss << intermediate;
-			ss << std::endl;
-		}
-		ss << std::endl;
-
-		return ss.str();
-	}
-
-	template <typename T, typename U>
-	std::string toString(T* matrix1, U* matrix2, int rows = 4, int columns = 4, std::string name = "") {
-		std::stringstream ss;
-		std::string delimiter = " ";
-
-		for (int row = 0; row < rows; row++)
-		{
-			ss << name << ": ";
-			for (int column = 0; column < columns; column++)
-			{
-				auto m = matrix1[row + column * rows];
-				ss << m << delimiter;
-			}
-			ss << "--> ";
-			for (int column = 0; column < columns; column++)
-			{
-				auto m = matrix2[row + column * rows];
-				ss << m << delimiter;
-			}
-			std::string intermediate = ss.str();
-			intermediate.erase(intermediate.length() - delimiter.length(), intermediate.length());
-
-			ss = std::stringstream();
-			ss << intermediate;
-			ss << std::endl;
-		}
-		ss << std::endl;
-
-		return ss.str();
-	}
-
 	std::string toString(glm::vec4 vec) {
 		return std::to_string(vec.x) + ", " + std::to_string(vec.y) + ", " + std::to_string(vec.z) + ", " + std::to_string(vec.w) + "\n";
 	}
@@ -102,30 +46,55 @@ namespace vc::utils {
 		return ss.str();
 	}
 
-	template <typename T>
-	std::string toString(std::vector<std::vector<T>> vec) {
-		std::stringstream ss;
-		std::string valueDelimiter = ", ";
-		std::string pipeDelimiter = " | ";
 
+	template <typename T>
+	std::string toString(std::vector<T> v, std::string valueDelimiter = ", ") {
+		std::stringstream ss;
+
+		for (auto& value : v)
+		{
+			ss << value << valueDelimiter;
+		}
+		std::string intermediate = ss.str();
+		intermediate.erase(intermediate.length() - valueDelimiter.length(), intermediate.length());
+
+		return intermediate;
+	}
+
+	template <typename T>
+	std::string toString(std::vector<std::vector<T>> vec, std::string valueDelimiter = ", ", std::string pipeDelimiter = " | ") {
+		std::stringstream ss;
+		
 		for (auto& v : vec)
 		{
-			for (auto& value : v)
-			{
-				ss << std::to_string(value) << valueDelimiter;
-			}
-			std::string intermediate = ss.str();
-			intermediate.erase(intermediate.length() - valueDelimiter.length(), intermediate.length());
-
-			ss = std::stringstream();
-			ss << intermediate;
-
+			ss << toString(v);
 			ss << pipeDelimiter;
 		}
 		std::string intermediate = ss.str();
 		intermediate.erase(intermediate.length() - pipeDelimiter.length(), intermediate.length());
 		
 		return intermediate;
+	}
+
+	std::string toString(std::string header, std::vector<Eigen::Matrix4d> b) {
+		std::stringstream ss;
+		ss << header << std::endl;
+		
+		for(auto & m : b)
+		{
+			ss << m << std::endl << std::endl;
+		}
+		
+		return ss.str();
+	}
+
+	std::string toString(std::string header, Eigen::Matrix4d b) {
+		std::stringstream ss;
+		ss << header << std::endl;
+
+		ss << b << std::endl << std::endl;
+
+		return ss.str();
 	}
 }
 

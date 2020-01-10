@@ -122,11 +122,12 @@ std::atomic_bool calibrateCameras = true;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
-vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::MockOptimizationProblem();
+vc::optimization::BundleAdjustment* optimizationProblem = new vc::optimization::BundleAdjustment();
 
 int main(int argc, char* argv[]) try {
 	
-	//vc::optimization::MockBundleAdjustment().optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>>(), false);
+	////vc::optimization::MockProcrustes().optimize();
+	//vc::optimization::MockBundleAdjustment().optimize();
 	//return 0;
 
 	google::InitGoogleLogging("Bundle Adjustment");
@@ -185,6 +186,7 @@ int main(int argc, char* argv[]) try {
 	});
 
 	voxelgrid = new vc::fusion::Voxelgrid();
+	optimizationProblem->setupOpenGL();
 
 	//ImGui_ImplGlfw_Init(window, false);
 	
@@ -344,7 +346,7 @@ int main(int argc, char* argv[]) try {
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
 
 		vc::rendering::startFrame(window);
-		optimizationProblem->calculateRelativeTransformations();
+		optimizationProblem->calculateTransformations();
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
@@ -357,21 +359,25 @@ int main(int argc, char* argv[]) try {
 					pipelines[i]->renderDepth(x, y, aspect, width, height);
 				}
 			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, optimizationProblem->getRelativeTransformation(i), renderCoordinateSystem);
+					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, optimizationProblem->getRelativeTransformation(i, 0), renderCoordinateSystem);
 					if (renderVoxelgrid) {
 						voxelgrid->renderGrid(model, view, projection);
 					}
 				}
 			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, optimizationProblem->getRelativeTransformation(i), renderCoordinateSystem);
+					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, optimizationProblem->getRelativeTransformation(i, 0), renderCoordinateSystem);
 				}
 		}
+
+		if (state.renderState == RenderState::ONLY_CHARACTERISTIC_POINTS) {
+			optimizationProblem->render(model, view, projection);
+		}
+
 		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 			voxelgrid->renderGrid(model, view, projection);
 		}
 		if (state.renderState == RenderState::VOXELGRID) {
 			voxelgrid->renderField(model, view, projection);
-			
 		}
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
@@ -499,7 +505,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			break;
 		}
 		case GLFW_KEY_5: {
-			//state.renderState = RenderState::VOXELGRID;
+			//state.renderState = RenderState::ONLY_CHARACTERISTIC_POINTS;
 			break;
 		}
 		case GLFW_KEY_V: {

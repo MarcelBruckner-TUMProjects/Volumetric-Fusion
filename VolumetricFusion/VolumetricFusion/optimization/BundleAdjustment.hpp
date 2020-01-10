@@ -21,12 +21,143 @@
 #include "../CaptureDevice.hpp"
 
 namespace vc::optimization {
-    class ABundleAdjustment : public vc::optimization::OptimizationProblem {
-    public:
-        void solveProblem(ceres::Problem* problem) {
-            auto initialTranslations = translations;
-            auto initialRotations = rotations;
+    class BundleAdjustment : virtual public OptimizationProblem {
+    protected:
+        bool needsRecalculation = true;
 
+        const int num_translation_parameters = 3;
+        const int num_rotation_parameters = 3;
+        const int num_intrinsic_parameters = 4;
+        const int num_distCoeff_parameters = 4;
+
+        std::vector<std::vector<double>> translations;
+        std::vector<std::vector<double>> rotations;
+        std::vector<std::vector<double>> intrinsics;
+        std::vector<std::vector<double>> distCoeffs;
+
+
+        Eigen::Matrix4d getTransformation(int camera_index) {
+            if (needsRecalculation) {
+                calculateTransformations();
+            }
+            return relativeTransformations[camera_index];
+        }
+
+        void randomize() {
+            Eigen::Vector3d randomTranslation = Eigen::Vector3d::Random();
+            translations[1][0] += (double)randomTranslation[0];
+            translations[1][1] += (double)randomTranslation[1];
+            translations[1][2] += (double)randomTranslation[2];
+
+            Eigen::Vector3d randomRotation = Eigen::Vector3d::Random();
+            randomRotation.normalize();
+            double angle = std::rand() % 360;
+            randomRotation *= glm::radians(angle);
+            rotations[1][0] += (double)randomRotation[0];
+            rotations[1][1] += (double)randomRotation[1];
+            rotations[1][2] += (double)randomRotation[2];
+
+            needsRecalculation = true;
+        }
+
+        bool init(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+            if (!OptimizationProblem::init(pipelines)) {
+                return false;
+            }
+
+            for (int i = 0; i < pipelines.size(); i++) {
+                std::vector<double> translation;
+                for (int j = 0; j < num_translation_parameters; j++)
+                {
+                    translation.emplace_back(pipelines[i]->chArUco->translation[j]);
+                }
+
+                std::vector<double> rotation;
+                for (int j = 0; j < num_rotation_parameters; j++)
+                {
+                    rotation.emplace_back(pipelines[i]->chArUco->rotation[j]);
+                }
+
+                translations[i] = (translation);
+                rotations[i] = (rotation);
+            }
+
+            randomize();
+
+            needsRecalculation = true;
+
+            //calculateRelativeTransformations();
+            return true;
+        }
+        Eigen::Matrix4d getRotationMatrix(int camera_index) {
+            try {
+                Eigen::Vector3d rotationVector(
+                    rotations.at(camera_index).at(0),
+                    rotations.at(camera_index).at(1),
+                    rotations.at(camera_index).at(2)
+                );
+                return generateTransformationMatrix(0.0, 0.0, 0.0, rotationVector.norm(), rotationVector.normalized());
+            }
+            catch (std::out_of_range&) {
+                return Eigen::Matrix4d::Identity();
+            }
+            catch (std::exception&) {
+                return Eigen::Matrix4d::Identity();
+            }
+        }
+
+        Eigen::Matrix4d getTranslationMatrix(int camera_index) {
+            try {
+                return generateTransformationMatrix(
+                    translations.at(camera_index).at(0),
+                    translations.at(camera_index).at(1),
+                    translations.at(camera_index).at(2),
+                    0.0, Eigen::Vector3d::Identity()
+                );
+            }
+            catch (std::out_of_range&) {
+                return Eigen::Matrix4d::Identity();
+            }
+            catch (std::exception&) {
+                return Eigen::Matrix4d::Identity();
+            }
+        }
+
+    public:
+        void calculateTransformations() {
+            for (int i = 0; i < translations.size(); i++) {
+                relativeTransformations[i] = getTranslationMatrix(i) * getRotationMatrix(i);
+            }
+
+            needsRecalculation = false;
+        }
+
+        BundleAdjustment() {
+            for (int i = 0; i < 4; i++)
+            {
+                translations.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
+                rotations.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
+                intrinsics.push_back(std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
+                distCoeffs.push_back(std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
+            }
+        }
+
+        void clear() {
+            OptimizationProblem::clear();
+            needsRecalculation = true;
+
+            for (int i = 0; i < 4; i++)
+            {
+                translations[i] = (std::vector<double> { 0.0, 0.0, 0.0 });
+                rotations[i] = (std::vector<double> { 0.0, 0.0, 0.0 });
+                intrinsics[i] = (std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
+                distCoeffs[i] = (std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
+            }
+        }
+        
+        void solveProblem(ceres::Problem* problem) {
+            std::vector<Eigen::Matrix4d> initialTransformations = relativeTransformations;
+            
             ceres::Solver::Options options;
             options.num_threads = 4;
             options.linear_solver_type = ceres::DENSE_QR;
@@ -37,9 +168,11 @@ namespace vc::optimization {
             ceres::Solver::Summary summary;
             ceres::Solve(options, problem, &summary);
             std::cout << summary.FullReport() << "\n";
+            
+            calculateTransformations();
 
-            std::cout << vc::utils::toString("Initial", initialTranslations, initialRotations);
-            std::cout << vc::utils::toString("Final", translations, rotations);
+            std::cout << vc::utils::toString("Initial", initialTransformations);
+            std::cout << vc::utils::toString("Final", relativeTransformations);
 
             std::cout << std::endl;
         }
@@ -50,10 +183,7 @@ namespace vc::optimization {
             ceres::Problem problem;
             for (int baseId = 0; baseId < characteristicPoints.size(); baseId++)
             {
-                glm::mat4 baseToMarkerTranslation = getTranslationMatrix(baseId);
-                glm::mat4 baseToMarkerRotation = getRotationMatrix(baseId);
-                auto inverseBaseToMarkerTranslation = glmToCeresMatrix(glm::inverse(baseToMarkerTranslation));
-                auto inverseBaseToMarkerRotation = glmToCeresMatrix(glm::inverse(baseToMarkerRotation));
+                Eigen::Matrix4d inverseBaseTransformation = getTransformation(baseId).inverse();
 
                 for (int relativeId = 1; relativeId < characteristicPoints.size(); relativeId++) {
                     if (baseId == relativeId) {
@@ -78,7 +208,7 @@ namespace vc::optimization {
                                 relativeMarkerCorners.first, cornerId,
                                 relativeFramePoint,
                                 baseFramePoint,
-                                inverseBaseToMarkerRotation, inverseBaseToMarkerTranslation
+                                inverseBaseTransformation
                             );
                             problem.AddResidualBlock(cost_function, NULL,
                                 translations[relativeId].data(),
@@ -96,7 +226,7 @@ namespace vc::optimization {
                             relativeCharucoCorners.first, 0,
                             relativeCharucoCorners.second,
                             characteristicPoints[baseId].charucoCorners[relativeCharucoCorners.first],
-                            inverseBaseToMarkerRotation, inverseBaseToMarkerTranslation
+                            inverseBaseTransformation
                         );
                         problem.AddResidualBlock(cost_function, NULL,
                             translations[relativeId].data(),
@@ -109,101 +239,48 @@ namespace vc::optimization {
             solveProblem(&problem);
             return true;
         }
-    };
 
-    class MockBundleAdjustment : public ABundleAdjustment {
-    public:
         bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) {
-            glm::vec3 baseTranslationVector = glm::vec3(0.0f, 0.0f, 1.0f);
-            translations[0] = (std::vector<double>{ baseTranslationVector.x, baseTranslationVector.y, baseTranslationVector.z });
-            glm::mat4 baseTranslation = getTranslationMatrix(0);
-
-            glm::vec3 relativeTranslationVector = glm::vec3(0.0f, 0.0f, 3.0f);
-            translations[1] = (std::vector<double>{ relativeTranslationVector.x, relativeTranslationVector.y, relativeTranslationVector.z });
-            glm::mat4 relativeTranslation = getTranslationMatrix(1);
-            translations[1][0] -= 3;
-            translations[1][1] += 1;
-
-            glm::vec3 baseAxis = glm::vec3(0.0f, 1.0f, 0.0f);
-            baseAxis = glm::normalize(baseAxis);
-            float baseAngle = glm::radians(00.0f);
-            baseAxis *= baseAngle;
-            rotations[0] = (std::vector<double>{baseAxis.x, baseAxis.y, baseAxis.z});
-            glm::mat4 baseRotation = getRotationMatrix(0);
-            auto baseTransformation = glmToCeresMatrix(baseTranslation * baseRotation);
-
-            glm::vec3 relativeAxis = glm::vec3(0.0f, 1.0f, 0.0f);
-            relativeAxis = glm::normalize(relativeAxis);
-            float relativeAngle = glm::radians(90.0f);
-            relativeAxis *= relativeAngle;
-            rotations[1] = (std::vector<double>{relativeAxis.x, relativeAxis.y, relativeAxis.z});
-            glm::mat4 relativeRotation = getRotationMatrix(1);
-            auto relativeTransformation = glmToCeresMatrix(relativeTranslation * relativeRotation);
-            rotations[1][0] -= 1;
-            rotations[1][1] += 0.5;
-
-            std::vector<std::vector<double>> expectedTranslations;
-            expectedTranslations.emplace_back(std::vector<double>{baseTranslationVector.x, baseTranslationVector.y, baseTranslationVector.z});
-            expectedTranslations.emplace_back(std::vector<double>{relativeTranslationVector.x, relativeTranslationVector.y, relativeTranslationVector.z});
-
-            std::vector<std::vector<double>> expectedRotations;
-            expectedRotations.emplace_back(std::vector<double>{baseAxis.x, baseAxis.y, baseAxis.z});
-            expectedRotations.emplace_back(std::vector<double>{relativeAxis.x, relativeAxis.y, relativeAxis.z});
-
-            std::vector<ceres::Vector> points;
-            points.emplace_back(Eigen::Vector4d(1.0f, 1.0f, 0.0f, 1.0f));
-            points.emplace_back(Eigen::Vector4d(1.0f, 1.0f, 1.0f, 1.0f));
-            points.emplace_back(Eigen::Vector4d(1.0f, -1.0f, 0.0f, 1.0f));
-            points.emplace_back(Eigen::Vector4d(-1.0f, 1.0f, 0.0f, 1.0f));
-            points.emplace_back(Eigen::Vector4d(-1.0f, -1.0f, 0.0f, 1.0f));
-            points.emplace_back(Eigen::Vector4d(0.5f, 0.5f, 0.0f, 1.0f));
-            points.emplace_back(Eigen::Vector4d(0.5f, -0.5f, 0.0f, 1.0f));
-            points.emplace_back(Eigen::Vector4d(-0.5f, 0.5f, 0.0f, 1.0f));
-            points.emplace_back(Eigen::Vector4d(-0.5f, -0.5f, 0.0f, 1.0f));
-            
-            std::vector<ceres::Vector> baseFramePoints;
-            std::vector<ceres::Vector> relativeFramePoints;
-
-            std::vector<ACharacteristicPoints> mockCharacteristicPoints;
-            mockCharacteristicPoints.emplace_back(MockCharacteristicPoints());
-            mockCharacteristicPoints.emplace_back(MockCharacteristicPoints());
-
-            for (int i = 0; i < points.size(); i++)
-            {
-                mockCharacteristicPoints[0].markerCorners[0].emplace_back(baseTransformation * points[i]);
-                mockCharacteristicPoints[1].markerCorners[0].emplace_back(relativeTransformation * points[i]);
-            }
-
-            ABundleAdjustment::solvePointCorrespondenceError(mockCharacteristicPoints);
-
-            std::cout << vc::utils::toString("Expected", expectedTranslations, expectedRotations);
-
-            std::cout << std::endl;
-
-            return true;
-        }
-    };
-
-    class BundleAdjustment : public ABundleAdjustment {
-    public:
-        bool specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) {
-            //vc::utils::sleepFor("Pre recalculation after optimization", 4000);
-
             if (!solvePointCorrespondenceError(characteristicPoints)) {
                 return false;
             }
-            //vc::utils::sleepFor("After recalculation after optimization", 4000);
 
             return true;
         }
+    };
 
+    class MockBundleAdjustment : public BundleAdjustment, public MockOptimizationProblem {
     private:
-        bool solvePointCorrespondenceError(std::vector<ACharacteristicPoints> characteristicPoints) {
-            ABundleAdjustment::solvePointCorrespondenceError(characteristicPoints);
+        void setup() {
+            for (int i = 0; i < expectedTransformations.size(); i++)
+            {
+                Eigen::Vector3d translation = expectedTransformations[i].block<3, 1>(0, 3);
+                double angle = Eigen::AngleAxisd(expectedTransformations[i].block<3, 3>(0, 0)).angle();
+                Eigen::Vector3d rotation = Eigen::AngleAxisd(expectedTransformations[i].block<3, 3>(0, 0)).axis().normalized();
+                rotation *= angle;
+
+                for (int j = 0; j < 3; j++)
+                {
+                    translations[i][j] = translation[j];
+                    rotations[i][j] = rotation[j];
+                }
+            }
+            needsRecalculation = true;
+        }
+
+    public:
+        bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) {
+            setupMock();
+            setup();
+
+            randomize();
+
+            BundleAdjustment::specific_optimize(mockCharacteristicPoints);
+
+            std::cout << vc::utils::toString("Expected transformation", expectedTransformations);
 
             return true;
         }
-
     };
 }
 #endif // !_BUNDLE_ADJUSTMENT_HEADER

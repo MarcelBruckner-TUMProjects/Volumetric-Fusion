@@ -86,6 +86,12 @@
     <None Include="shader\pointcloud.frag">
       <Filter>Shader</Filter>
     </None>
+    <None Include="shader\characteristic_points.vert">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\characteristic_points.frag">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Shader">

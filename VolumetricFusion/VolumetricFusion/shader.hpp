@@ -3,6 +3,8 @@
 #ifndef SHADER_H
 #define SHADER_H
 
+#include "ceres/ceres.h"
+
 #include <glad/glad.h>
 
 #include <string>
@@ -69,6 +71,9 @@ namespace vc::rendering {
 		}
 		void setMat4(const std::string& name, const glm::mat4 matrix) {
 			glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, glm::value_ptr(matrix));
+		}
+		void setMat4(const std::string& name, const Eigen::Matrix4d matrix) {
+			glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, Eigen::Matrix<glm::f32, 4, 4>(matrix.cast<glm::f32>()).data());
 		}
 
 		void setArray3(const std::string& name, GLfloat *vec, int count) {

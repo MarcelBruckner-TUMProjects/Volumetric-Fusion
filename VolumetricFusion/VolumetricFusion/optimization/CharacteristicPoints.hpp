@@ -13,6 +13,7 @@
 #include "ceres/rotation.h"
 #include <sstream>
 
+#include "../Rendering.hpp"
 #include "PointCorrespondenceError.hpp"
 #include "ReprojectionError.hpp"
 #include "../Utils.hpp"
@@ -20,25 +21,174 @@
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 
 namespace vc::optimization {
-
+    
     class ACharacteristicPoints {
     public:
-        std::map<int, std::vector<ceres::Vector>> markerCorners;
-        std::map<int, ceres::Vector> charucoCorners;
+        std::map<int, std::vector<Eigen::Vector4d>> markerCorners;
+        std::map<int, Eigen::Vector4d> charucoCorners;
 
         ACharacteristicPoints(){}
 
         ACharacteristicPoints(
-            std::map<int, std::vector<ceres::Vector>> markerCorners, std::map<int, ceres::Vector> charucoCorners) :
+            std::map<int, std::vector<Eigen::Vector4d>> markerCorners, std::map<int, Eigen::Vector4d> charucoCorners) :
             markerCorners(markerCorners), charucoCorners(charucoCorners) {}
-    };
 
+
+        std::vector<float> getAllVerticesForRendering(glm::vec3 color = glm::vec3(-1.0f, -1.0f, -1.0f)) {
+            std::vector<float> vertices;
+
+            for (auto& marker : markerCorners)
+            {
+                for (auto& markerCorner : marker.second)
+                {
+                    vertices.emplace_back(markerCorner[0]);
+                    vertices.emplace_back(markerCorner[1]);
+                    vertices.emplace_back(markerCorner[2]);
+
+                    if (color.x < 0) {
+                        for (int i = 0; i < 3; i++)
+                        {
+                            vertices.emplace_back((std::rand() % 1000) / 1000.0f);
+                        }
+                    }
+                    else {
+                        vertices.emplace_back(color.x);
+                        vertices.emplace_back(color.y);
+                        vertices.emplace_back(color.z);
+                    }
+                }
+            }
+
+            for (auto& charucoMarker : charucoCorners)
+            {
+                vertices.emplace_back(charucoMarker.second[0]);
+                vertices.emplace_back(charucoMarker.second[1]);
+                vertices.emplace_back(charucoMarker.second[2]);
+
+                if (color.x < 0) {
+                    for (int i = 0; i < 3; i++)
+                    {
+                        vertices.emplace_back((std::rand() % 1000) / 1000.0f);
+                    }
+                }
+                else {
+                    vertices.emplace_back(color.x);
+                    vertices.emplace_back(color.y);
+                    vertices.emplace_back(color.z);
+                }
+            }
+
+            return vertices;
+        }
+
+        template<typename F>
+        void iterateAllPoints(F& lambda) {
+            for (auto& marker : markerCorners)
+            {
+                for (auto& markerCorner : marker.second)
+                {
+                    //std::cout << Eigen::Vector4d(markerCorner) << std::endl;
+                    lambda(markerCorner);
+                }
+            }
+
+            for (auto& charucoMarker : charucoCorners)
+            {
+                lambda(charucoMarker.second);
+            }
+        }
+
+        std::vector<Eigen::Vector4d> getFlattenedPoints() {
+            std::vector<Eigen::Vector4d> flattened;
+
+            iterateAllPoints([&flattened](Eigen::Vector4d point) {
+                flattened.emplace_back(point);
+            });
+
+            return flattened;
+        }
+
+        Eigen::Vector4d getCenterOfGravity(bool verbose = true) {
+            Eigen::Vector4d centerOfGravity(0,0,0,0);
+
+            iterateAllPoints([&centerOfGravity](Eigen::Vector4d point) {
+                centerOfGravity += point;
+            });
+            
+            centerOfGravity /= getNumberOfPoints();
+
+            if (verbose) {
+                std::cout << "Center of gravity:" << std::endl << centerOfGravity << std::endl;
+            }
+            return centerOfGravity;
+        }
+
+        float getAverageDistance() {
+            double distance = 0;
+            Eigen::Vector4d centerOfGravity = getCenterOfGravity(false);
+
+            iterateAllPoints([&distance, &centerOfGravity](Eigen::Vector4d point) {
+                distance += Eigen::Vector4d(centerOfGravity - point).norm();
+            });
+            
+            distance /= getNumberOfPoints();
+
+            std::cout << "Average distance:" << std::endl << distance << std::endl;
+
+            return distance;
+        }
+
+        int getNumberOfPoints() {
+            int num_points = 0;
+            for (auto& marker : markerCorners)
+            {
+                num_points += marker.second.size();
+            }
+            num_points += charucoCorners.size();
+            return num_points;
+        }
+
+        Eigen::Matrix4d estimateRotation(const std::vector<Eigen::Vector4d>& targetPoints, const Eigen::Vector4d& targetMean) {
+            // TODO: Estimate the rotation from source to target points, following the Procrustes algorithm.
+            // To compute the singular value decomposition you can use JacobiSVD() from Eigen.
+            // Important: The covariance matrices should contain mean-centered source/target points.
+            Eigen::Vector4d sourceMean = getCenterOfGravity(false);
+            std::vector<Eigen::Vector4d>& sourcePoints = getFlattenedPoints();
+
+            std::vector<Eigen::Vector4d> meanCenteredSourcePoints = getFlattenedPoints();
+            std::vector<Eigen::Vector4d> meanCenteredTargetPoints = targetPoints;
+
+            std::cout << "Relative points:" << std::endl << vc::utils::toString(meanCenteredSourcePoints, "\n\n") << std::endl << std::endl;
+            std::cout << "Base points:" << std::endl << vc::utils::toString(meanCenteredTargetPoints, "\n\n");
+
+            std::transform(meanCenteredSourcePoints.begin(), meanCenteredSourcePoints.end(), meanCenteredSourcePoints.begin(), [sourceMean](Eigen::Vector4d point) -> Eigen::Vector4d { return point - sourceMean; });
+            std::transform(meanCenteredTargetPoints.begin(), meanCenteredTargetPoints.end(), meanCenteredTargetPoints.begin(), [targetMean](Eigen::Vector4d point) -> Eigen::Vector4d { return point - targetMean; });
+
+
+            std::cout << "Mean centered Relative points:" << std::endl << vc::utils::toString(meanCenteredSourcePoints, "\n\n") << std::endl << std::endl;
+            std::cout << "Mean centered Base points:" << std::endl << vc::utils::toString(meanCenteredTargetPoints, "\n\n");
+
+            Eigen::Matrix4d A = Eigen::Matrix4d();
+            A << meanCenteredSourcePoints[4] - meanCenteredSourcePoints[0], meanCenteredSourcePoints[3] - meanCenteredSourcePoints[0], meanCenteredSourcePoints[2] - meanCenteredSourcePoints[0], meanCenteredSourcePoints[1] - meanCenteredSourcePoints[0];
+            Eigen::Matrix4d B = Eigen::Matrix4d();
+            B << meanCenteredTargetPoints[4] - meanCenteredTargetPoints[0], meanCenteredTargetPoints[3] - meanCenteredTargetPoints[0], meanCenteredTargetPoints[2] - meanCenteredTargetPoints[0], meanCenteredTargetPoints[1] - meanCenteredTargetPoints[0];
+
+            Eigen::JacobiSVD<Eigen::Matrix4d> svd = Eigen::JacobiSVD<Eigen::Matrix4d>(B * A.transpose(), Eigen::ComputeFullU | Eigen::ComputeFullV);
+
+            auto result = Eigen::Matrix4d(svd.matrixU() * svd.matrixV().transpose());
+
+            std::cout << "Rotation: " << std::endl << result << std::endl;
+
+            return result;
+        }
+    };
+     
     class MockCharacteristicPoints : public ACharacteristicPoints {
     public:
         MockCharacteristicPoints() : ACharacteristicPoints(){}
 
         MockCharacteristicPoints(
-            std::map<int, std::vector<ceres::Vector>> markerCorners, std::map<int, ceres::Vector> charucoCorners) :
+            std::map<int, std::vector<Eigen::Vector4d>> markerCorners, std::map<int, Eigen::Vector4d> charucoCorners) :
             ACharacteristicPoints(markerCorners, charucoCorners) {}
     };
 
@@ -86,7 +236,7 @@ namespace vc::optimization {
             }
         }
 
-        ceres::Vector pixel2Point(cv::Point2f observation) {
+        Eigen::Vector4d pixel2Point(cv::Point2f observation) {
             try {
                 int x = observation.x * color2DepthWidth;
                 int y = observation.y * color2DepthHeight;
@@ -123,6 +273,62 @@ namespace vc::optimization {
             catch (rs2::error & e) {
                 return false;
             }
+        }
+    };
+
+    class CharacteristicPointsRenderer {
+    private:
+        unsigned int VBO, VAO;
+        vc::rendering::Shader* SHADER;
+        
+        void setupOpenGL() {
+            SHADER = new vc::rendering::VertexFragmentShader("shader/characteristic_points.vert", "shader/characteristic_points.frag");
+            glGenVertexArrays(1, &VAO);
+            glGenBuffers(1, &VBO);
+
+            //setVertices();
+        }
+
+        int setVertices(ACharacteristicPoints* characteristicPoints, glm::vec3 color = glm::vec3(-1.0f, -1.0f, -1.0f)) {
+            auto vertices = characteristicPoints->getAllVerticesForRendering(color);
+
+            glBindVertexArray(0);
+
+            glBindVertexArray(VAO);
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_DYNAMIC_DRAW);
+
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)3);
+            glEnableVertexAttribArray(1);
+
+            return vertices.size() / 6;
+        }
+
+    public:
+        CharacteristicPointsRenderer() {
+            setupOpenGL();
+        }
+
+        void render(ACharacteristicPoints* characteristicPoints, glm::mat4 model, glm::mat4 view, glm::mat4 projection, glm::mat4 relativeTransformation = glm::mat4(1.0f), glm::vec3 color = glm::vec3(-1.0f, -1.0f, -1.0f)) {
+
+            int num_vertices = setVertices(characteristicPoints, color);
+
+            SHADER->use();
+
+            SHADER->setMat4("relativeTransformation", relativeTransformation);
+            SHADER->setMat4("correction", vc::rendering::COORDINATE_CORRECTION);
+            SHADER->setMat4("model", model);
+            SHADER->setMat4("view", view);
+            SHADER->setMat4("projection", projection);
+
+            glBindVertexArray(VAO);
+
+            glDrawArrays(GL_POINTS, 0, num_vertices);
+
+            glBindVertexArray(0);
         }
     };
 }
