@@ -22,18 +22,21 @@ namespace vc::utils {
 
 		return ss.str();
 	}
-
-	void sleepFor(unsigned long milliseconds) {
-		using namespace std::chrono_literals;
-		std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
-	}
 	
-	void sleepFor(std::string message, unsigned long milliseconds) {
+	void sleepFor(std::string message, long milliseconds, bool verbose = false) {
+		if (milliseconds < 0) {
+			return;
+		}
 		using namespace std::chrono_literals;
-		std::cout << message << std::endl;
-		std::cout << "Sleeping" << std::endl;
+		std::stringstream ss;
+		ss << vc::utils::asHeader(message) << std::endl;
+		ss << "Sleeping" << std::endl;
 		std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
-		std::cout << "Awaken" << std::endl;
+		ss << "Awaken" << std::endl;
+
+		if (verbose) {
+			std::cout << ss.str();
+		}
 	}
 	
 	template <typename T>
@@ -106,6 +109,58 @@ namespace vc::utils {
 		ss << b << std::endl << std::endl;
 
 		return ss.str();
+	}
+
+	std::string toString(std::string header, std::map<unsigned long long, Eigen::Vector4d> b) {
+		std::stringstream ss;
+		ss << asHeader(header) << std::endl;
+
+		for (auto& m : b)
+		{
+			ss << m.first << ":" << std::endl << m.second << std::endl;
+		}
+
+		return ss.str();
+	}
+
+	template <typename T>
+	bool contains(std::vector<T> v, T x) {
+		return std::find(v.begin(), v.end(), x) != v.end();
+	}
+
+	template<typename T, typename V>
+	std::vector<T> extractKeys(std::map<T, V> const& input_map) {
+		std::vector<T> retval;
+		for (auto const& element : input_map) {
+			retval.emplace_back(element.first);
+		}
+		return retval;
+	}
+
+
+	template<typename T>
+	std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
+		std::vector<T> c;
+
+		for (T x : a) {
+			if (contains(b, x)) {
+				c.emplace_back(x);
+			}
+		}
+
+		return c;
+	}
+
+	template <typename T, typename V>
+	std::map<T, V> filter(std::map<T, V> map, std::vector<T> keys) {
+		std::map<T, V> filtered;
+
+		for (auto& key : keys)
+		{
+			filtered[key] = map[key];
+		}
+
+		return filtered;
 	}
 }
 

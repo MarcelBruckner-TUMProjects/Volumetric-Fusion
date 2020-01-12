@@ -132,7 +132,7 @@ namespace vc::optimization {
             needsRecalculation = false;
         }
 
-        BundleAdjustment() {
+        BundleAdjustment(bool verbose = false, bool withSleep = false) : OptimizationProblem(verbose, withSleep) {
             for (int i = 0; i < 4; i++)
             {
                 translations.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
@@ -177,7 +177,7 @@ namespace vc::optimization {
             std::cout << std::endl;
         }
 
-        bool solvePointCorrespondenceError(std::vector<ACharacteristicPoints> characteristicPoints) {
+        bool solvePointCorrespondenceError() {
             // Create residuals for each observation in the bundle adjustment problem. The
             // parameters for cameras and points are added automatically.
             ceres::Problem problem;
@@ -240,8 +240,8 @@ namespace vc::optimization {
             return true;
         }
 
-        bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) {
-            if (!solvePointCorrespondenceError(characteristicPoints)) {
+        bool vc::optimization::OptimizationProblem::specific_optimize() {
+            if (!solvePointCorrespondenceError()) {
                 return false;
             }
 
@@ -269,13 +269,13 @@ namespace vc::optimization {
         }
 
     public:
-        bool vc::optimization::OptimizationProblem::specific_optimize(std::vector<ACharacteristicPoints> characteristicPoints) {
+        bool vc::optimization::OptimizationProblem::specific_optimize() {
             setupMock();
             setup();
 
             randomize();
 
-            BundleAdjustment::specific_optimize(mockCharacteristicPoints);
+            BundleAdjustment::specific_optimize();
 
             return true;
         }

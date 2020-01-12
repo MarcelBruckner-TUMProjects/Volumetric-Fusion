@@ -22,7 +22,7 @@
 
 namespace vc::optimization {
     
-    class ACharacteristicPoints {
+    class ACharacteristicPoints{
     public:
         std::map<int, std::vector<Eigen::Vector4d>> markerCorners;
         std::map<int, Eigen::Vector4d> charucoCorners;
@@ -81,63 +81,68 @@ namespace vc::optimization {
             return vertices;
         }
 
+        unsigned long long hash(int markerId, int cornerId, bool verbose = false) {
+            unsigned long long value = std::hash<unsigned long long>()(std::hash<int>()(markerId) + std::hash<int>()(cornerId));
+
+            if (verbose) {
+                std::stringstream ss;
+                ss << "Hash of " << markerId << ", " << cornerId << ": " << value;
+                std::cout << vc::utils::asHeader(ss.str());
+            }
+
+            return value;
+        }
+
         template<typename F>
-        void iterateAllPoints(F& lambda) {
+        void iterateAllPoints(F& lambda, bool verbose = false) {
             for (auto& marker : markerCorners)
             {
-                for (auto& markerCorner : marker.second)
+                for (int i = 0; i < marker.second.size(); i++)
                 {
-                    //std::cout << Eigen::Vector4d(markerCorner) << std::endl;
-                    lambda(markerCorner);
+                    lambda(marker.second[i], hash(marker.first, i, verbose));
                 }
             }
 
             for (auto& charucoMarker : charucoCorners)
             {
-                lambda(charucoMarker.second);
+                lambda(charucoMarker.second, hash(charucoMarker.first, -1, verbose));
             }
         }
 
-        std::vector<Eigen::Vector4d> getFlattenedPoints() {
-            std::vector<Eigen::Vector4d> flattened;
+        std::map<unsigned long long, Eigen::Vector4d> getFlattenedPoints(bool verbose = false) {
+            std::map<unsigned long long, Eigen::Vector4d> flattened;
 
-            iterateAllPoints([&flattened](Eigen::Vector4d point) {
-                flattened.emplace_back(point);
-            });
+            iterateAllPoints([&flattened](Eigen::Vector4d& point, unsigned long long hash) {
+                flattened[hash] = point;
+            }, verbose);
 
             return flattened;
         }
 
-        Eigen::Vector4d getCenterOfGravity(bool verbose = true) {
-            Eigen::Vector4d centerOfGravity(0,0,0,0);
+        std::map<unsigned long long, Eigen::Vector4d> getFilteredPoints(std::vector<unsigned long long> keys, bool verbose = false) {
+            std::map<unsigned long long, Eigen::Vector4d> flattened;
 
-            iterateAllPoints([&centerOfGravity](Eigen::Vector4d point) {
-                centerOfGravity += point;
-            });
-            
-            centerOfGravity /= getNumberOfPoints();
+            iterateAllPoints([&flattened, &keys](Eigen::Vector4d& point, unsigned long long hash) {
+                if (vc::utils::contains(keys, hash)) {
+                    flattened[hash] = point;
+                }
+            }, verbose);
 
-            if (verbose) {
-                std::cout << "Center of gravity:" << std::endl << centerOfGravity << std::endl;
-            }
-            return centerOfGravity;
+            return flattened;
         }
 
-        float getAverageDistance() {
-            double distance = 0;
-            Eigen::Vector4d centerOfGravity = getCenterOfGravity(false);
+        std::vector<unsigned long long> getHashes(bool verbose = false) {
+            std::vector<unsigned long long> flattened;
 
-            iterateAllPoints([&distance, &centerOfGravity](Eigen::Vector4d point) {
-                distance += Eigen::Vector4d(centerOfGravity - point).norm();
-            });
-            
-            distance /= getNumberOfPoints();
+            std::cout << vc::utils::asHeader("New hashset") << std::endl;
 
-            std::cout << "Average distance:" << std::endl << distance << std::endl;
+            iterateAllPoints([&flattened](Eigen::Vector4d& point, unsigned long long hash) {
+                flattened.push_back(hash);
+            }, verbose);
 
-            return distance;
+            return flattened;
         }
-
+        
         int getNumberOfPoints() {
             int num_points = 0;
             for (auto& marker : markerCorners)
@@ -146,40 +151,6 @@ namespace vc::optimization {
             }
             num_points += charucoCorners.size();
             return num_points;
-        }
-
-        Eigen::Matrix4d estimateRotation(const std::vector<Eigen::Vector4d>& targetPoints, const Eigen::Vector4d& targetMean) {
-            // TODO: Estimate the rotation from source to target points, following the Procrustes algorithm.
-            // To compute the singular value decomposition you can use JacobiSVD() from Eigen.
-            // Important: The covariance matrices should contain mean-centered source/target points.
-            Eigen::Vector4d sourceMean = getCenterOfGravity(false);
-            std::vector<Eigen::Vector4d>& sourcePoints = getFlattenedPoints();
-
-            std::vector<Eigen::Vector4d> meanCenteredSourcePoints = getFlattenedPoints();
-            std::vector<Eigen::Vector4d> meanCenteredTargetPoints = targetPoints;
-
-            std::cout << "Relative points:" << std::endl << vc::utils::toString(meanCenteredSourcePoints, "\n\n") << std::endl << std::endl;
-            std::cout << "Base points:" << std::endl << vc::utils::toString(meanCenteredTargetPoints, "\n\n");
-
-            std::transform(meanCenteredSourcePoints.begin(), meanCenteredSourcePoints.end(), meanCenteredSourcePoints.begin(), [sourceMean](Eigen::Vector4d point) -> Eigen::Vector4d { return point - sourceMean; });
-            std::transform(meanCenteredTargetPoints.begin(), meanCenteredTargetPoints.end(), meanCenteredTargetPoints.begin(), [targetMean](Eigen::Vector4d point) -> Eigen::Vector4d { return point - targetMean; });
-
-
-            std::cout << "Mean centered Relative points:" << std::endl << vc::utils::toString(meanCenteredSourcePoints, "\n\n") << std::endl << std::endl;
-            std::cout << "Mean centered Base points:" << std::endl << vc::utils::toString(meanCenteredTargetPoints, "\n\n");
-
-            Eigen::Matrix4d B = Eigen::Matrix4d();
-            B << meanCenteredSourcePoints[4] - meanCenteredSourcePoints[0], meanCenteredSourcePoints[3] - meanCenteredSourcePoints[0], meanCenteredSourcePoints[2] - meanCenteredSourcePoints[0], meanCenteredSourcePoints[1] - meanCenteredSourcePoints[0];
-            Eigen::Matrix4d A = Eigen::Matrix4d();
-            A << meanCenteredTargetPoints[4] - meanCenteredTargetPoints[0], meanCenteredTargetPoints[3] - meanCenteredTargetPoints[0], meanCenteredTargetPoints[2] - meanCenteredTargetPoints[0], meanCenteredTargetPoints[1] - meanCenteredTargetPoints[0];
-
-            Eigen::JacobiSVD<Eigen::Matrix4d> svd = Eigen::JacobiSVD<Eigen::Matrix4d>(B * A.transpose(), Eigen::ComputeFullU | Eigen::ComputeFullV);
-
-            auto result = Eigen::Matrix4d(svd.matrixU() * svd.matrixV().transpose());
-
-            std::cout << "Rotation: " << std::endl << result << std::endl;
-
-            return result;
         }
     };
      
@@ -208,7 +179,7 @@ namespace vc::optimization {
         float color2DepthHeight;
 
     public:
-        CharacteristicPoints(std::shared_ptr<vc::capture::CaptureDevice> pipeline) : ACharacteristicPoints(){
+        CharacteristicPoints(std::shared_ptr<vc::capture::CaptureDevice> pipeline) : ACharacteristicPoints() {
             if (!setPipelineStuff(pipeline)) {
                 return;
             }
@@ -224,7 +195,7 @@ namespace vc::optimization {
                 int markerId = ids[j];
 
                 for (int cornerId = 0; cornerId < markerCorners[j].size(); cornerId++) {
-                        this->markerCorners[markerId].emplace_back(pixel2Point(markerCorners[j][cornerId]));
+                    this->markerCorners[markerId].emplace_back(pixel2Point(markerCorners[j][cornerId]));
                 }
             }
 
@@ -232,7 +203,7 @@ namespace vc::optimization {
             {
                 int charucoId = charucoIds[j];
 
-                    this->charucoCorners[charucoId] = pixel2Point(charucoCorners[j]);
+                this->charucoCorners[charucoId] = pixel2Point(charucoCorners[j]);
             }
         }
 
@@ -312,7 +283,7 @@ namespace vc::optimization {
             setupOpenGL();
         }
 
-        void render(ACharacteristicPoints* characteristicPoints, glm::mat4 model, glm::mat4 view, glm::mat4 projection, glm::mat4 relativeTransformation = glm::mat4(1.0f), glm::vec3 color = glm::vec3(-1.0f, -1.0f, -1.0f)) {
+        void render(ACharacteristicPoints* characteristicPoints, glm::mat4 model, glm::mat4 view, glm::mat4 projection, Eigen::Matrix4d relativeTransformation = Eigen::Matrix4d::Identity(), glm::vec3 color = glm::vec3(-1.0f, -1.0f, -1.0f)) {
 
             int num_vertices = setVertices(characteristicPoints, color);
 

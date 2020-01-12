@@ -63,12 +63,6 @@ using namespace vc::enums;
 
 #pragma endregion
 
-template<typename T, typename V>
-std::vector<T> extractKeys(std::map<T, V> const& input_map);
-
-template<typename T>
-std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b);
-
 void my_function_to_handle_aborts(int signalNumber) {
 	std::cout << "Something aborted" << std::endl;
 }
@@ -115,6 +109,7 @@ vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderSta
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
+bool overlayCharacteristicPoints = true;
 
 bool renderVoxelgrid = false;
 vc::fusion::Voxelgrid* voxelgrid;
@@ -122,13 +117,18 @@ std::atomic_bool calibrateCameras = true;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
-vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::Procrustes();
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::Procrustes(true, 1000);
 
-int main(int argc, char* argv[]) try {
-	
-	vc::optimization::MockProcrustes().optimize();
-	//vc::optimization::MockBundleAdjustment().optimize();
-	return 0;
+float vertices[] = {
+	-0.5f, -0.5f, 0.0f,
+	 0.5f, -0.5f, 0.0f,
+	 0.0f,  0.5f, 0.0f
+};
+
+int main(int argc, char* argv[]) try {	
+	//vc::optimization::MockProcrustes().optimize();
+	////vc::optimization::MockBundleAdjustment().optimize();
+	//return 0;
 
 	google::InitGoogleLogging("Bundle Adjustment");
 	ceres::Solver::Summary summary;
@@ -187,6 +187,8 @@ int main(int argc, char* argv[]) try {
 
 	voxelgrid = new vc::fusion::Voxelgrid();
 	optimizationProblem->setupOpenGL();
+
+	vc::rendering::Shader testingShader = vc::rendering::VertexFragmentShader("shader/testing.vert", "shader/testing.frag");
 
 	//ImGui_ImplGlfw_Init(window, false);
 	
@@ -265,10 +267,11 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
-			if (!optimizationProblem->optimize(pipelines, false)) {
+			if (!optimizationProblem->optimize(pipelines)) {
 				continue;
 			}
 
+			//setCalibration(false);
 			//vc::utils::sleepFor("After optimization", 2000);
 
 			//if (programState.allMarkersDetected) 
@@ -318,6 +321,39 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Main loop
 
+	// set up vertex data (and buffer(s)) and configure vertex attributes
+	// ------------------------------------------------------------------
+	float vertices[] = {
+		 0.5f,  0.5f, 0.0f,  // top right
+		 0.5f, -0.5f, 0.0f,  // bottom right
+		-0.5f, -0.5f, 0.0f,  // bottom left
+		-0.5f,  0.5f, 0.0f   // top left 
+	};
+	unsigned int indices[] = {  // note that we start from 0!
+		0, 1, 3,  // first Triangle
+		1, 2, 3   // second Triangle
+	};
+	unsigned int VBO, VAO, EBO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &EBO);
+	// bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	// note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	vc::rendering::Rendering testRenderer = vc::rendering::Rendering();
+
 	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT - TOP_BAR_HEIGHT);
 	while (!glfwWindowShouldClose(window))
 	{
@@ -348,28 +384,39 @@ int main(int argc, char* argv[]) try {
 		vc::rendering::startFrame(window);
 		//optimizationProblem->calculateTransformations();
 
+		testRenderer.initializeCoordinateSystemBuffers();
+		testRenderer.renderCoordinateSystem(model, view, projection);
+		
+		float alpha = 1.0f;
+		if (overlayCharacteristicPoints) {
+			alpha = 0.1;
+		}
+
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
 			int x = i % 2;
 			int y = (int)floor(i / 2);
-				if (state.renderState == RenderState::ONLY_COLOR) {
-					pipelines[i]->renderColor(x, y, aspect, width, height);
-				}
-				else if (state.renderState == RenderState::ONLY_DEPTH) {
-					pipelines[i]->renderDepth(x, y, aspect, width, height);
-				}
+
+			pipelines[i]->rendering->requestVertexRecalculation();
+
+			if (state.renderState == RenderState::ONLY_COLOR) {
+				pipelines[i]->renderColor(x, y, aspect, width, height);
+			}
+			else if (state.renderState == RenderState::ONLY_DEPTH) {
+				pipelines[i]->renderDepth(x, y, aspect, width, height);
+			}
 			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, optimizationProblem->getRelativeTransformation(i, 0), renderCoordinateSystem);
-					if (renderVoxelgrid) {
-						voxelgrid->renderGrid(model, view, projection);
-					}
+				pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, optimizationProblem->getRelativeTransformation(i, 0), renderCoordinateSystem, alpha);
+				if (renderVoxelgrid) {
+					voxelgrid->renderGrid(model, view, projection);
 				}
+			}
 			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, optimizationProblem->getRelativeTransformation(i, 0), renderCoordinateSystem);
-				}
+				pipelines[i]->renderAllPointclouds(model, view, projection, width, height, optimizationProblem->getRelativeTransformation(i, 0), renderCoordinateSystem, alpha);
+			}
 		}
 
-		if (state.renderState == RenderState::ONLY_CHARACTERISTIC_POINTS) {
+		if (overlayCharacteristicPoints || state.renderState == RenderState::ONLY_CHARACTERISTIC_POINTS) {
 			optimizationProblem->render(model, view, projection);
 		}
 
@@ -379,6 +426,7 @@ int main(int argc, char* argv[]) try {
 		if (state.renderState == RenderState::VOXELGRID) {
 			voxelgrid->renderField(model, view, projection);
 		}
+			   		 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
 		glfwSwapBuffers(window);
@@ -411,31 +459,6 @@ catch (const std::exception & e)
 	return EXIT_FAILURE;
 }
 #pragma endregion
-
-#pragma region Helper functions
-
-template<typename T, typename V>
-std::vector<T> extractKeys(std::map<T, V> const& input_map) {
-	std::vector<T> retval;
-	for (auto const& element : input_map) {
-		retval.emplace_back(element.first);
-	}
-	return retval;
-}
-
-
-template<typename T>
-std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
-	std::vector<T> c;
-
-	for (T x : a) {
-		if (std::find(b.begin(), b.end(), x) != b.end()) {
-			c.emplace_back(x);
-		}
-	}
-
-	return c;
-}
 
 void setCalibration(bool calibrate) {
 	fuseFrames.store(!calibrate);
@@ -505,7 +528,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			break;
 		}
 		case GLFW_KEY_5: {
-			//state.renderState = RenderState::ONLY_CHARACTERISTIC_POINTS;
+			state.renderState = RenderState::ONLY_CHARACTERISTIC_POINTS;
+			for (int i = 0; i < pipelines.size() && i < 4; ++i)
+			{
+				pipelines[i]->rendering->requestVertexRecalculation();
+			}
 			break;
 		}
 		case GLFW_KEY_V: {
@@ -525,6 +552,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_L: {
 			renderCoordinateSystem = !renderCoordinateSystem;
+			break;
+		}
+		case GLFW_KEY_O: {
+			overlayCharacteristicPoints = !overlayCharacteristicPoints;
 			break;
 		}
 		}
