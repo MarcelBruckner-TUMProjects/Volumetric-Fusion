@@ -92,6 +92,9 @@
     <None Include="shader\characteristic_points.frag">
       <Filter>Shader</Filter>
     </None>
+    <None Include="shader\characteristic_points.geom">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Shader">

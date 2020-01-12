@@ -36,6 +36,8 @@ namespace vc::optimization {
 
         std::vector<float> getAllVerticesForRendering(glm::vec3 color = glm::vec3(-1.0f, -1.0f, -1.0f)) {
             std::vector<float> vertices;
+            std::map<int, std::vector<Eigen::Vector4d>> markerCorners = this->markerCorners;
+            std::map<int, Eigen::Vector4d> charucoCorners = this->charucoCorners;
 
             for (auto& marker : markerCorners)
             {
@@ -173,25 +175,36 @@ namespace vc::optimization {
         int color_width;
         int color_height;
 
-        glm::mat3 cam2World;
+        Eigen::Matrix3d cam2World;
 
         float color2DepthWidth;
         float color2DepthHeight;
 
     public:
         CharacteristicPoints(std::shared_ptr<vc::capture::CaptureDevice> pipeline) : ACharacteristicPoints() {
+            std::cout << vc::utils::asHeader("Starting new characteristic points");
+
             if (!setPipelineStuff(pipeline)) {
                 return;
             }
 
             std::vector<int> ids = pipeline->chArUco->ids;
+            std::cout << vc::utils::toString("ids", ids);
+
             std::vector<std::vector<cv::Point2f>> markerCorners = pipeline->chArUco->markerCorners;
+            std::cout << vc::utils::toString("markerCorners", markerCorners, "\n", "\n");
+
+            std::vector<int> charucoIds = pipeline->chArUco->charucoIds;
+            std::cout << vc::utils::toString("charucoIds", charucoIds);
 
             std::vector<cv::Point2f> charucoCorners = pipeline->chArUco->charucoCorners;
-            std::vector<int> charucoIds = pipeline->chArUco->charucoIds;
+            std::cout << vc::utils::toString("charucoCorners", charucoCorners, "\n");
 
             for (int j = 0; j < ids.size(); j++)
             {
+                if (j >= markerCorners.size()) {
+                    break;
+                }
                 int markerId = ids[j];
 
                 for (int cornerId = 0; cornerId < markerCorners[j].size(); cornerId++) {
@@ -201,6 +214,9 @@ namespace vc::optimization {
 
             for (int j = 0; j < charucoIds.size(); j++)
             {
+                if (j >= charucoCorners.size()) {
+                    break;
+                }
                 int charucoId = charucoIds[j];
 
                 this->charucoCorners[charucoId] = pixel2Point(charucoCorners[j]);
@@ -209,14 +225,24 @@ namespace vc::optimization {
 
         Eigen::Vector4d pixel2Point(cv::Point2f observation) {
             try {
+                std::cout << vc::utils::toString("Observation", observation);
+
                 int x = observation.x * color2DepthWidth;
+                std::cout << vc::utils::toString("x", x);
                 int y = observation.y * color2DepthHeight;
+                std::cout << vc::utils::toString("y", y);
 
-                glm::vec3 point = glm::vec3(x, y, 1.0f);
-                point = point * cam2World;
+                Eigen::Vector3d point = Eigen::Vector3d(x * 2.0f, y * 2.0f, 1.0f);
+                std::cout << vc::utils::toString("point", point);
+
+                point = cam2World * point;
+                std::cout << vc::utils::toString("after cam2world", point);    
+
                 point *= depth_frame->get_distance(x, y);
+                std::cout << vc::utils::toString("with depth", point);
 
-                Eigen::Vector4d v(point.x, point.y, point.z, 1.0f);
+                Eigen::Vector4d v(point[0], point[1], point[2], 1.0f);
+                std::cout << vc::utils::toString("Final point", v);
                 return v;
             }
             catch (rs2::error&) {
@@ -228,20 +254,28 @@ namespace vc::optimization {
             try {
                 depth_frame = (rs2::depth_frame*) & pipe->data->filteredDepthFrames;
                 depth_width = depth_frame->as<rs2::video_frame>().get_width();
+                std::cout << vc::utils::toString("depth_width", depth_width);
                 depth_height = depth_frame->as<rs2::video_frame>().get_height();
+                std::cout << vc::utils::toString("depth_height", depth_height);
 
                 color_frame = &pipe->data->filteredColorFrames;
                 color_width = color_frame->as<rs2::video_frame>().get_width();
+                std::cout << vc::utils::toString("color_width", color_width);
                 color_height = color_frame->as<rs2::video_frame>().get_height();
+                std::cout << vc::utils::toString("color_height", color_height);
 
                 cam2World = pipe->depth_camera->cam2world;
+                std::cout << vc::utils::toString("cam2World", cam2World);
 
                 color2DepthWidth = 1.0f * depth_width / color_width;
+                std::cout << vc::utils::toString("color2DepthWidth", color2DepthWidth);
                 color2DepthHeight = 1.0f * depth_height / color_height;
+                std::cout << vc::utils::toString("color2DepthHeight", color2DepthHeight);
 
                 return true;
             }
             catch (rs2::error & e) {
+                std::cout << vc::utils::asHeader("Couldn't set all values. Skipping!");
                 return false;
             }
         }
@@ -253,7 +287,7 @@ namespace vc::optimization {
         vc::rendering::Shader* SHADER;
         
         void setupOpenGL() {
-            SHADER = new vc::rendering::VertexFragmentShader("shader/characteristic_points.vert", "shader/characteristic_points.frag");
+            SHADER = new vc::rendering::VertexFragmentShader("shader/characteristic_points.vert", "shader/characteristic_points.frag", "shader/characteristic_points.geom");
             glGenVertexArrays(1, &VAO);
             glGenBuffers(1, &VBO);
 
@@ -289,6 +323,7 @@ namespace vc::optimization {
 
             SHADER->use();
 
+            SHADER->setFloat("cube_radius", 0.01f);
             SHADER->setMat4("relativeTransformation", relativeTransformation);
             SHADER->setMat4("correction", vc::rendering::COORDINATE_CORRECTION);
             SHADER->setMat4("model", model);

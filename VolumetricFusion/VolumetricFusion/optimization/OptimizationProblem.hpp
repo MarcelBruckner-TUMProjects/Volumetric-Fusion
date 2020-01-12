@@ -67,6 +67,7 @@ namespace vc::optimization {
         };
 
         void clear() {
+            characteristicPoints.clear();
             transformations = {
                 Eigen::Matrix4d::Identity(),
                 Eigen::Matrix4d::Identity(),
@@ -156,11 +157,12 @@ namespace vc::optimization {
             if (!init(pipelines)) {
                 return false;
             }
-            
+
+            getCharacteristicPoints(pipelines);
+
             randomize();
             vc::utils::sleepFor("Pre optimization", sleepDuration);
 
-            getCharacteristicPoints(pipelines);
             auto success = specific_optimize();
 
             vc::utils::sleepFor("After optimization", sleepDuration);
@@ -187,9 +189,24 @@ namespace vc::optimization {
         virtual bool specific_optimize() = 0;
 
         void render(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
-            for (int i = 0; i < characteristicPoints.size(); i++)
+            std::cout << characteristicPointsRenderers.size() << std::endl;
+            std::cout << characteristicPoints.size() << std::endl;
+            std::cout << transformations.size() << std::endl;
+
+            try {
+                for (int i = 0; i < characteristicPoints.size(); i++)
+                {
+                    std::cout << vc::utils::asHeader("Rendering: " + std::to_string(i));
+                    characteristicPointsRenderers[i].render(&characteristicPoints[i], model, view, projection, getRelativeTransformation(i, 0), colors[i]);
+                }
+            }
+            catch (std::exception&)
             {
-                characteristicPointsRenderers[i].render(&characteristicPoints[i], model, view, projection, getRelativeTransformation(i, 0), colors[i]);
+                std::cout << vc::utils::asHeader("Normal Exception");
+            }
+            catch (std::out_of_range&)
+            {
+                std::cout << vc::utils::asHeader("Out of range Exception");
             }
         }
 

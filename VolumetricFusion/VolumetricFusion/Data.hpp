@@ -35,6 +35,8 @@
 
 #include "Processing.hpp"
 
+#include "ceres/ceres.h"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -51,7 +53,8 @@ namespace vc::data {
 		rs2_intrinsics intrinsics;
 		cv::Matx33f K;
 		cv::Matx33f world2cam;
-		glm::mat3 cam2world;
+		Eigen::Matrix3d cam2world;
+		glm::mat3 cam2world_glm;
 		std::vector<float> distCoeffs;
 
 		float depthScale;
@@ -71,11 +74,17 @@ namespace vc::data {
 				0, 1.0f / intrinsics.fy, (-intrinsics.ppy) / intrinsics.fy,
 				0, 0, 1
 			);
-			cam2world = glm::mat3(
+			cam2world_glm = glm::mat3(
 				1.0f / intrinsics.fx, 0, (-intrinsics.ppx) / intrinsics.fx,
 				0, 1.0f / intrinsics.fy, (-intrinsics.ppy) / intrinsics.fy,
 				0, 0, 1
 			);
+
+			cam2world << 
+				1.0f / intrinsics.fx, 0, (-intrinsics.ppx) / intrinsics.fx,
+				0, 1.0f / intrinsics.fy, (-intrinsics.ppy) / intrinsics.fy,
+				0, 0, 1
+			;
 
 			for (float c : intrinsics.coeffs) {
 				distCoeffs.push_back(c);

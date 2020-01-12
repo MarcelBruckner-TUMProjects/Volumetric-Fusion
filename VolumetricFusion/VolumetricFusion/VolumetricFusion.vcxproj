@@ -27,6 +27,7 @@
     <None Include="packages.config" />
     <None Include="readme.md" />
     <None Include="shader\characteristic_points.frag" />
+    <None Include="shader\characteristic_points.geom" />
     <None Include="shader\characteristic_points.vert" />
     <None Include="shader\compute_shader.comp" />
     <None Include="shader\coordinate.fs" />

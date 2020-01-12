@@ -205,10 +205,11 @@ namespace vc::rendering {
                         vertices[y * width + x] = glm::vec2(x, y);
                     }
                 }
-                glBindVertexArray(VAOs[1]);
-                glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
-                glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(glm::vec2), vertices, GL_STATIC_DRAW);
             }
+            
+            glBindVertexArray(VAOs[1]);
+            glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
+            glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(glm::vec2), vertices, GL_STATIC_DRAW);
 
             glBindVertexArray(VAOs[1]);
             glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), (void*)0);
@@ -216,7 +217,7 @@ namespace vc::rendering {
 
             //POINTCLOUD_new_shader->set
 
-            POINTCLOUD_new_shader->setMat3("cam2World", depth_camera->cam2world);
+            POINTCLOUD_new_shader->setMat3("cam2World", depth_camera->cam2world_glm);
             POINTCLOUD_new_shader->setFloat("depth_scale", depth_camera->depthScale);
             POINTCLOUD_new_shader->setFloat("alpha", alpha);
             POINTCLOUD_new_shader->setVec2("depth_resolution", (float)depth_width, (float)depth_height);

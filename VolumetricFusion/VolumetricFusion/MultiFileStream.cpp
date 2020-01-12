@@ -117,7 +117,7 @@ std::atomic_bool calibrateCameras = true;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
-vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::Procrustes(true, 1000);
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::Procrustes(true, 500);
 
 float vertices[] = {
 	-0.5f, -0.5f, 0.0f,
@@ -529,10 +529,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_5: {
 			state.renderState = RenderState::ONLY_CHARACTERISTIC_POINTS;
-			for (int i = 0; i < pipelines.size() && i < 4; ++i)
-			{
-				pipelines[i]->rendering->requestVertexRecalculation();
-			}
+			//for (int i = 0; i < pipelines.size() && i < 4; ++i)
+			//{
+			//	pipelines[i]->rendering->requestVertexRecalculation();
+			//}
 			break;
 		}
 		case GLFW_KEY_V: {

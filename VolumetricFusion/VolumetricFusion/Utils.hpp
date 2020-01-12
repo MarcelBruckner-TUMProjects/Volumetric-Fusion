@@ -42,7 +42,7 @@ namespace vc::utils {
 	template <typename T>
 	std::string toString(std::string header, std::vector<std::vector<T>> translations, std::vector<std::vector<T>> rotations) {
 		std::stringstream ss;
-		ss << asHeader(header) << std::endl;
+		ss << asHeader(header);
 
 		ss << "Translations: " << toString(translations) << std::endl;
 		ss << "   Rotations: " << toString(rotations) << std::endl;
@@ -54,6 +54,10 @@ namespace vc::utils {
 
 	template <typename T>
 	std::string toString(std::vector<T> v, std::string valueDelimiter = ", ") {
+		if (v.empty()) {
+			return "";
+		}
+
 		std::stringstream ss;
 
 		for (auto& value : v)
@@ -67,7 +71,16 @@ namespace vc::utils {
 	}
 
 	template <typename T>
+	std::string toString(std::string header, std::vector<T> v, std::string valueDelimiter = ", ") {
+		return asHeader(header) + toString(v, valueDelimiter);
+	}
+
+	template <typename T>
 	std::string toString(std::vector<std::vector<T>> vec, std::string valueDelimiter = ", ", std::string pipeDelimiter = " | ") {
+		if (vec.empty()) {
+			return "";
+		}
+		
 		std::stringstream ss;
 		
 		for (auto& v : vec)
@@ -81,9 +94,14 @@ namespace vc::utils {
 		return intermediate;
 	}
 
+	template <typename T>
+	std::string toString(std::string header, std::vector<std::vector<T>> vec, std::string valueDelimiter = ", ", std::string pipeDelimiter = " | ") {
+		return asHeader(header) + toString(vec, valueDelimiter, pipeDelimiter);
+	}
+
 	std::string toString(std::string header, std::vector<Eigen::Matrix4d> b) {
 		std::stringstream ss;
-		ss << asHeader(header) << std::endl;
+		ss << asHeader(header);
 
 		for (auto& m : b)
 		{
@@ -93,9 +111,18 @@ namespace vc::utils {
 		return ss.str();
 	}
 
+	std::string toString(std::string header, Eigen::Matrix3d b) {
+		std::stringstream ss;
+		ss << asHeader(header);
+
+		ss << b << std::endl << std::endl;
+
+		return ss.str();
+	}
+
 	std::string toString(std::string header, Eigen::Matrix4d b) {
 		std::stringstream ss;
-		ss << asHeader(header) << std::endl;
+		ss << asHeader(header);
 
 		ss << b << std::endl << std::endl;
 
@@ -104,7 +131,7 @@ namespace vc::utils {
 
 	std::string toString(std::string header, Eigen::Vector4d b) {
 		std::stringstream ss;
-		ss << asHeader(header) << std::endl;
+		ss << asHeader(header);
 
 		ss << b << std::endl << std::endl;
 
@@ -113,7 +140,7 @@ namespace vc::utils {
 
 	std::string toString(std::string header, std::map<unsigned long long, Eigen::Vector4d> b) {
 		std::stringstream ss;
-		ss << asHeader(header) << std::endl;
+		ss << asHeader(header);
 
 		for (auto& m : b)
 		{
@@ -161,6 +188,13 @@ namespace vc::utils {
 		}
 
 		return filtered;
+	}
+
+	template <typename T>
+	std::string toString(std::string header, T value) {
+		std::stringstream ss;
+		ss << header << std::endl << value;
+		return asHeader(ss.str());
 	}
 }
 
