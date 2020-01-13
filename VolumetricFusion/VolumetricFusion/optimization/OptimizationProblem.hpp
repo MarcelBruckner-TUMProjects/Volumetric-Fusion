@@ -80,14 +80,8 @@ namespace vc::optimization {
             Eigen::Matrix4d::Identity()
         };
 
-        void clear() {
+        virtual void clear() {
             characteristicPoints.clear();
-            currentTransformations = {
-                Eigen::Matrix4d::Identity(),
-                Eigen::Matrix4d::Identity(),
-                Eigen::Matrix4d::Identity(),
-                Eigen::Matrix4d::Identity()
-            };
         }
 
     public:

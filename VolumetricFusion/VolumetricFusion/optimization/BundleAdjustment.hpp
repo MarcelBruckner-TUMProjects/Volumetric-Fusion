@@ -70,23 +70,23 @@ namespace vc::optimization {
                 return false;
             }
 
-            for (int i = 0; i < pipelines.size(); i++) {
-                std::vector<double> translation;
-                for (int j = 0; j < num_translation_parameters; j++)
-                {
-                    translation.emplace_back(pipelines[i]->chArUco->translation[j]);
-                }
+            //for (int i = 0; i < pipelines.size(); i++) {
+            //    std::vector<double> translation;
+            //    for (int j = 0; j < num_translation_parameters; j++)
+            //    {
+            //        translation.emplace_back(pipelines[i]->chArUco->translation[j]);
+            //    }
 
-                std::vector<double> rotation;
-                for (int j = 0; j < num_rotation_parameters; j++)
-                {
-                    rotation.emplace_back(pipelines[i]->chArUco->rotation[j]);
-                }
+            //    std::vector<double> rotation;
+            //    for (int j = 0; j < num_rotation_parameters; j++)
+            //    {
+            //        rotation.emplace_back(pipelines[i]->chArUco->rotation[j]);
+            //    }
 
-                translations[i] = (translation);
-                rotations[i] = (rotation);
-                scales[i] = std::vector<double>{ 1.0, 1.0, 1.0 };
-            }
+            //    translations[i] = (translation);
+            //    rotations[i] = (rotation);
+            //    scales[i] = std::vector<double>{ 1.0, 1.0, 1.0 };
+            //}
 
             needsRecalculation = true;
 
@@ -156,8 +156,8 @@ namespace vc::optimization {
             for (int i = 0; i < 4; i++)
             {
                 translations.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
-                rotations.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
-                scales.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
+                rotations.push_back(std::vector<double> { 0.0, 2 * M_PI, 0.0 });
+                scales.push_back(std::vector<double> {1.0, 1.0, 1.0  });
 
                 intrinsics.push_back(std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
                 distCoeffs.push_back(std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
@@ -167,16 +167,6 @@ namespace vc::optimization {
         void clear() {
             OptimizationProblem::clear();
             needsRecalculation = true;
-
-            for (int i = 0; i < 4; i++)
-            {
-                translations[i] = (std::vector<double> { 0.0, 0.0, 0.0 });
-                rotations[i] = (std::vector<double> { 0.0, 0.0, 0.0 });
-                scales.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
-
-                intrinsics[i] = (std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
-                distCoeffs[i] = (std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
-            }
         }
         
         void solveProblem(ceres::Problem* problem) {
@@ -229,10 +219,37 @@ namespace vc::optimization {
 
                     for (auto& hash : matchingHashes)
                     {
+                        auto relativePoint = filteredRelativeFramePoints[hash];
+                        auto basePoint = filteredBaseFramePoints[hash];
+
+                        bool valid = true;
+                        for (int i = 0; i < 3; i++)
+                        {
+                            if (std::abs(relativePoint[i]) > 10e5) {
+                                valid = false;
+                                break;
+                            }
+                        }
+                        if (!valid) {
+                            continue;
+                        }
+
+                        for (int i = 0; i < 3; i++)
+                        {
+                            if (std::abs(basePoint[i]) > 10e5) {
+                                valid = false;
+                                break;
+                            }
+                        }
+
+                        if (!valid) {
+                            continue;
+                        }
+
                         ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
                             hash, 
-                            filteredRelativeFramePoints[hash],
-                            filteredBaseFramePoints[hash],
+                            relativePoint,
+                            basePoint,
                             inverseBaseTransformation
                         );
                         problem.AddResidualBlock(cost_function, NULL,
