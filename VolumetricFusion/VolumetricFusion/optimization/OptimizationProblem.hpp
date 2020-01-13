@@ -59,7 +59,21 @@ namespace vc::optimization {
             glm::vec3(1.0f, 1.0f, 0.0f)
         };
 
-        std::vector<Eigen::Matrix4d> transformations = {
+        std::vector<Eigen::Matrix4d> currentTransformations = {
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity()
+        };
+
+        std::vector<double> bestErrors = {
+            DBL_MAX,
+            DBL_MAX,
+            DBL_MAX,
+            DBL_MAX
+        };
+
+        std::vector<Eigen::Matrix4d> bestTransformations = {
             Eigen::Matrix4d::Identity(),
             Eigen::Matrix4d::Identity(),
             Eigen::Matrix4d::Identity(),
@@ -68,7 +82,7 @@ namespace vc::optimization {
 
         void clear() {
             characteristicPoints.clear();
-            transformations = {
+            currentTransformations = {
                 Eigen::Matrix4d::Identity(),
                 Eigen::Matrix4d::Identity(),
                 Eigen::Matrix4d::Identity(),
@@ -80,6 +94,12 @@ namespace vc::optimization {
 
         OptimizationProblem(bool verbose = false, long sleepDuration = -1l) : verbose(verbose), sleepDuration(sleepDuration) {
             clear();
+        }
+
+        Eigen::Matrix4d generateScaleMatrix(double x, double y, double z) {
+            Eigen::Matrix4d scale = Eigen::Matrix4d::Identity();
+            scale.diagonal() = Eigen::Vector4d(x, y, z, 1.0);
+            return scale;
         }
 
         Eigen::Matrix4d generateTransformationMatrix(Eigen::Vector3d angleAxis) {
@@ -132,13 +152,21 @@ namespace vc::optimization {
 
             return true;
         }
-        
-        virtual Eigen::Matrix4d getTransformation(int camera_index) {
-            return transformations[camera_index];
+
+        virtual Eigen::Matrix4d getCurrentTransformation(int camera_index) {
+            return currentTransformations[camera_index];
         }
 
-        Eigen::Matrix4d getRelativeTransformation(int from, int to) {
-            return getTransformation(to) * getTransformation(from).inverse();
+        Eigen::Matrix4d getBestTransformation(int camera_index) {
+            return bestTransformations[camera_index];
+        }
+
+        Eigen::Matrix4d getCurrentRelativeTransformation(int from, int to) {
+            return getCurrentTransformation(to) * getCurrentTransformation(from).inverse();
+        }
+
+        Eigen::Matrix4d getBestRelativeTransformation(int from, int to) {
+            return getBestTransformation(to) * getBestTransformation(from).inverse();
         }
 
         void getCharacteristicPoints(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
@@ -150,54 +178,55 @@ namespace vc::optimization {
         }
 
         virtual void randomize() {
-            transformations[1] = generateTransformationMatrix(std::rand() % 1000 / 500.0 - 1.0, std::rand() % 1000 / 500.0 - 1.0, std::rand() % 1000 / 500.0 - 1.0, std::rand() % 360, Eigen::Vector3d::Random());
+            currentTransformations[1] = generateTransformationMatrix(std::rand() % 1000 / 500.0 - 1.0, std::rand() % 1000 / 500.0 - 1.0, std::rand() % 1000 / 500.0 - 1.0, std::rand() % 360, Eigen::Vector3d::Random());
         }
 
-        bool vc::optimization::OptimizationProblem::optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines = std::vector<std::shared_ptr<vc::capture::CaptureDevice>>(), bool evaluate = true) {
+        bool vc::optimization::OptimizationProblem::optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines = std::vector<std::shared_ptr<vc::capture::CaptureDevice>>()) {
             if (!init(pipelines)) {
                 return false;
             }
 
             getCharacteristicPoints(pipelines);
 
-            randomize();
+            //randomize();
             vc::utils::sleepFor("Pre optimization", sleepDuration);
 
             auto success = specific_optimize();
 
             vc::utils::sleepFor("After optimization", sleepDuration);
-          
-            if (evaluate) {
-                std::map<int, double> errors;
-                for (int i = 1; i < pipelines.size(); i++)
-                {
-                    errors[i] = calculateRelativeError(i, 0);
 
-                    std::stringstream ss;
-                    ss << "Error " << i << ": " << errors[i] << std::endl;
-                    std::cout << ss.str();
-
-                    if (errors[i] > 1e-10) {
-                        return false;
-                    }
-                }
-            }
+            evaluate();
 
             return success;
+        }
+
+        void evaluate() {
+            for (int i = 0; i < characteristicPoints.size(); i++)
+            {
+                double error = calculateRelativeError(i, 0);
+
+                if (error < bestErrors[i]) {
+                    bestErrors[i] = error;
+                    bestTransformations[i] = currentTransformations[i]; getCurrentRelativeTransformation(i, 0);
+                    std::cout << vc::utils::toString("Transformation " + std::to_string(i), bestTransformations[i]);
+                }
+            }
         }
 
         virtual bool specific_optimize() = 0;
 
         void render(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
-            std::cout << characteristicPointsRenderers.size() << std::endl;
-            std::cout << characteristicPoints.size() << std::endl;
-            std::cout << transformations.size() << std::endl;
+            //std::cout << characteristicPointsRenderers.size() << std::endl;
+            //std::cout << characteristicPoints.size() << std::endl;
+            //std::cout << transformations.size() << std::endl;
 
             try {
                 for (int i = 0; i < characteristicPoints.size(); i++)
                 {
-                    std::cout << vc::utils::asHeader("Rendering: " + std::to_string(i));
-                    characteristicPointsRenderers[i].render(&characteristicPoints[i], model, view, projection, getRelativeTransformation(i, 0), colors[i]);
+                    //std::cout << vc::utils::asHeader("Rendering: " + std::to_string(i));
+                    //std::cout << vc::utils::toString("Best Transformation " + std::to_string(i), getBestRelativeTransformation(i, 0));
+
+                    characteristicPointsRenderers[i].render(&characteristicPoints[i], model, view, projection, getBestRelativeTransformation(i, 0), colors[i]);
                 }
             }
             catch (std::exception&)
@@ -211,7 +240,7 @@ namespace vc::optimization {
         }
 
         double calculateRelativeError(int from, int to) {
-            auto relativeTransformation = getRelativeTransformation(from, to);
+            auto relativeTransformation = getCurrentRelativeTransformation(from, to);
 
             std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(
                 characteristicPoints[from].getHashes(verbose), characteristicPoints[to].getHashes(verbose)
@@ -249,7 +278,7 @@ namespace vc::optimization {
     public:
         ~MockOptimizationProblem() {
             std::cout << vc::utils::toString("Final total expected:", expectedRelativeTransformation);
-            std::cout << vc::utils::toString("Final total:", Eigen::Matrix4d(getRelativeTransformation(1, 0)));
+            std::cout << vc::utils::toString("Final total:", Eigen::Matrix4d(getCurrentRelativeTransformation(1, 0)));
         }
         
         void setupMock() {
@@ -293,8 +322,8 @@ namespace vc::optimization {
             characteristicPoints[0].markerCorners[7].emplace_back(Eigen::Vector4d(-1.0f, -1.0f, 0.0f, 1.0f));
             characteristicPoints[1].markerCorners[9].emplace_back(Eigen::Vector4d(-1.0f, -1.0f, 0.0f, 1.0f));
 
-            transformations[0] = Eigen::Matrix4d::Identity();
-            transformations[1] = baseTransformation * relativeTransformation.inverse();
+            currentTransformations[0] = Eigen::Matrix4d::Identity();
+            currentTransformations[1] = baseTransformation * relativeTransformation.inverse();
 
             expectedRelativeTransformation = baseTransformation * relativeTransformation.inverse();
         }

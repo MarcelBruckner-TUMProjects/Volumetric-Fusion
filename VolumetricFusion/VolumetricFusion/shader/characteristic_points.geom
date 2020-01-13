@@ -12,8 +12,8 @@ out vec3 fColor;
 
 void assemble_cube(vec4 position)
 {   
-//    fColor = gs_in[0].color;
-    fColor = vec3(1.0f, 0.0f, 0.0f);
+    fColor = gs_in[0].color;
+//    fColor = vec3(1.0f, 0.0f, 0.0f);
 
     gl_Position = position + vec4(cube_radius, cube_radius, cube_radius, 0.0);    
     EmitVertex();   

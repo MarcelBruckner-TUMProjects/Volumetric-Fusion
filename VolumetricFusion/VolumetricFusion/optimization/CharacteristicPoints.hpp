@@ -19,6 +19,7 @@
 #include "../Utils.hpp"
 #include "../CaptureDevice.hpp"
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
+#include <mutex>
 
 namespace vc::optimization {
     
@@ -27,6 +28,8 @@ namespace vc::optimization {
         std::map<int, std::vector<Eigen::Vector4d>> markerCorners;
         std::map<int, Eigen::Vector4d> charucoCorners;
 
+        std::vector<glm::vec3> allForRendering;
+
         ACharacteristicPoints(){}
 
         ACharacteristicPoints(
@@ -34,53 +37,55 @@ namespace vc::optimization {
             markerCorners(markerCorners), charucoCorners(charucoCorners) {}
 
 
-        std::vector<float> getAllVerticesForRendering(glm::vec3 color = glm::vec3(-1.0f, -1.0f, -1.0f)) {
-            std::vector<float> vertices;
-            std::map<int, std::vector<Eigen::Vector4d>> markerCorners = this->markerCorners;
-            std::map<int, Eigen::Vector4d> charucoCorners = this->charucoCorners;
+        std::vector<glm::vec3> getAllVerticesForRendering() {
+            return allForRendering;
 
-            for (auto& marker : markerCorners)
-            {
-                for (auto& markerCorner : marker.second)
-                {
-                    vertices.emplace_back(markerCorner[0]);
-                    vertices.emplace_back(markerCorner[1]);
-                    vertices.emplace_back(markerCorner[2]);
+            //std::vector<float> vertices;
+            //std::map<int, std::vector<Eigen::Vector4d>> markerCorners = this->markerCorners;
+            //std::map<int, Eigen::Vector4d> charucoCorners = this->charucoCorners;
 
-                    if (color.x < 0) {
-                        for (int i = 0; i < 3; i++)
-                        {
-                            vertices.emplace_back((std::rand() % 1000) / 1000.0f);
-                        }
-                    }
-                    else {
-                        vertices.emplace_back(color.x);
-                        vertices.emplace_back(color.y);
-                        vertices.emplace_back(color.z);
-                    }
-                }
-            }
+            //for (auto& marker : markerCorners)
+            //{
+            //    for (auto& markerCorner : marker.second)
+            //    {
+            //        vertices.emplace_back(markerCorner[0]);
+            //        vertices.emplace_back(markerCorner[1]);
+            //        vertices.emplace_back(markerCorner[2]);
 
-            for (auto& charucoMarker : charucoCorners)
-            {
-                vertices.emplace_back(charucoMarker.second[0]);
-                vertices.emplace_back(charucoMarker.second[1]);
-                vertices.emplace_back(charucoMarker.second[2]);
+            //        if (color.x < 0) {
+            //            for (int i = 0; i < 3; i++)
+            //            {
+            //                vertices.emplace_back((std::rand() % 1000) / 1000.0f);
+            //            }
+            //        }
+            //        else {
+            //            vertices.emplace_back(color.x);
+            //            vertices.emplace_back(color.y);
+            //            vertices.emplace_back(color.z);
+            //        }
+            //    }
+            //}
 
-                if (color.x < 0) {
-                    for (int i = 0; i < 3; i++)
-                    {
-                        vertices.emplace_back((std::rand() % 1000) / 1000.0f);
-                    }
-                }
-                else {
-                    vertices.emplace_back(color.x);
-                    vertices.emplace_back(color.y);
-                    vertices.emplace_back(color.z);
-                }
-            }
+            //for (auto& charucoMarker : charucoCorners)
+            //{
+            //    vertices.emplace_back(charucoMarker.second[0]);
+            //    vertices.emplace_back(charucoMarker.second[1]);
+            //    vertices.emplace_back(charucoMarker.second[2]);
 
-            return vertices;
+            //    if (color.x < 0) {
+            //        for (int i = 0; i < 3; i++)
+            //        {
+            //            vertices.emplace_back((std::rand() % 1000) / 1000.0f);
+            //        }
+            //    }
+            //    else {
+            //        vertices.emplace_back(color.x);
+            //        vertices.emplace_back(color.y);
+            //        vertices.emplace_back(color.z);
+            //    }
+            //}
+
+            //return vertices;
         }
 
         unsigned long long hash(int markerId, int cornerId, bool verbose = false) {
@@ -136,7 +141,7 @@ namespace vc::optimization {
         std::vector<unsigned long long> getHashes(bool verbose = false) {
             std::vector<unsigned long long> flattened;
 
-            std::cout << vc::utils::asHeader("New hashset") << std::endl;
+            //std::cout << vc::utils::asHeader("New hashset") << std::endl;
 
             iterateAllPoints([&flattened](Eigen::Vector4d& point, unsigned long long hash) {
                 flattened.push_back(hash);
@@ -180,25 +185,21 @@ namespace vc::optimization {
         float color2DepthWidth;
         float color2DepthHeight;
 
+        std::mutex mutex;
+
     public:
         CharacteristicPoints(std::shared_ptr<vc::capture::CaptureDevice> pipeline) : ACharacteristicPoints() {
-            std::cout << vc::utils::asHeader("Starting new characteristic points");
-
+            std::unique_lock<std::mutex> lock(mutex); 
+            
             if (!setPipelineStuff(pipeline)) {
                 return;
             }
 
             std::vector<int> ids = pipeline->chArUco->ids;
-            std::cout << vc::utils::toString("ids", ids);
-
             std::vector<std::vector<cv::Point2f>> markerCorners = pipeline->chArUco->markerCorners;
-            std::cout << vc::utils::toString("markerCorners", markerCorners, "\n", "\n");
 
             std::vector<int> charucoIds = pipeline->chArUco->charucoIds;
-            std::cout << vc::utils::toString("charucoIds", charucoIds);
-
             std::vector<cv::Point2f> charucoCorners = pipeline->chArUco->charucoCorners;
-            std::cout << vc::utils::toString("charucoCorners", charucoCorners, "\n");
 
             for (int j = 0; j < ids.size(); j++)
             {
@@ -208,7 +209,9 @@ namespace vc::optimization {
                 int markerId = ids[j];
 
                 for (int cornerId = 0; cornerId < markerCorners[j].size(); cornerId++) {
-                    this->markerCorners[markerId].emplace_back(pixel2Point(markerCorners[j][cornerId]));
+                    auto point = pixel2Point(markerCorners[j][cornerId]);
+                    this->markerCorners[markerId].emplace_back();
+                    allForRendering.push_back(glm::vec3(point[0], point[1], point[2]));
                 }
             }
 
@@ -218,31 +221,24 @@ namespace vc::optimization {
                     break;
                 }
                 int charucoId = charucoIds[j];
-
-                this->charucoCorners[charucoId] = pixel2Point(charucoCorners[j]);
+                auto point = pixel2Point(charucoCorners[j]);
+                this->charucoCorners[charucoId] = point;
+                allForRendering.push_back(glm::vec3(point[0], point[1], point[2]));
             }
         }
 
         Eigen::Vector4d pixel2Point(cv::Point2f observation) {
             try {
-                std::cout << vc::utils::toString("Observation", observation);
-
                 int x = observation.x * color2DepthWidth;
-                std::cout << vc::utils::toString("x", x);
                 int y = observation.y * color2DepthHeight;
-                std::cout << vc::utils::toString("y", y);
 
                 Eigen::Vector3d point = Eigen::Vector3d(x * 2.0f, y * 2.0f, 1.0f);
-                std::cout << vc::utils::toString("point", point);
 
                 point = cam2World * point;
-                std::cout << vc::utils::toString("after cam2world", point);    
 
                 point *= depth_frame->get_distance(x, y);
-                std::cout << vc::utils::toString("with depth", point);
 
                 Eigen::Vector4d v(point[0], point[1], point[2], 1.0f);
-                std::cout << vc::utils::toString("Final point", v);
                 return v;
             }
             catch (rs2::error&) {
@@ -254,28 +250,20 @@ namespace vc::optimization {
             try {
                 depth_frame = (rs2::depth_frame*) & pipe->data->filteredDepthFrames;
                 depth_width = depth_frame->as<rs2::video_frame>().get_width();
-                std::cout << vc::utils::toString("depth_width", depth_width);
                 depth_height = depth_frame->as<rs2::video_frame>().get_height();
-                std::cout << vc::utils::toString("depth_height", depth_height);
 
                 color_frame = &pipe->data->filteredColorFrames;
                 color_width = color_frame->as<rs2::video_frame>().get_width();
-                std::cout << vc::utils::toString("color_width", color_width);
                 color_height = color_frame->as<rs2::video_frame>().get_height();
-                std::cout << vc::utils::toString("color_height", color_height);
 
                 cam2World = pipe->depth_camera->cam2world;
-                std::cout << vc::utils::toString("cam2World", cam2World);
 
                 color2DepthWidth = 1.0f * depth_width / color_width;
-                std::cout << vc::utils::toString("color2DepthWidth", color2DepthWidth);
                 color2DepthHeight = 1.0f * depth_height / color_height;
-                std::cout << vc::utils::toString("color2DepthHeight", color2DepthHeight);
 
                 return true;
             }
             catch (rs2::error & e) {
-                std::cout << vc::utils::asHeader("Couldn't set all values. Skipping!");
                 return false;
             }
         }
@@ -294,22 +282,22 @@ namespace vc::optimization {
             //setVertices();
         }
 
-        int setVertices(ACharacteristicPoints* characteristicPoints, glm::vec3 color = glm::vec3(-1.0f, -1.0f, -1.0f)) {
-            auto vertices = characteristicPoints->getAllVerticesForRendering(color);
+        int setVertices(ACharacteristicPoints* characteristicPoints) {
+            auto vertices = characteristicPoints->getAllVerticesForRendering();
 
             glBindVertexArray(0);
 
             glBindVertexArray(VAO);
             glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
-            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_DYNAMIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), vertices.data(), GL_DYNAMIC_DRAW);
 
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 1 * sizeof(glm::vec3), (void*)0);
             glEnableVertexAttribArray(0);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)3);
-            glEnableVertexAttribArray(1);
+            //glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)3);
+            //glEnableVertexAttribArray(1);
 
-            return vertices.size() / 6;
+            return vertices.size();
         }
 
     public:
@@ -319,10 +307,13 @@ namespace vc::optimization {
 
         void render(ACharacteristicPoints* characteristicPoints, glm::mat4 model, glm::mat4 view, glm::mat4 projection, Eigen::Matrix4d relativeTransformation = Eigen::Matrix4d::Identity(), glm::vec3 color = glm::vec3(-1.0f, -1.0f, -1.0f)) {
 
-            int num_vertices = setVertices(characteristicPoints, color);
+            int num_vertices = setVertices(characteristicPoints);
+
+            //std::cout << vc::utils::toString("In render Best Transformation " , relativeTransformation);
 
             SHADER->use();
 
+            SHADER->setVec3("aColor", color);
             SHADER->setFloat("cube_radius", 0.01f);
             SHADER->setMat4("relativeTransformation", relativeTransformation);
             SHADER->setMat4("correction", vc::rendering::COORDINATE_CORRECTION);

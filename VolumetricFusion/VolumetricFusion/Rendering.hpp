@@ -155,7 +155,8 @@ namespace vc::rendering {
         }
 
         void renderPointcloud(const rs2::frame depth_frame, const rs2::frame color_frame, std::shared_ptr<vc::data::Camera> depth_camera, std::shared_ptr < vc::data::Camera> rgb_camera,
-            glm::mat4 model, glm::mat4 view, glm::mat4 projection, const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, Eigen::Matrix4d relativeTransformation = Eigen::Matrix4d::Identity(),  bool renderCoordinateSystem = false, float alpha = 1.0f) {
+            glm::mat4 model, glm::mat4 view, glm::mat4 projection, const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, Eigen::Matrix4d relativeTransformation = Eigen::Matrix4d::Identity(),  
+            bool renderCoordinateSystem = false, float alpha = 1.0f) try {
             setViewport(viewport_width, viewport_height, pos_x, pos_y);
 
             if (renderCoordinateSystem) {
@@ -209,7 +210,7 @@ namespace vc::rendering {
             
             glBindVertexArray(VAOs[1]);
             glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
-            glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(glm::vec2), vertices, GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(glm::vec2), vertices, GL_DYNAMIC_DRAW);
 
             glBindVertexArray(VAOs[1]);
             glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), (void*)0);
@@ -231,6 +232,9 @@ namespace vc::rendering {
             glDrawArrays(GL_POINTS, 0, num_vertices);
             glBindVertexArray(0);
             glDisable(GL_DEPTH_TEST);
+        }
+        catch (rs2::frame&) {
+            std::cerr << "Error in render function.";
         }
 
         void renderTexture(rs2::frame color_image, const int pos_x, const int pos_y, const float aspect, const int viewport_width, const int viewport_height) {

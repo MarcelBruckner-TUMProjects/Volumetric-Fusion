@@ -26,16 +26,16 @@ namespace vc::optimization {
         {}
 
         Eigen::Matrix4d getRelativeTransformation(int camera_index) {
-            return transformations[camera_index];
+            return currentTransformations[camera_index];
         }
 
         bool vc::optimization::OptimizationProblem::specific_optimize() {
 
-            transformations[0] = Eigen::Matrix4d::Identity();
+            currentTransformations[0] = Eigen::Matrix4d::Identity();
 
             for (int i = 1; i < characteristicPoints.size(); i++)
             {
-                transformations[i] = calculateRelativetranformation(characteristicPoints[i], characteristicPoints[0]);
+                currentTransformations[i] = calculateRelativetranformation(characteristicPoints[i], characteristicPoints[0]);
             }
 
             return true;
@@ -73,7 +73,7 @@ namespace vc::optimization {
             ss << vc::utils::toString("Translation", finalTrans);
 
             Eigen::Matrix4d scaling = (sourceDistance / targetDistance) * Eigen::Matrix4d::Identity();
-            scaling.bottomRightCorner<1, 1>() << 1;
+            scaling.bottomRightCorner<1, 1>() << 1.0;
             
             ss << vc::utils::toString("Scaling", scaling);
 

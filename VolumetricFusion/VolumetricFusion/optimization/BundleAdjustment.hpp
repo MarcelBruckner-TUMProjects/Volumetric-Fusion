@@ -24,14 +24,19 @@ namespace vc::optimization {
     class BundleAdjustment : virtual public OptimizationProblem {
     protected:
         bool needsRecalculation = true;
+        int iterationsSinceImprovement = 0;
+        int maxIterationsSinceImprovement = 5;
 
         const int num_translation_parameters = 3;
         const int num_rotation_parameters = 3;
+        const int num_scale_parameters = 3;
         const int num_intrinsic_parameters = 4;
         const int num_distCoeff_parameters = 4;
 
         std::vector<std::vector<double>> translations;
         std::vector<std::vector<double>> rotations;
+        std::vector<std::vector<double>> scales;
+
         std::vector<std::vector<double>> intrinsics;
         std::vector<std::vector<double>> distCoeffs;
 
@@ -40,7 +45,7 @@ namespace vc::optimization {
             if (needsRecalculation) {
                 calculateTransformations();
             }
-            return transformations[camera_index];
+            return currentTransformations[camera_index];
         }
 
         void randomize() {
@@ -80,9 +85,8 @@ namespace vc::optimization {
 
                 translations[i] = (translation);
                 rotations[i] = (rotation);
+                scales[i] = std::vector<double>{ 1.0, 1.0, 1.0 };
             }
-
-            randomize();
 
             needsRecalculation = true;
 
@@ -123,10 +127,26 @@ namespace vc::optimization {
             }
         }
 
+        Eigen::Matrix4d getScaleMatrix(int camera_index) {
+            try {
+                return generateScaleMatrix(
+                    scales.at(camera_index).at(0),
+                    scales.at(camera_index).at(1),
+                    scales.at(camera_index).at(2)
+                );
+            }
+            catch (std::out_of_range&) {
+                return Eigen::Matrix4d::Identity();
+            }
+            catch (std::exception&) {
+                return Eigen::Matrix4d::Identity();
+            }
+        }
+
     public:
         void calculateTransformations() {
             for (int i = 0; i < translations.size(); i++) {
-                transformations[i] = getTranslationMatrix(i) * getRotationMatrix(i);
+                currentTransformations[i] = getTranslationMatrix(i) * getRotationMatrix(i) * getScaleMatrix(i);
             }
 
             needsRecalculation = false;
@@ -137,6 +157,8 @@ namespace vc::optimization {
             {
                 translations.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
                 rotations.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
+                scales.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
+
                 intrinsics.push_back(std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
                 distCoeffs.push_back(std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
             }
@@ -150,16 +172,18 @@ namespace vc::optimization {
             {
                 translations[i] = (std::vector<double> { 0.0, 0.0, 0.0 });
                 rotations[i] = (std::vector<double> { 0.0, 0.0, 0.0 });
+                scales.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
+
                 intrinsics[i] = (std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
                 distCoeffs[i] = (std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
             }
         }
         
         void solveProblem(ceres::Problem* problem) {
-            std::vector<Eigen::Matrix4d> initialTransformations = transformations;
+            std::vector<Eigen::Matrix4d> initialTransformations = currentTransformations;
             
             ceres::Solver::Options options;
-            options.num_threads = 4;
+            options.num_threads = 8;
             options.linear_solver_type = ceres::DENSE_QR;
             options.minimizer_progress_to_stdout = true;
             options.max_num_iterations = 500;
@@ -172,7 +196,7 @@ namespace vc::optimization {
             calculateTransformations();
 
             std::cout << vc::utils::toString("Initial", initialTransformations);
-            std::cout << vc::utils::toString("Final", transformations);
+            std::cout << vc::utils::toString("Final", currentTransformations);
 
             std::cout << std::endl;
         }
@@ -181,8 +205,10 @@ namespace vc::optimization {
             // Create residuals for each observation in the bundle adjustment problem. The
             // parameters for cameras and points are added automatically.
             ceres::Problem problem;
-            for (int baseId = 0; baseId < characteristicPoints.size(); baseId++)
+            //for (int baseId = 0; baseId < characteristicPoints.size(); baseId++)
             {
+                int baseId = 0;
+                ACharacteristicPoints baseFramePoints = characteristicPoints[baseId];
                 Eigen::Matrix4d inverseBaseTransformation = getTransformation(baseId).inverse();
 
                 for (int relativeId = 1; relativeId < characteristicPoints.size(); relativeId++) {
@@ -190,47 +216,29 @@ namespace vc::optimization {
                         continue;
                     }
 
-                    for (auto& relativeMarkerCorners : characteristicPoints[relativeId].markerCorners)
+                    ACharacteristicPoints relativeFramePoints = characteristicPoints[relativeId];
+                    std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(baseFramePoints.getHashes(verbose), relativeFramePoints.getHashes(verbose));
+
+                    //if (matchingHashes.size() <= 4) {
+                    //    std::cerr << "At least 5 points are needed for Procrustes. Provided: " << matchingHashes.size() << std::endl;
+                    //    return Eigen::Matrix4d::Identity();
+                    //}
+
+                    auto& filteredBaseFramePoints = baseFramePoints.getFilteredPoints(matchingHashes, verbose);
+                    auto& filteredRelativeFramePoints = relativeFramePoints.getFilteredPoints(matchingHashes, verbose);
+
+                    for (auto& hash : matchingHashes)
                     {
-                        for (int cornerId = 0; cornerId < relativeMarkerCorners.second.size(); cornerId++)
-                        {
-                            if (characteristicPoints[baseId].markerCorners.count(relativeMarkerCorners.first) <= 0) {
-                                continue;
-                            }
-
-                            auto baseFramePoint = characteristicPoints[baseId].markerCorners[relativeMarkerCorners.first][cornerId];
-                            auto relativeFramePoint = relativeMarkerCorners.second[cornerId];
-
-                            //std::cout << "base" << std::endl << baseFramePoint << std::endl;
-                            //std::cout << "relative" << std::endl << relativeFramePoint << std::endl;
-
-                            ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
-                                relativeMarkerCorners.first, cornerId,
-                                relativeFramePoint,
-                                baseFramePoint,
-                                inverseBaseTransformation
-                            );
-                            problem.AddResidualBlock(cost_function, NULL,
-                                translations[relativeId].data(),
-                                rotations[relativeId].data()
-                            );
-                        }
-                    }
-
-                    for (auto& relativeCharucoCorners : characteristicPoints[relativeId].charucoCorners)
-                    {
-                        if (characteristicPoints[baseId].charucoCorners.count(relativeCharucoCorners.first) <= 0) {
-                            continue;
-                        }
                         ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
-                            relativeCharucoCorners.first, 0,
-                            relativeCharucoCorners.second,
-                            characteristicPoints[baseId].charucoCorners[relativeCharucoCorners.first],
+                            hash, 
+                            filteredRelativeFramePoints[hash],
+                            filteredBaseFramePoints[hash],
                             inverseBaseTransformation
                         );
                         problem.AddResidualBlock(cost_function, NULL,
                             translations[relativeId].data(),
-                            rotations[relativeId].data()
+                            rotations[relativeId].data(),
+                            scales[relativeId].data()
                         );
                     }
                 }
@@ -251,12 +259,17 @@ namespace vc::optimization {
 
     class MockBundleAdjustment : public BundleAdjustment, public MockOptimizationProblem {
     private:
+        void setupMock() {
+            MockOptimizationProblem::setupMock();
+            setup();
+        }
+
         void setup() {
-            for (int i = 0; i < transformations.size(); i++)
+            for (int i = 0; i < currentTransformations.size(); i++)
             {
-                Eigen::Vector3d translation = transformations[i].block<3, 1>(0, 3);
-                double angle = Eigen::AngleAxisd(transformations[i].block<3, 3>(0, 0)).angle();
-                Eigen::Vector3d rotation = Eigen::AngleAxisd(transformations[i].block<3, 3>(0, 0)).axis().normalized();
+                Eigen::Vector3d translation = currentTransformations[i].block<3, 1>(0, 3);
+                double angle = Eigen::AngleAxisd(currentTransformations[i].block<3, 3>(0, 0)).angle();
+                Eigen::Vector3d rotation = Eigen::AngleAxisd(currentTransformations[i].block<3, 3>(0, 0)).axis().normalized();
                 rotation *= angle;
 
                 for (int j = 0; j < 3; j++)
@@ -271,9 +284,6 @@ namespace vc::optimization {
     public:
         bool vc::optimization::OptimizationProblem::specific_optimize() {
             setupMock();
-            setup();
-
-            randomize();
 
             BundleAdjustment::specific_optimize();
 
