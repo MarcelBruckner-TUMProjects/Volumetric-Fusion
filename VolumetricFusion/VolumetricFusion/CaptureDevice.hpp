@@ -36,9 +36,12 @@ namespace vc::capture {
 
 		std::shared_ptr < std::thread> thread;
 
+		rs2::device device;
+		int masterSlaveId = 0;
+		rs2::pipeline_profile activeProfile = nullptr;
 
 		void startPipeline() {
-			this->pipeline->start(this->cfg);
+			activeProfile = this->pipeline->start(this->cfg);
 			isPipelineRunning->store(true);
 			setCameras();
 			isThreadRunning->store(true);
@@ -105,14 +108,28 @@ namespace vc::capture {
 		void setResolutions(const std::vector<int> colorStream, const std::vector<int> depthStream, bool directResume = true) {
 			pauseThread();
 			stopPipeline();
+
 			if (colorStream.size() == 2) {
 				this->cfg.enable_stream(RS2_STREAM_COLOR, colorStream[0], colorStream[1], RS2_FORMAT_RGB8, 30);
 			}
 			if (depthStream.size() == 2) {
 				this->cfg.enable_stream(RS2_STREAM_DEPTH, depthStream[0], depthStream[1], RS2_FORMAT_Z16, 30);
 			}
+
 			if (directResume) {
 				startPipeline();
+
+				// Reference: https://github.com/IntelRealSense/librealsense/issues/2281
+				if (this->masterSlaveId > 0) {
+					stopPipeline();
+
+					//this->device.hardware_reset();
+					auto sensor = this->device.first<rs2::depth_sensor>();
+					sensor.set_option(RS2_OPTION_INTER_CAM_SYNC_MODE, this->masterSlaveId);
+					sensor.set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 0);
+
+					startPipeline();
+				}
 			}
 		}
 
@@ -212,11 +229,13 @@ namespace vc::capture {
 	/// <seealso cref="CaptureDevice" />
 	class StreamingCaptureDevice : public CaptureDevice {
 	public:
-		StreamingCaptureDevice(rs2::context context, rs2::device device, const std::vector<int> colorStream, const std::vector<int> depthStream) :
+		StreamingCaptureDevice(rs2::context context, rs2::device device, const std::vector<int> colorStream, const std::vector<int> depthStream, const int masterSlaveId = 0) :
 			CaptureDevice(context)
 		{
 			data->deviceName = device.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
 
+			this->device = device;
+			this->masterSlaveId = masterSlaveId;
 			this->cfg.enable_device(data->deviceName);
 			setResolutions(colorStream, depthStream, false);
 		}
@@ -233,6 +252,7 @@ namespace vc::capture {
 		{
 			/*this->cfg.enable_device(data->deviceName);
 			setResolutions(colorStream, depthStream);*/
+			this->device = device;
 			this->cfg.enable_record_to_file(foldername + data->deviceName + ".bag");
 		}
 	};

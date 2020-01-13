@@ -2,8 +2,6 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
-#define _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS	
-
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "stb_image.h"
@@ -110,23 +108,19 @@ float lastFrame = 0.0f;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::VOXELGRID);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::PCL);
+//vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::MULTI_POINTCLOUD);
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
 
 bool renderVoxelgrid = false;
 vc::fusion::Voxelgrid* voxelgrid;
-std::atomic_bool calibrateCameras = true;
+std::atomic_bool calibrateCameras = false;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
-// disable compiler warning C4996
-#include <pcl/visualization/cloud_viewer.h>
-//#include <pcl/io/io.h>
-#include <pcl/point_types.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/registration/icp.h>
+vc::rendering::SurfaceRendering* sr = nullptr;
 
 int main(int argc, char* argv[]) try {
 	
@@ -207,7 +201,7 @@ int main(int argc, char* argv[]) try {
 				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM, folderSettings.recordingsFolder));
 			}
 			else if (state.captureState == CaptureState::STREAMING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM));
+				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM, i == 0 ? 1 : 2));
 			}
 			i++;
 		}
@@ -338,7 +332,7 @@ int main(int argc, char* argv[]) try {
 			if (programState.allMarkersDetected) {
 				setCalibration(false);
 				// start fusion thread logic
-				fuseFrames.store(true);
+				//fuseFrames.store(true);
 			}
 		}
 	});
@@ -423,6 +417,8 @@ int main(int argc, char* argv[]) try {
 		//	glm::vec4(0.37f, 0.29f, -8.45, 1.0f)
 		//);
 
+		std::stringstream ss;
+		ss << "RENDER MULTI_POINTCLOUD:   ";
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
 			int x = i % 2;
@@ -434,6 +430,12 @@ int main(int argc, char* argv[]) try {
 					pipelines[i]->renderDepth(x, y, aspect, width, height);
 				}
 			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
+					if (pipelines[i]->data->filteredDepthFrames && pipelines[i]->data->filteredColorFrames) {
+						auto colorFrameId = pipelines[i]->data->filteredDepthFrames.as<rs2::video_frame>().get_frame_number();
+						auto depthFrameId = pipelines[i]->data->filteredDepthFrames.as<rs2::depth_frame>().get_frame_number();
+						ss << i << "," << depthFrameId << "," << colorFrameId << "   ";
+					}
+
 					pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, relativeTransformations[i], renderCoordinateSystem);
 					if (renderVoxelgrid) {
 						voxelgrid->renderGrid(model, view, projection);
@@ -443,6 +445,7 @@ int main(int argc, char* argv[]) try {
 					pipelines[i]->renderAllPointclouds(model, view, projection, width, height, relativeTransformations[i], i, renderCoordinateSystem);
 				}
 		}
+		//std::cout << ss.str() << std::endl;
 		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 			voxelgrid->renderGrid(model, view, projection);
 		}
@@ -451,103 +454,13 @@ int main(int argc, char* argv[]) try {
 		}
 
 		if (state.renderState == RenderState::PCL) {
-			//const float r = 233, g = 233, b = 0;
-			std::uint32_t rgb_color_green(0x00FF00);
-			std::uint32_t rgb_color_red(0xFF0000);
-			std::uint32_t rgb_color_blue(0x0000FF);
 
-			// pipeline 0
-			pcl::PointCloud<pcl::PointXYZRGB>::Ptr point_cloud_ptr0(new pcl::PointCloud<pcl::PointXYZRGB>);
-			pcl::PointCloud<pcl::PointXYZRGB>::Ptr point_cloud_ptr0_cpy(new pcl::PointCloud<pcl::PointXYZRGB>);
-			auto depthFrame0 = pipelines[0]->data->filteredDepthFrames;
-			auto points0 = pipelines[0]->data->pointclouds.calculate(depthFrame0);
-			const float* vertices_0 = reinterpret_cast<const float*>(points0.get_vertices());
-			for (int i = 0; i < points0.size(); i += 3) {
-				pcl::PointXYZRGB point;
-				point.x = vertices_0[i + 0];
-				point.y = vertices_0[i + 1];
-				point.z = vertices_0[i + 2];
-				point.rgb = *reinterpret_cast<float*>(&rgb_color_green);
-				point_cloud_ptr0->points.push_back(point);
-				pcl::PointXYZRGB point_cpy;
-				point_cpy.x = vertices_0[i + 0];
-				point_cpy.y = vertices_0[i + 1];
-				point_cpy.z = vertices_0[i + 2];
-				point_cpy.rgb = *reinterpret_cast<float*>(&rgb_color_blue);
-				point_cloud_ptr0_cpy->points.push_back(point_cpy);
-			}
-			Eigen::Matrix4f transform0 = Eigen::Matrix4f::Identity();
-			glm::mat4 rt0 = relativeTransformations[1];
-			transform0(0, 0) = rt0[0][0]; transform0(0, 1) = rt0[0][1]; transform0(0, 2) = rt0[0][2]; transform0(0, 3) = rt0[0][3];
-			transform0(1, 0) = rt0[1][0]; transform0(1, 1) = rt0[1][1]; transform0(1, 2) = rt0[1][2]; transform0(1, 3) = rt0[1][3];
-			transform0(2, 0) = rt0[2][0]; transform0(2, 1) = rt0[2][1]; transform0(2, 2) = rt0[2][2]; transform0(2, 3) = rt0[2][3];
-			transform0(3, 0) = rt0[3][0]; transform0(3, 1) = rt0[3][1]; transform0(3, 2) = rt0[3][2]; transform0(3, 3) = rt0[3][3];
-			std::cout << "Transform1: " << transform0 << ", glm1: " << glm::to_string(rt0) << std::endl;
-			//pcl::PointCloud<pcl::PointXYZRGB>::Ptr point_cloud_transformed_ptr0(new pcl::PointCloud<pcl::PointXYZRGB>());
-			//pcl::transformPointCloud(*point_cloud_ptr0, *point_cloud_ptr0, transform0);
-
-			// pipeline 1
-			pcl::PointCloud<pcl::PointXYZRGB>::Ptr point_cloud_ptr1(new pcl::PointCloud<pcl::PointXYZRGB>);
-			auto depthFrame1 = pipelines[1]->data->filteredDepthFrames;
-			auto points1 = pipelines[1]->data->pointclouds.calculate(depthFrame1);
-			const float* vertices_1 = reinterpret_cast<const float*>(points1.get_vertices());
-			for (int i = 0; i < points1.size(); i += 3) {
-				pcl::PointXYZRGB point;
-				point.x = vertices_1[i + 0];
-				point.y = vertices_1[i + 1];
-				point.z = vertices_1[i + 2];
-				point.rgb = *reinterpret_cast<float*>(&rgb_color_red);
-				point_cloud_ptr1->points.push_back(point);
-			}
-			Eigen::Matrix4f transform1 = Eigen::Matrix4f::Identity();
-			glm::mat4 rt1 = relativeTransformations[1];
-			transform1(0, 0) = rt1[0][0]; transform1(0, 1) = rt1[0][1]; transform1(0, 2) = rt1[0][2]; transform1(0, 3) = rt1[0][3];
-			transform1(1, 0) = rt1[1][0]; transform1(1, 1) = rt1[1][1]; transform1(1, 2) = rt1[1][2]; transform1(1, 3) = rt1[1][3];
-			transform1(2, 0) = rt1[2][0]; transform1(2, 1) = rt1[2][1]; transform1(2, 2) = rt1[2][2]; transform1(2, 3) = rt1[2][3];
-			transform1(3, 0) = rt1[3][0]; transform1(3, 1) = rt1[3][1]; transform1(3, 2) = rt1[3][2]; transform1(3, 3) = rt1[3][3];
-			std::cout << "Transform1: " << transform1 << ", glm1: " << glm::to_string(rt1) << std::endl;
-			//pcl::PointCloud<pcl::PointXYZRGB>::Ptr point_cloud_transformed_ptr1(new pcl::PointCloud<pcl::PointXYZRGB>());
-			//pcl::transformPointCloud(*point_cloud_ptr1, *point_cloud_ptr1, transform1);
-
-			// do icp
-			pcl::IterativeClosestPoint<pcl::PointXYZRGB, pcl::PointXYZRGB> icp;
-			icp.setInputSource(point_cloud_ptr0);
-			icp.setInputTarget(point_cloud_ptr1);
-	
-			pcl::PointCloud<pcl::PointXYZRGB> point_cloud_final;
-			std::cout << "Run icp ..." << std::endl;
-			auto start_time = std::clock();
-			icp.align(point_cloud_final);
-			auto end_time = std::clock();
-			auto icpConverged = icp.hasConverged();
-			auto icpFitnessScore = icp.getFitnessScore();
-			double elapsed_secs = double(end_time - start_time) / CLOCKS_PER_SEC;
-			std::cout << "has converged: " << icp.hasConverged() << ", score: " << icpFitnessScore << ", time in s: " << elapsed_secs << std::endl;
-			std::cout << icp.getFinalTransformation() << std::endl;
-
-			pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
-			viewer->setBackgroundColor(0.5f, 0.5f, 0.5f);
-			
-			auto point_cloud_final_ptr = point_cloud_final.makeShared();
-			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb_blue(point_cloud_ptr0_cpy);
-			viewer->addPointCloud<pcl::PointXYZRGB>(point_cloud_ptr0_cpy, rgb_blue, "pc 0");
-			viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "pc 0");
-
-			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb_red(point_cloud_ptr1);
-			viewer->addPointCloud<pcl::PointXYZRGB>(point_cloud_ptr1, rgb_red, "pc 1");
-			viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "pc 1");
-
-			pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb_green(point_cloud_final_ptr);
-			viewer->addPointCloud<pcl::PointXYZRGB>(point_cloud_final_ptr, rgb_green, "final pc");
-			viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "final pc");
-
-			viewer->addCoordinateSystem(0.1);
-			viewer->initCameraParameters();
-
-			while (!viewer->wasStopped())
-			{
-				viewer->spinOnce(100);
-				std::this_thread::sleep_for(100ms);
+			if (sr == nullptr) {
+				auto depthFrame0 = pipelines[0]->data->filteredDepthFrames;
+				auto points0 = pipelines[0]->data->pointclouds.calculate(depthFrame0);
+				const float* vertices_0 = reinterpret_cast<const float*>(points0.get_vertices());
+				sr = new vc::rendering::SurfaceRendering(vertices_0, points0.size());
+				sr->render();
 			}
 		}
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -609,7 +522,7 @@ std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
 }
 
 void setCalibration(bool calibrate) {
-	fuseFrames.store(!calibrate);
+	//fuseFrames.store(!calibrate);
 	calibrateCameras.store(calibrate);
 	for (int i = 0; i < pipelines.size(); i++) {
 		if (calibrateCameras) {
