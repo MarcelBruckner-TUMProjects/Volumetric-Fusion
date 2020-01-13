@@ -28,7 +28,7 @@ A multi-view RGB-D Capture Setup is built using 4 [Intel® RealSense™ Depth Ca
 - [Volumetric Capture](https://github.com/VCL3D/VolumetricCapture)
 - [Voxel grid TSDF](https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=1&ved=2ahUKEwjW972elb_mAhWEs3EKHWG9BuMQFjAAegQIBRAK&url=https%3A%2F%2Fvision.in.tum.de%2F_media%2Fteaching%2Fss2015%2Fgpucourse_ss2015%2Fkinectfusion.pdf&usg=AOvVaw0IM23fQBT9kj6x-c594nz2)
 - [OpenGL Compute Shader](http://antongerdelan.net/opengl/compute.html)
-- [Kintinuous - Real-time large scale dense visual SLAM system](https://github.com/mp3guy/Kintinuous)
+
 ## Github Repos
 - [tsdf Fusion](https://github.com/andyzeng/tsdf-fusion)
 - [tsdf Fusion in Python](https://github.com/andyzeng/tsdf-fusion-python)
@@ -36,3 +36,4 @@ A multi-view RGB-D Capture Setup is built using 4 [Intel® RealSense™ Depth Ca
 - [ReFusion](https://github.com/PRBonn/refusion)
 - [KinectFusion](https://github.com/chrdiller/KinectFusionApp)
 - [ReFusion](https://github.com/PRBonn/refusion)
+- [Kintinuous - Real-time large scale dense visual SLAM system](https://github.com/mp3guy/Kintinuous)
