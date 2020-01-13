@@ -2,12 +2,11 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
+#include "ImGuiHelpers.hpp"
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "stb_image.h"
-
-#include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
-// Include short list of convenience functions for rendering
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -23,9 +22,6 @@
 #include <atomic>
 #include <filesystem>
 
-
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -36,7 +32,6 @@ using namespace vc::enums;
 #include "processing.hpp"
 
 #include "Settings.hpp"
-#include "Data.hpp"
 #include "CaptureDevice.hpp"
 #include "Rendering.hpp"
 #if APPLE
@@ -47,10 +42,6 @@ using namespace vc::enums;
 #endif
 #include <signal.h>
 
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 #include "camera.hpp"
 #include "shader.hpp"
 #include <VolumetricFusion\Voxelgrid.hpp>
@@ -62,7 +53,6 @@ using namespace vc::enums;
 #include "glog/logging.h"
 
 #pragma endregion
-
 void my_function_to_handle_aborts(int signalNumber) {
 	std::cout << "Something aborted" << std::endl;
 }
@@ -106,6 +96,8 @@ double lastFrame = 0.0;
 bool mouseButtonDown[4] = { false, false, false, false };
 
 vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
+std::vector<vc::imgui::PipelineGUI> pipelineGuis;
+vc::imgui::AllPipelinesGUI* allPipelinesGui;
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
@@ -117,8 +109,11 @@ std::atomic_bool calibrateCameras = true;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
-vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment(false, 50);
+vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment();
+vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState);
 
+void addPipeline(std::shared_ptr<  vc::capture::CaptureDevice> pipeline);
 
 int main(int argc, char* argv[]) try {	
 	////vc::optimization::MockProcrustes().optimize();
@@ -149,6 +144,7 @@ int main(int argc, char* argv[]) try {
 		return -1;
 	}
 	glfwMakeContextCurrent(window);
+	
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
@@ -180,8 +176,12 @@ int main(int argc, char* argv[]) try {
 		}
 	});
 
+	vc::imgui::init(window, &SCR_WIDTH, &SCR_HEIGHT);
+	vc::imgui::init(window, &SCR_WIDTH, &SCR_HEIGHT);
+
 	voxelgrid = new vc::fusion::Voxelgrid();
 	optimizationProblem->setupOpenGL();
+	optimizationProblemGUI = new vc::imgui::OptimizationProblemGUI(optimizationProblem);
 
 	//ImGui_ImplGlfw_Init(window, false);
 	
@@ -204,10 +204,10 @@ int main(int argc, char* argv[]) try {
 		for (auto&& device : ctx.query_devices())
 		{
 			if (state.captureState == CaptureState::RECORDING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM, folderSettings.recordingsFolder));
+				addPipeline(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM, folderSettings.recordingsFolder));
 			}
 			else if (state.captureState == CaptureState::STREAMING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM));
+				addPipeline(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM));
 			}
 			i++;
 		}
@@ -217,9 +217,11 @@ int main(int argc, char* argv[]) try {
 
 		for (int i = 0; i < filenames.size() && i < 4; i++)
 		{
-			pipelines.emplace_back(std::make_shared < vc::capture::PlayingCaptureDevice>(ctx, filenames[i]));
+			addPipeline(std::make_shared < vc::capture::PlayingCaptureDevice>(ctx, filenames[i]));
 		}
 	}
+
+	allPipelinesGui = new vc::imgui::AllPipelinesGUI(&pipelineGuis);
 
 	if (pipelines.size() <= 0) {
 		throw(rs2::error("No device or file found!"));
@@ -232,11 +234,7 @@ int main(int argc, char* argv[]) try {
 	// to prevent UI thread from blocking due to long computations.
 	std::atomic_bool stopped(false);
 	std::atomic_bool paused(false);
-
-	// Create custom depth processing block and their output queues:
-	/*std::map<int, rs2::frame_queue> depth_processing_queues;
-	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
-	
+		
 	std::thread calibrationThread;
 	std::thread fusionThread;
 
@@ -302,6 +300,8 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Main loop
 
+	float f = 0;
+	char* buf = "";
 	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT - TOP_BAR_HEIGHT);
 	while (!glfwWindowShouldClose(window))
 	{
@@ -331,18 +331,26 @@ int main(int argc, char* argv[]) try {
 
 		vc::rendering::startFrame(window);
 		//optimizationProblem->calculateTransformations();
-				
-		float alpha = 1.0f;
-		if (overlayCharacteristicPoints) {
-			alpha = 0.1;
+
+		glfwPollEvents();
+
+		vc::imgui::startFrame();
+
+		programGui->render();
+
+		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+			optimizationProblemGUI->render();
+			allPipelinesGui->render();
 		}
+		//vc::imgui::test();
+
+		//ImGui::InputText("string", buf, IM_ARRAYSIZE(buf));
+		//ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
 			int x = i % 2;
 			int y = (int)floor(i / 2);
-
-			pipelines[i]->rendering->requestVertexRecalculation();
 
 			if (state.renderState == RenderState::ONLY_COLOR) {
 				pipelines[i]->renderColor(x, y, aspect, width, height);
@@ -350,32 +358,26 @@ int main(int argc, char* argv[]) try {
 			else if (state.renderState == RenderState::ONLY_DEPTH) {
 				pipelines[i]->renderDepth(x, y, aspect, width, height);
 			}
-			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-				pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, optimizationProblem->getBestRelativeTransformation(i, 0), renderCoordinateSystem, alpha);
+			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+				pipelineGuis[i].render();
+				if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+					x = -1;
+					y = -1;
+				}
+				vc::rendering::setViewport(width, height, x, y);
+				pipelines[i]->renderPointcloud(model, view, projection, optimizationProblem->getBestRelativeTransformation(i, 0), pipelineGuis[i].alpha);
 				if (renderVoxelgrid) {
 					voxelgrid->renderGrid(model, view, projection);
 				}
+				if (optimizationProblemGUI->highlightMarkerCorners) {
+					optimizationProblem->render(model, view, projection, i);
+				}
 			}
-			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-				pipelines[i]->renderAllPointclouds(model, view, projection, width, height, optimizationProblem->getBestRelativeTransformation(i, 0), renderCoordinateSystem, alpha);
-			}
 		}
+				
+		vc::imgui::render();
 
-		if (overlayCharacteristicPoints || state.renderState == RenderState::ONLY_CHARACTERISTIC_POINTS) {
-			optimizationProblem->render(model, view, projection);
-		}
-
-		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-			voxelgrid->renderGrid(model, view, projection);
-		}
-		if (state.renderState == RenderState::VOXELGRID) {
-			//voxelgrid->renderField(model, view, projection);
-		}
-			   		 
-		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-		// -------------------------------------------------------------------------------
 		glfwSwapBuffers(window);
-		glfwPollEvents();
 	}
 #pragma endregion
 
@@ -388,6 +390,9 @@ int main(int argc, char* argv[]) try {
 	calibrationThread.join();
 	fusionThread.join();
 #pragma endregion
+
+	vc::imgui::terminate();
+
 	glfwTerminate();
 	//std::exit(EXIT_SUCCESS);
 	return EXIT_SUCCESS;
@@ -417,6 +422,12 @@ void setCalibration(bool calibrate) {
 		}
 		pipelines[i]->calibrate(calibrateCameras);
 	}
+}
+
+void addPipeline(std::shared_ptr<vc::capture::CaptureDevice> pipeline)
+{
+	pipelines.emplace_back(pipeline);
+	pipelineGuis.emplace_back(vc::imgui::PipelineGUI(pipeline));
 }
 
 bool isKeyPressed(GLFWwindow* window, int key) {
@@ -470,14 +481,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_4: {
 			state.renderState = RenderState::CALIBRATED_POINTCLOUD;
-			break;
-		}
-		case GLFW_KEY_5: {
-			state.renderState = RenderState::ONLY_CHARACTERISTIC_POINTS;
-			//for (int i = 0; i < pipelines.size() && i < 4; ++i)
-			//{
-			//	pipelines[i]->rendering->requestVertexRecalculation();
-			//}
 			break;
 		}
 		case GLFW_KEY_V: {
@@ -541,7 +544,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 		lastY = ypos;
 
 		//processMouse(xoffset, yoffset);
-		camera.ProcessMouseMovement(xoffset, yoffset);
+		//camera.ProcessMouseMovement(xoffset, yoffset);
 	}
 }
 

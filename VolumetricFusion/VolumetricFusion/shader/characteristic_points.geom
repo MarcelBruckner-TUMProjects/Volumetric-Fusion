@@ -5,10 +5,10 @@ layout (triangle_strip, max_vertices = 8) out;
 uniform float cube_radius;
 
 in VS_OUT {
-    vec3 color;
+    vec4 color;
 } gs_in[];  
 
-out vec3 fColor;  
+out vec4 fColor;  
 
 void assemble_cube(vec4 position)
 {   

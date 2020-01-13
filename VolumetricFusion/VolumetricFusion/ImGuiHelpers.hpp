@@ -1,188 +1,148 @@
 #pragma once
+#ifndef _IMGUI_HELPERS_HEADER
+#define _IMGUI_HELPERS_HEADER
+
 #include <atomic>
-#include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
+#include <string>
+#include <memory>
+#include "CaptureDevice.hpp"
+#include "Data.hpp"
+#include "optimization/OptimizationProblem.hpp"
+#include "Enums.hpp"
 
-#if APPLE
-#include "../example.hpp"
-#include "FileAccess.hpp"
-#else
-#include "VolumetricFusion/FileAccess.hpp"
-#endif
-#include <opencv2/highgui/highgui.hpp>
-//#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgcodecs/imgcodecs.hpp>
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_opengl3.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_internal.h"
 
-namespace vc::imgui_helpers {
+const char* glsl_version = "#version 330";
 
-	void initialize(const float& width, const float& height)
-	{
-		/*draw_text(10, 20, stream_names[0].c_str());
-		draw_text(width / 2.0f, 20, stream_names[1].c_str());
-		draw_text(10, height / 2.0f + 10, stream_names[2].c_str());
-		draw_text(width / 2.0f, height / 2.0f + 10, stream_names[3].c_str());*/
+namespace vc::imgui {
+	class ProgramGUI {
+		vc::enums::RenderState* renderState;
 
-		// Flags for displaying ImGui window
-		static const int flags = ImGuiWindowFlags_NoCollapse
-			| ImGuiWindowFlags_NoScrollbar
-			| ImGuiWindowFlags_NoSavedSettings
-			| ImGuiWindowFlags_NoTitleBar
-			| ImGuiWindowFlags_NoResize
-			| ImGuiWindowFlags_NoMove;
-		// UI Rendering
-		ImGui_ImplGlfw_NewFrame(1);
-		ImGui::SetNextWindowSize({ width, height });
-		ImGui::Begin("window_main", nullptr, flags);
-	}
+	public:
+		ProgramGUI(vc::enums::RenderState* renderState) : renderState(renderState) {}
 
-	void finalize()
-	{
-		ImGui::End();
-		ImGui::Render();
-	}
+		void render() {
+			ImGui::Begin("Program Info");
 
-	template<typename F>
-	bool addTopBarButton(const char* text, F& onButtonPressedAction, float pos_x = 0.0F, float spacing_w = -1.0F) {
-		ImGui::SameLine(pos_x, spacing_w);
-		if (ImGui::Button(text)) {
-			onButtonPressedAction();
-			return true;
+			for (int n = 0; n < (int)vc::enums::RenderState::COUNT; n++)
+			{
+				auto nn = static_cast<vc::enums::RenderState>(n);
+				auto name = vc::enums::renderStateToName[nn];
+				std::stringstream ss;
+				ss << "View: " << name;
+				auto value = (int)*renderState == n;
+				if (ImGui::Selectable(ss.str().c_str(), value)) {
+					*renderState = nn;
+				}
+			}
+			
+			ImGui::Separator();
+			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+			ImGui::End();
 		}
-		return false;
-	}
+	};
 
-	bool addSwitchViewButton(RenderState &renderState, std::atomic_bool& calibrate)
-	{
-	    const auto callback = [&]() {
-          int s = (int)renderState;
-          s = (s + 1) % (int)RenderState::COUNT;
-          renderState = (RenderState)s;
-
-          calibrate = false;
-
-          std::cout << "Switching render state to " << std::to_string((int)renderState) << std::endl;
-        };
-		return addTopBarButton("Switch view", callback);
-	}
-
-	bool addToggleButton(const char* offText, const char* onText, std::atomic_bool &variable) {
-		const char* text = offText;
-		if (variable) {
-			text = onText;
-		}
-		const auto callback = [&]() {
-          variable = !variable;
-        };
-		return addTopBarButton(text, callback);
-	}
-
-	bool addPauseResumeToggle(std::atomic_bool& paused)
-	{
-		return addToggleButton("Pause", "Resume", paused);
-	}
+	class PipelineGUI {
+	private:
+		std::shared_ptr<vc::capture::CaptureDevice> pipeline;
 	
-	bool addCalibrateToggle(std::atomic_bool& calibrate)
-	{
-		return addToggleButton("Calibrate", "Stop Calibration", calibrate);
-	}
+	public:
+		float alpha = 1.0f;
 
-	bool addAlignPointCloudsButton(std::atomic_bool& paused, std::map<int, rs2::points>& filtered_points)
-	{
-        const auto callback = [&]() {
-          paused = true;
-          auto points = filtered_points[0];
+		PipelineGUI(std::shared_ptr<vc::capture::CaptureDevice> pipeline) : pipeline(pipeline) {}
 
-          /*auto vertices = points.get_vertices();              // get vertices
-          auto tex_coords = points.get_texture_coordinates(); // and texture coordinates
-          for (int i = 0; i < points.size(); i++)
-          {
-          if (vertices[i].z)
-          {
-          // upload the point and texture coordinates only for points we have depth data for
-          glVertex3fv(vertices[i]);
-          glTexCoord2fv(tex_coords[i]);
-          }
-          }*/
+		void render() {
+			ImGui::Begin(("Pointcloud " + pipeline->data->deviceName).c_str());
+			ImGui::Text("Editable settings of pointclouds.");
 
-          paused = false;
-          std::cout << "Aligned the current lframes" << std::endl;
-        };
-		return addTopBarButton("Align Pointclouds", callback);
-	}
+			ImGui::SliderFloat("Alpha", &alpha, 0.0f, 1.0f);
+			
+			ImGui::End();
+		}
+	};
 
-	bool addSaveFramesButton(std::string& captures_folder, std::map<int, std::shared_ptr<rs2::pipeline>>& pipelines, std::map<int, rs2::frame>& colorized_depth_frames, std::map<int, rs2::points>& filtered_points) {
-		const auto callback = [&]() {
-          vc::file_access::isDirectory(captures_folder, true);
-          // Write images to disk
-          for (int i = 0; i < pipelines.size(); ++i) {
-              auto vf = colorized_depth_frames[i].as<rs2::video_frame>();
+	class AllPipelinesGUI {
+	private:
+		std::vector<PipelineGUI>* pipelines;
 
-              auto filename = std::to_string(vf.get_timestamp());
-              //filename = filename.erase(filename.find(".bag"), filename.length());
+	public:
+		float alpha = 1.0f;
+		float rotationSpeed = 0.0f;
 
-              std::stringstream png_file;
-              png_file << captures_folder << "frame_" << filename << ".png";
-              stbi_write_png(png_file.str().c_str(), vf.get_width(), vf.get_height(),
-                             vf.get_bytes_per_pixel(), vf.get_data(), vf.get_stride_in_bytes());
+		AllPipelinesGUI(std::vector<PipelineGUI>* pipelines) : pipelines(pipelines) {}
 
-              std::string ply_file = captures_folder + "frame_" + filename + ".ply";
-              filtered_points[i].export_to_ply(ply_file, vf);
+		void render() {
+			ImGui::Begin("Pointclouds");
+			ImGui::Text("Editable settings of all pointclouds.");
 
-              std::cout << "Saved frame " << i << " to \"" << png_file.str() << "\""
-                        << std::endl;
-              std::cout << "Saved frame " << i << " to \"" << ply_file << "\""
-                        << std::endl;
-          }
-        };
-		return addTopBarButton("Save Frames", callback);
-	}
-
-	bool addGenerateCharucoDiamond(std::string& charuco_folder) {
-		const auto callback = [&]() {
-			vc::file_access::isDirectory(charuco_folder, true);
-			for (int i = 0; i < 6; i++) {
-				cv::Mat diamondImage;
-				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-				cv::aruco::drawCharucoDiamond(dictionary, cv::Vec4i((i * 4) + 0, (i * 4) + 1, (i * 4) + 2, (i * 4) + 3), 200, 120, diamondImage);
-
-				imshow("board", diamondImage);
-				auto filename = charuco_folder + "diamond_" + std::to_string(i) + ".png";
-
-				try {
-					cv::imwrite(filename, diamondImage);
-				}
-				catch (std::runtime_error & ex) {
-					fprintf(stderr, "Exception converting image to PNG format: %s\n", ex.what());
-					return 1;
+			if (ImGui::SliderFloat("Alpha", &alpha, 0.0f, 1.0f)) {
+				for (auto& pipe : *pipelines)
+				{
+					pipe.alpha = alpha;
 				}
 			}
-		};
 
-		return addTopBarButton("Generate ChAruCo Diamonds", callback);
+			ImGui::SliderFloat("Rotation speed", &rotationSpeed, -1.0f, 1.0f);
+			ImGui::End();
+		}
+	};
+
+	class OptimizationProblemGUI {
+	private:
+		vc::optimization::OptimizationProblem* optimizationProblem;
+
+	public:
+		bool highlightMarkerCorners = true;
+
+		OptimizationProblemGUI(vc::optimization::OptimizationProblem* optimizationProblem) :
+			optimizationProblem(optimizationProblem) {}
+
+		void render() {
+			ImGui::Begin("Optimization");
+			ImGui::Text("Editable settings of the camera calibration.");
+
+			ImGui::Checkbox("Highlight marker corners", &highlightMarkerCorners);
+
+			ImGui::End();
+		}
+	};
+
+	void init(GLFWwindow* window, int* window_width, int* window_height) {
+		static bool isInitialized = false;
+
+		if (!isInitialized) {
+			ImGui::CreateContext();
+			ImGuiIO& io = ImGui::GetIO(); (void)io;
+			io.DisplaySize = ImVec2(*window_width, *window_height);
+			unsigned char* pixels;
+			int width = 100;
+			int height = 100;
+			io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+			ImGui_ImplGlfw_InitForOpenGL(window, true);
+			ImGui_ImplOpenGL3_Init(glsl_version);
+
+			ImGui::StyleColorsLight();
+			isInitialized = true;
+		}
 	}
 
-	bool addGenerateCharucoBoard(std::string& charuco_folder) {
-		const auto callback = [&]() {
-			vc::file_access::isDirectory(charuco_folder, true);
-			for (int i = 0; i < 6; i++) {
+	void startFrame() {
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+	}
 
-				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
-				cv::Mat boardImage;
-				board->draw(cv::Size(5000, 5000), boardImage, 10, 1);
+	void render() {
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	}
 
-				imshow("board", boardImage);
-				auto filename = charuco_folder + "board_" + std::to_string(i) + ".png";
-
-				try {
-					cv::imwrite(filename, boardImage);
-				}
-				catch (std::runtime_error & ex) {
-					fprintf(stderr, "Exception converting image to PNG format: %s\n", ex.what());
-					return 1;
-				}
-			}
-		};
-
-		return addTopBarButton("Generate ChAruCo Boards", callback);
+	void terminate() {
+		ImGui_ImplGlfw_Shutdown();
+		ImGui::DestroyContext();
 	}
 }
+#endif // !_IMGUI_HELPERS_HEADER

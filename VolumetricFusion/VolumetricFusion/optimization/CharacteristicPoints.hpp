@@ -188,6 +188,8 @@ namespace vc::optimization {
         std::mutex mutex;
 
     public:
+        CharacteristicPoints() : ACharacteristicPoints() {}
+
         CharacteristicPoints(std::shared_ptr<vc::capture::CaptureDevice> pipeline) : ACharacteristicPoints() {
             std::unique_lock<std::mutex> lock(mutex); 
             
@@ -305,15 +307,14 @@ namespace vc::optimization {
             setupOpenGL();
         }
 
-        void render(ACharacteristicPoints* characteristicPoints, glm::mat4 model, glm::mat4 view, glm::mat4 projection, Eigen::Matrix4d relativeTransformation = Eigen::Matrix4d::Identity(), glm::vec3 color = glm::vec3(-1.0f, -1.0f, -1.0f)) {
-
+        void render(ACharacteristicPoints* characteristicPoints, glm::mat4 model, glm::mat4 view, glm::mat4 projection, Eigen::Matrix4d relativeTransformation, float* color) {
             int num_vertices = setVertices(characteristicPoints);
 
             //std::cout << vc::utils::toString("In render Best Transformation " , relativeTransformation);
 
             SHADER->use();
 
-            SHADER->setVec3("aColor", color);
+            SHADER->setColor("aColor", color[0], color[1], color[2], color[3]);
             SHADER->setFloat("cube_radius", 0.01f);
             SHADER->setMat4("relativeTransformation", relativeTransformation);
             SHADER->setMat4("correction", vc::rendering::COORDINATE_CORRECTION);

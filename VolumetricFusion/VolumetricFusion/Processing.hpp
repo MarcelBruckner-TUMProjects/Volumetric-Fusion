@@ -14,6 +14,7 @@
 #include <opencv2/calib3d/calib3d.hpp>
 
 #include "Data.hpp"
+#include "PinholeCamera.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -104,7 +105,7 @@ namespace vc::processing {
 
 		cv::Vec3d rotation, translation;
 		
-		void startCharucoProcessing(vc::data::Camera camera) {
+		void startCharucoProcessing(vc::camera::PinholeCamera camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04f, 0.02f, dictionary);

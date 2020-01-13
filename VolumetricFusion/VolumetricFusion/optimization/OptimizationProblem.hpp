@@ -51,13 +51,6 @@ namespace vc::optimization {
 
         std::vector<CharacteristicPointsRenderer> characteristicPointsRenderers;
 
-        std::vector<glm::vec3> colors{
-            glm::vec3(1.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f),
-            glm::vec3(0.0f, 0.0f, 1.0f),
-            glm::vec3(1.0f, 1.0f, 0.0f)
-        };
-
         std::vector<double> bestErrors = {
             DBL_MAX,
             DBL_MAX,
@@ -66,11 +59,28 @@ namespace vc::optimization {
         };
 
         virtual void clear() {
-            characteristicPoints.clear();
+            characteristicPoints = {
+                CharacteristicPoints(),
+                CharacteristicPoints(),
+                CharacteristicPoints(),
+                CharacteristicPoints()
+            };
         }
 
     public:
-        std::vector<ACharacteristicPoints> characteristicPoints;
+        std::vector<float*> colors = {
+            new float[4]{1.0f, 0.0f, 0.0f, 1.0f},
+            new float[4]{0.0f, 1.0f, 0.0f, 1.0f},
+            new float[4]{0.0f, 0.0f, 1.0f, 1.0f},
+            new float[4]{1.0f, 1.0f, 0.0f, 1.0f}
+        };
+
+        std::vector<ACharacteristicPoints> characteristicPoints = {
+            CharacteristicPoints(),
+            CharacteristicPoints(),
+            CharacteristicPoints(),
+            CharacteristicPoints()
+        };
 
         std::vector<Eigen::Matrix4d> currentTranslations = {
             Eigen::Matrix4d::Identity(),
@@ -193,10 +203,9 @@ namespace vc::optimization {
         }
 
         void getCharacteristicPoints(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
-            characteristicPoints.clear();
             for (int i = 0; i < pipelines.size(); i++)
             {
-                characteristicPoints.emplace_back(CharacteristicPoints(pipelines[i]));
+                characteristicPoints[i] = CharacteristicPoints(pipelines[i]);
             }
         }
 
@@ -236,20 +245,20 @@ namespace vc::optimization {
                 if (error < bestErrors[i]) {
                     bestErrors[i] = error;
                     bestTransformations[i] = getCurrentTransformation(i); 
-                    std::cout << vc::utils::toString("Transformation " + std::to_string(i), bestTransformations[i]);
+                    //std::cout << vc::utils::toString("Transformation " + std::to_string(i), bestTransformations[i]);
                 }
             }
         }
 
         virtual bool specific_optimize() = 0;
 
-        void render(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
+        void render(glm::mat4 model, glm::mat4 view, glm::mat4 projection, int i) {
             //std::cout << characteristicPointsRenderers.size() << std::endl;
             //std::cout << characteristicPoints.size() << std::endl;
             //std::cout << transformations.size() << std::endl;
 
             try {
-                for (int i = 0; i < characteristicPoints.size(); i++)
+                //for (int i = 0; i < characteristicPoints.size(); i++)
                 {
                     //std::cout << vc::utils::asHeader("Rendering: " + std::to_string(i));
                     //std::cout << vc::utils::toString("Best Transformation " + std::to_string(i), getBestRelativeTransformation(i, 0));
@@ -338,8 +347,8 @@ namespace vc::optimization {
                 //Eigen::Vector4d(-0.5f, -0.5f, 0.0f, 1.0f)
             };
 
-            characteristicPoints.emplace_back(MockCharacteristicPoints());
-            characteristicPoints.emplace_back(MockCharacteristicPoints());
+            characteristicPoints[0] = (MockCharacteristicPoints());
+            characteristicPoints[1] = (MockCharacteristicPoints());
 
             for (int i = 0; i < points.size() / 2; i++)
             {

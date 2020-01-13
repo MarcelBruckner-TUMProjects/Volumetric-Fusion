@@ -3,15 +3,15 @@
 #ifndef _CAPTURE_DEVICE_
 #define _CAPTURE_DEVICE_
 
-#include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 #include <map>
 #include <iostream>
 #include <string>
 #include <thread>
 #include <atomic>
 #include <chrono>
-#include "data.hpp"
-#include "processing.hpp"
+#include "Data.hpp"
+#include "PinholeCamera.hpp"
+#include "Processing.hpp"
 #include "Rendering.hpp"
 
 #include "ceres/problem.h"
@@ -27,8 +27,8 @@ namespace vc::capture {
 		std::shared_ptr < vc::rendering::Rendering> rendering;
 		std::shared_ptr < vc::processing::ChArUco> chArUco;
 		std::shared_ptr < vc::data::Data> data;
-		std::shared_ptr < vc::data::Camera> rgb_camera;
-		std::shared_ptr < vc::data::Camera> depth_camera;
+		std::shared_ptr < vc::camera::PinholeCamera> rgb_camera;
+		std::shared_ptr < vc::camera::PinholeCamera> depth_camera;
 
 		std::shared_ptr<rs2::pipeline > pipeline;
 
@@ -38,7 +38,7 @@ namespace vc::capture {
 		std::shared_ptr < std::atomic_bool> calibrateCameras;
 
 		std::shared_ptr < std::thread> thread;
-
+		
 		void startPipeline() {
 			this->pipeline->start(this->cfg);
 			isPipelineRunning->store(true);
@@ -91,16 +91,11 @@ namespace vc::capture {
 			}
 		}
 		
-		void renderAllPointclouds(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
-			const int viewport_width, const int viewport_height, Eigen::Matrix4d relativeTransformation = Eigen::Matrix4d::Identity(), bool renderCoordinateSystem = false, float alpha = 1.0f) {
-			renderPointcloud(model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, renderCoordinateSystem, alpha);
-		}
-
 		void renderPointcloud(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
-			const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, Eigen::Matrix4d relativeTransformation = Eigen::Matrix4d::Identity(), bool renderCoordinateSystem = false, float alpha = 1.0f) {
+			Eigen::Matrix4d relativeTransformation, float alpha) {
 			if (data->filteredDepthFrames && data->filteredColorFrames) {
 				rendering->renderPointcloud(data->filteredDepthFrames, data->filteredColorFrames, depth_camera, rgb_camera, model, view, projection,
-					viewport_width, viewport_height, pos_x, pos_y, relativeTransformation, renderCoordinateSystem, alpha);
+					relativeTransformation, alpha);
 			}
 		}
 
@@ -144,12 +139,11 @@ namespace vc::capture {
 			this->paused = std::make_shared<std::atomic_bool>(true);
 			this->calibrateCameras = std::make_shared<std::atomic_bool>(false);
 			//setCameras();
-
 		}
 
 		void setCameras() {
-			this->rgb_camera = std::make_shared<vc::data::Camera>(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
-			this->depth_camera = std::make_shared<vc::data::Camera>(this->pipeline->get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>().get_intrinsics(), 
+			this->rgb_camera = std::make_shared<vc::camera::PinholeCamera>(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
+			this->depth_camera = std::make_shared<vc::camera::PinholeCamera>(this->pipeline->get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>().get_intrinsics(),
 				this->pipeline->get_active_profile().get_device().first<rs2::depth_sensor>().get_depth_scale());
 		}
 

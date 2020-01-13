@@ -2,7 +2,7 @@
 layout (location = 0) in vec3 aPos;
 //layout (location = 1) in vec3 aColor;
 
-uniform vec3 aColor;
+uniform vec4 aColor;
 uniform mat4 relativeTransformation;
 uniform mat4 model;
 uniform mat4 correction;
@@ -10,7 +10,7 @@ uniform mat4 view;
 uniform mat4 projection;
 
 out VS_OUT {
-    vec3 color;
+    vec4 color;
 } vs_out;
 
 void main()

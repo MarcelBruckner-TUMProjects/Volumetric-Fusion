@@ -3,10 +3,7 @@
 #ifndef _RENDERING_HEADER_
 #define _RENDERING_HEADER_
 
-#if KEVIN_MACOS
-#pragma message("Included on Mac OS")
-#endif
-
+#include "PinholeCamera.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "stb_image.h"
@@ -18,9 +15,6 @@
 
 #define GL_GLEXT_PROTOTYPES
 
-//#include <GL/GL.h>
-
-#include <librealsense2/rs.hpp> 
 
 #include <string>
 #include <sstream>
@@ -149,20 +143,15 @@ namespace vc::rendering {
             glBindBuffer(GL_ARRAY_BUFFER, VBOs[2]);
         }
 
-        void renderAllPointclouds(const rs2::frame depth_frame, const rs2::frame color_frame, std::shared_ptr<vc::data::Camera> depth_camera, std::shared_ptr < vc::data::Camera> rgb_camera, 
+        void renderAllPointclouds(const rs2::frame depth_frame, const rs2::frame color_frame, std::shared_ptr<vc::camera::PinholeCamera> depth_camera, std::shared_ptr < vc::camera::PinholeCamera> rgb_camera,
             glm::mat4 model, glm::mat4 view, glm::mat4 projection, const int viewport_width, const int viewport_height, Eigen::Matrix4d relativeTransformation = Eigen::Matrix4d::Identity(), bool renderCoordinateSystem = false, float alpha = 1.0f) {
-            renderPointcloud(depth_frame, color_frame, depth_camera, rgb_camera, model, view, projection, viewport_width, viewport_height, -1, -1, relativeTransformation, renderCoordinateSystem, alpha);
+            renderPointcloud(depth_frame, color_frame, depth_camera, rgb_camera, model, view, projection, relativeTransformation, alpha);
         }
 
-        void renderPointcloud(const rs2::frame depth_frame, const rs2::frame color_frame, std::shared_ptr<vc::data::Camera> depth_camera, std::shared_ptr < vc::data::Camera> rgb_camera,
-            glm::mat4 model, glm::mat4 view, glm::mat4 projection, const int viewport_width, const int viewport_height, const int pos_x, const int pos_y, Eigen::Matrix4d relativeTransformation = Eigen::Matrix4d::Identity(),  
-            bool renderCoordinateSystem = false, float alpha = 1.0f) try {
-            setViewport(viewport_width, viewport_height, pos_x, pos_y);
-
-            if (renderCoordinateSystem) {
-                this->renderCoordinateSystem(model, view, projection);
-            }
-
+        void renderPointcloud(const rs2::frame depth_frame, const rs2::frame color_frame, std::shared_ptr<vc::camera::PinholeCamera> depth_camera, std::shared_ptr < vc::camera::PinholeCamera> rgb_camera,
+            glm::mat4 model, glm::mat4 view, glm::mat4 projection, Eigen::Matrix4d relativeTransformation = Eigen::Matrix4d::Identity(),  
+            float alpha = 1.0f) try {
+            
             glEnable(GL_DEPTH_TEST);
 
             glEnable(GL_BLEND);
