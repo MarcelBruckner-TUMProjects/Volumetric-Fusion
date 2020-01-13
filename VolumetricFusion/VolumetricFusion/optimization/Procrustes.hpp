@@ -25,28 +25,30 @@ namespace vc::optimization {
         Procrustes(bool verbose = false, long sleepDuration = -1l) : OptimizationProblem(verbose, sleepDuration)
         {}
 
-        Eigen::Matrix4d getRelativeTransformation(int camera_index) {
-            return currentTransformations[camera_index];
-        }
-
         bool vc::optimization::OptimizationProblem::specific_optimize() {
 
-            currentTransformations[0] = Eigen::Matrix4d::Identity();
+            currentTranslations[0] = Eigen::Matrix4d::Identity();
+            currentRotations[0] = Eigen::Matrix4d::Identity();
+            currentScales[0] = Eigen::Matrix4d::Identity();
 
             for (int i = 1; i < characteristicPoints.size(); i++)
             {
-                currentTransformations[i] = calculateRelativetranformation(characteristicPoints[i], characteristicPoints[0]);
+                calculateRelativetranformation(characteristicPoints[i], characteristicPoints[0], i);
             }
 
             return true;
         }
 
-        Eigen::Matrix4d calculateRelativetranformation(ACharacteristicPoints& source, ACharacteristicPoints& target) {
+        void calculateRelativetranformation(ACharacteristicPoints& source, ACharacteristicPoints& target, int index) {
             std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(source.getHashes(verbose), target.getHashes(verbose));
 
             if (matchingHashes.size() <= 4) {
                 std::cerr << "At least 5 points are needed for Procrustes. Provided: " << matchingHashes.size() << std::endl;
-                return Eigen::Matrix4d::Identity();
+
+                currentTranslations[index] = Eigen::Matrix4d::Identity();
+                currentRotations[index] = Eigen::Matrix4d::Identity();
+                currentScales[index] = Eigen::Matrix4d::Identity();
+                return;
             }
 
             auto& sourcePoints = source.getFilteredPoints(matchingHashes, verbose);
@@ -85,7 +87,9 @@ namespace vc::optimization {
                 std::cout << ss.str();
             }
 
-            return finalTransformation;
+            currentTranslations[index] = finalTrans;
+            currentRotations[index] = rotation;
+            currentScales[index] = scaling;
         }
 
         Eigen::Matrix4d estimateRotation(std::vector<unsigned long long> hashes,

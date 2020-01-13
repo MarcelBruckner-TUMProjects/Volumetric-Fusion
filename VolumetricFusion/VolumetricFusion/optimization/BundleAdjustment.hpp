@@ -13,6 +13,7 @@
 #include "ceres/rotation.h"
 #include <sstream>
 
+#include "Procrustes.hpp"
 #include "CharacteristicPoints.hpp"
 #include "OptimizationProblem.hpp"
 #include "PointCorrespondenceError.hpp"
@@ -23,6 +24,8 @@
 namespace vc::optimization {
     class BundleAdjustment : virtual public OptimizationProblem {
     protected:
+
+        bool hasProcrustesInitialization = false;
         bool needsRecalculation = true;
         int iterationsSinceImprovement = 0;
         int maxIterationsSinceImprovement = 5;
@@ -45,7 +48,7 @@ namespace vc::optimization {
             if (needsRecalculation) {
                 calculateTransformations();
             }
-            return currentTransformations[camera_index];
+            return OptimizationProblem::getCurrentTransformation(camera_index);
         }
 
         void randomize() {
@@ -146,12 +149,14 @@ namespace vc::optimization {
     public:
         void calculateTransformations() {
             for (int i = 0; i < translations.size(); i++) {
-                currentTransformations[i] = getTranslationMatrix(i) * getRotationMatrix(i) * getScaleMatrix(i);
+                currentTranslations[i] = getTranslationMatrix(i);
+                currentRotations[i] = getRotationMatrix(i);
+                currentScales[i] = getScaleMatrix(i);
             }
 
             needsRecalculation = false;
         }
-
+        
         BundleAdjustment(bool verbose = false, bool withSleep = false) : OptimizationProblem(verbose, withSleep) {
             for (int i = 0; i < 4; i++)
             {
@@ -170,7 +175,7 @@ namespace vc::optimization {
         }
         
         void solveProblem(ceres::Problem* problem) {
-            std::vector<Eigen::Matrix4d> initialTransformations = currentTransformations;
+            std::vector<Eigen::Matrix4d> initialTransformations = bestTransformations;
             
             ceres::Solver::Options options;
             options.num_threads = 8;
@@ -186,7 +191,7 @@ namespace vc::optimization {
             calculateTransformations();
 
             std::cout << vc::utils::toString("Initial", initialTransformations);
-            std::cout << vc::utils::toString("Final", currentTransformations);
+            std::cout << vc::utils::toString("Final", bestTransformations);
 
             std::cout << std::endl;
         }
@@ -265,7 +270,43 @@ namespace vc::optimization {
             return true;
         }
 
+        void initializeWithProcrustes() {
+            vc::optimization::Procrustes procrustes = vc::optimization::Procrustes();
+            procrustes.characteristicPoints = characteristicPoints;
+            procrustes.optimizeOnPoints();
+            bestTransformations = procrustes.bestTransformations;
+            currentRotations = procrustes.currentRotations;
+            currentTranslations = procrustes.currentTranslations;
+            currentScales = procrustes.currentScales;
+            needsRecalculation = true;
+            hasProcrustesInitialization = true;
+            setup();
+        }
+
+        void setup() {
+            for (int i = 0; i < 4; i++)
+            {
+                Eigen::Vector3d translation = currentTranslations[i].block<3, 1>(0, 3);
+                double angle = Eigen::AngleAxisd(currentRotations[i].block<3, 3>(0, 0)).angle();
+                Eigen::Vector3d rotation = Eigen::AngleAxisd(currentRotations[i].block<3, 3>(0, 0)).axis().normalized();
+                rotation *= angle;
+                Eigen::Vector3d scale = currentScales[i].diagonal().block<3, 1>(0, 0);
+
+                for (int j = 0; j < 3; j++)
+                {
+                    translations[i][j] = translation[j];
+                    rotations[i][j] = rotation[j];
+                    scales[i][j] = scale[j];
+                }
+            }
+            needsRecalculation = true;
+        }
+
         bool vc::optimization::OptimizationProblem::specific_optimize() {
+            if (!hasProcrustesInitialization) {
+                initializeWithProcrustes();
+            }
+
             if (!solvePointCorrespondenceError()) {
                 return false;
             }
@@ -280,24 +321,7 @@ namespace vc::optimization {
             MockOptimizationProblem::setupMock();
             setup();
         }
-
-        void setup() {
-            for (int i = 0; i < currentTransformations.size(); i++)
-            {
-                Eigen::Vector3d translation = currentTransformations[i].block<3, 1>(0, 3);
-                double angle = Eigen::AngleAxisd(currentTransformations[i].block<3, 3>(0, 0)).angle();
-                Eigen::Vector3d rotation = Eigen::AngleAxisd(currentTransformations[i].block<3, 3>(0, 0)).axis().normalized();
-                rotation *= angle;
-
-                for (int j = 0; j < 3; j++)
-                {
-                    translations[i][j] = translation[j];
-                    rotations[i][j] = rotation[j];
-                }
-            }
-            needsRecalculation = true;
-        }
-
+        
     public:
         bool vc::optimization::OptimizationProblem::specific_optimize() {
             setupMock();

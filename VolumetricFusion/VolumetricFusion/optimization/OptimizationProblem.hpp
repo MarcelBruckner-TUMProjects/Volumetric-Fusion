@@ -49,7 +49,6 @@ namespace vc::optimization {
         long sleepDuration = -1l;
         bool verbose = false;
 
-        std::vector<ACharacteristicPoints> characteristicPoints;
         std::vector<CharacteristicPointsRenderer> characteristicPointsRenderers;
 
         std::vector<glm::vec3> colors{
@@ -59,18 +58,37 @@ namespace vc::optimization {
             glm::vec3(1.0f, 1.0f, 0.0f)
         };
 
-        std::vector<Eigen::Matrix4d> currentTransformations = {
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity()
-        };
-
         std::vector<double> bestErrors = {
             DBL_MAX,
             DBL_MAX,
             DBL_MAX,
             DBL_MAX
+        };
+
+        virtual void clear() {
+            characteristicPoints.clear();
+        }
+
+    public:
+        std::vector<ACharacteristicPoints> characteristicPoints;
+
+        std::vector<Eigen::Matrix4d> currentTranslations = {
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity()
+        };
+        std::vector<Eigen::Matrix4d> currentRotations = {
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity()
+        };
+        std::vector<Eigen::Matrix4d> currentScales = {
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity(),
+            Eigen::Matrix4d::Identity()
         };
 
         std::vector<Eigen::Matrix4d> bestTransformations = {
@@ -79,12 +97,6 @@ namespace vc::optimization {
             Eigen::Matrix4d::Identity(),
             Eigen::Matrix4d::Identity()
         };
-
-        virtual void clear() {
-            characteristicPoints.clear();
-        }
-
-    public:
 
         OptimizationProblem(bool verbose = false, long sleepDuration = -1l) : verbose(verbose), sleepDuration(sleepDuration) {
             clear();
@@ -95,6 +107,23 @@ namespace vc::optimization {
             scale.diagonal() = Eigen::Vector4d(x, y, z, 1.0);
             return scale;
         }
+
+        Eigen::Matrix4d generateRotationMatrix(double radians, Eigen::Vector3d axis = Eigen::Vector3d::Identity()) {
+            Eigen::Matrix3d R = Eigen::AngleAxisd(radians, axis.normalized()).matrix();
+            Eigen::Matrix4d Trans; // Your Transformation Matrix
+            Trans.setIdentity();   // Set to Identity to make bottom row of Matrix 0,0,0,1
+            Trans.block<3, 3>(0, 0) = R;
+            return Trans;
+        }
+
+        Eigen::Matrix4d generateTranslationMatrix(double tx, double ty, double tz) {
+            Eigen::Vector3d T = Eigen::Vector3d(tx, ty, tz);
+            Eigen::Matrix4d Trans; // Your Transformation Matrix
+            Trans.setIdentity();   // Set to Identity to make bottom row of Matrix 0,0,0,1
+            Trans.block<3, 1>(0, 3) = T;
+            return Trans;
+        }
+
 
         Eigen::Matrix4d generateTransformationMatrix(Eigen::Vector3d angleAxis) {
             return generateTransformationMatrix(0, 0, 0, angleAxis.norm(), angleAxis.normalized());
@@ -148,7 +177,7 @@ namespace vc::optimization {
         }
 
         virtual Eigen::Matrix4d getCurrentTransformation(int camera_index) {
-            return currentTransformations[camera_index];
+            return currentTranslations[camera_index] * currentRotations[camera_index] * currentScales[camera_index];
         }
 
         Eigen::Matrix4d getBestTransformation(int camera_index) {
@@ -172,16 +201,12 @@ namespace vc::optimization {
         }
 
         virtual void randomize() {
-            currentTransformations[1] = generateTransformationMatrix(std::rand() % 1000 / 500.0 - 1.0, std::rand() % 1000 / 500.0 - 1.0, std::rand() % 1000 / 500.0 - 1.0, std::rand() % 360, Eigen::Vector3d::Random());
+            currentTranslations[1] = generateTransformationMatrix(std::rand() % 1000 / 500.0 - 1.0, std::rand() % 1000 / 500.0 - 1.0, std::rand() % 1000 / 500.0 - 1.0, std::rand() % 360, Eigen::Vector3d::Random());
+            currentRotations[1] = generateTransformationMatrix(std::rand() % 1000 / 500.0 - 1.0, std::rand() % 1000 / 500.0 - 1.0, std::rand() % 1000 / 500.0 - 1.0, std::rand() % 360, Eigen::Vector3d::Random());
+            currentScales[1] = generateScaleMatrix(std::rand() % 1000 / 500.0 - 1.0, std::rand() % 1000 / 500.0 - 1.0, std::rand() % 1000 / 500.0 - 1.0);
         }
 
-        bool vc::optimization::OptimizationProblem::optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines = std::vector<std::shared_ptr<vc::capture::CaptureDevice>>()) {
-            if (!init(pipelines)) {
-                return false;
-            }
-
-            getCharacteristicPoints(pipelines);
-
+        bool optimizeOnPoints() {
             //randomize();
             vc::utils::sleepFor("Pre optimization", sleepDuration);
 
@@ -194,6 +219,15 @@ namespace vc::optimization {
             return success;
         }
 
+        bool optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines = std::vector<std::shared_ptr<vc::capture::CaptureDevice>>()) {
+            if (!init(pipelines)) {
+                return false;
+            }
+
+            getCharacteristicPoints(pipelines);
+            return optimizeOnPoints();
+        }
+
         void evaluate() {
             for (int i = 0; i < characteristicPoints.size(); i++)
             {
@@ -201,7 +235,7 @@ namespace vc::optimization {
 
                 if (error < bestErrors[i]) {
                     bestErrors[i] = error;
-                    bestTransformations[i] = currentTransformations[i]; getCurrentRelativeTransformation(i, 0);
+                    bestTransformations[i] = getCurrentTransformation(i); 
                     std::cout << vc::utils::toString("Transformation " + std::to_string(i), bestTransformations[i]);
                 }
             }
@@ -279,9 +313,16 @@ namespace vc::optimization {
             verbose = true;
             sleepDuration = -1l;
 
-            Eigen::Matrix4d baseTransformation = generateTransformationMatrix(0, 0, 1, 0, Eigen::Vector3d(0, 1, 0));
-            Eigen::Matrix4d relativeTransformation = generateTransformationMatrix(0, 0, 3, M_PI / 2.0, Eigen::Vector3d(0, 1, 0));
+            Eigen::Matrix4d baseTranslation = generateTranslationMatrix(0, 0, 1);
+            Eigen::Matrix4d baseRotation = generateRotationMatrix(0, Eigen::Vector3d(0, 1, 0));
+            Eigen::Matrix4d baseScale = generateScaleMatrix(1, 1, 1);
+            Eigen::Matrix4d baseTransformation = baseTranslation * baseRotation * baseScale;
 
+            Eigen::Matrix4d relativeTranslation = generateTranslationMatrix(0, 0, 3);
+            Eigen::Matrix4d relativeRotation = generateRotationMatrix(M_PI / 2.0, Eigen::Vector3d(0, 1, 0));
+            Eigen::Matrix4d relativeScale = generateScaleMatrix(1, 1, 1);
+            Eigen::Matrix4d relativeTransformation = relativeTranslation * relativeRotation * relativeScale;
+            
             //Eigen::Matrix4d baseTransformation = generateTransformationMatrix(0, 0, 0, 0, Eigen::Vector3d(0, 0, 0));
             //Eigen::Matrix4d relativeTransformation = generateTransformationMatrix(0, 0, 0, 0, Eigen::Vector3d(0, 0, 0));
 
@@ -316,8 +357,8 @@ namespace vc::optimization {
             characteristicPoints[0].markerCorners[7].emplace_back(Eigen::Vector4d(-1.0f, -1.0f, 0.0f, 1.0f));
             characteristicPoints[1].markerCorners[9].emplace_back(Eigen::Vector4d(-1.0f, -1.0f, 0.0f, 1.0f));
 
-            currentTransformations[0] = Eigen::Matrix4d::Identity();
-            currentTransformations[1] = baseTransformation * relativeTransformation.inverse();
+            //currentTransformations[0] = Eigen::Matrix4d::Identity();
+            //currentTransformations[1] = baseTransformation * relativeTransformation.inverse();
 
             expectedRelativeTransformation = baseTransformation * relativeTransformation.inverse();
         }
