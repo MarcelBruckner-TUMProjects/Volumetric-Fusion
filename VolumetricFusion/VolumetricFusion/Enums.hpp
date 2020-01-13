@@ -7,6 +7,7 @@ namespace vc::enums {
 		VOXELGRID,
 		ONLY_COLOR,
 		ONLY_DEPTH,
+		ONLY_CHARACTERISTIC_POINTS,
 		COUNT
 	};
 

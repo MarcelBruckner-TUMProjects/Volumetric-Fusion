@@ -56,17 +56,12 @@ using namespace vc::enums;
 #include <VolumetricFusion\Voxelgrid.hpp>
 //#include <io.h>
 
-#include "MarchingCubes.hpp"
-#include "Optimization.hpp"
+#include "optimization/optimizationProblem.hpp"
+#include "optimization/BundleAdjustment.hpp"
+#include "optimization/Procrustes.hpp"
 #include "glog/logging.h"
 
 #pragma endregion
-
-template<typename T, typename V>
-std::vector<T> extractKeys(std::map<T, V> const& input_map);
-
-template<typename T>
-std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b);
 
 void my_function_to_handle_aborts(int signalNumber) {
 	std::cout << "Something aborted" << std::endl;
@@ -81,29 +76,31 @@ void processInput(GLFWwindow* window);
 void setCalibration(bool calibrate);
 
 // settings
-const unsigned int SCR_WIDTH = 800 * 2;
-const unsigned int TOP_BAR_HEIGHT = 0;
-const unsigned int SCR_HEIGHT = 600 * 2 ;
+int SCR_WIDTH = 800 * 2;
+int TOP_BAR_HEIGHT = 0;
+int SCR_HEIGHT = 600 * 2 ;
 
 std::vector<int> DEFAULT_COLOR_STREAM = { 640, 480 };
 std::vector<int> DEFAULT_DEPTH_STREAM = { 640, 480 };
 
+//std::vector<int> CALIBRATION_COLOR_STREAM = { 640, 480 };
+//std::vector<int> CALIBRATION_DEPTH_STREAM = { 640, 480 };
 std::vector<int> CALIBRATION_COLOR_STREAM = { 1920, 1080 };
 std::vector<int> CALIBRATION_DEPTH_STREAM = { 1280, 720 };
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
 //Camera camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.f);
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
+double lastX = SCR_WIDTH / 2.0f;
+double lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
-float MouseSensitivity = 0.1;
+float MouseSensitivity = 0.1f;
 float Yaw = 0;
 float Pitch = 0;
 
 // timing
-float deltaTime = 0.0f;	// time between current frame and last frame
-float lastFrame = 0.0f;
+double deltaTime = 0.0;	// time between current frame and last frame
+double lastFrame = 0.0;
 
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
@@ -112,6 +109,7 @@ vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderSta
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
+bool overlayCharacteristicPoints = true;
 
 bool renderVoxelgrid = false;
 vc::fusion::Voxelgrid* voxelgrid;
@@ -119,15 +117,13 @@ std::atomic_bool calibrateCameras = true;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
-vc::optimization::BAProblem bundleAdjustment = vc::optimization::BAProblem();
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment(false, 50);
 
-int main(int argc, char* argv[]) try {
-	
-	//vc::fusion::testSingleCellMarchingCubes();
-	vc::fusion::testFourCellMarchingCubes();
-	return 0;
 
-	//vc::optimization::testFunc();
+int main(int argc, char* argv[]) try {	
+	////vc::optimization::MockProcrustes().optimize();
+	//vc::optimization::MockBundleAdjustment().optimize();
+	//return 0;
 
 	google::InitGoogleLogging("Bundle Adjustment");
 	ceres::Solver::Summary summary;
@@ -185,6 +181,7 @@ int main(int argc, char* argv[]) try {
 	});
 
 	voxelgrid = new vc::fusion::Voxelgrid();
+	optimizationProblem->setupOpenGL();
 
 	//ImGui_ImplGlfw_Init(window, false);
 	
@@ -263,13 +260,15 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
-			if (!bundleAdjustment.optimize(pipelines) || !bundleAdjustment.hasSolution) {
+			if (!optimizationProblem->optimize(pipelines)) {
 				continue;
 			}
 
-			
+			//setCalibration(false);
+			//vc::utils::sleepFor("After optimization", 2000);
 
 			//if (programState.allMarkersDetected) 
+			if(false)
 			{
 				setCalibration(false);
 				// start fusion thread logic
@@ -281,24 +280,24 @@ int main(int argc, char* argv[]) try {
 #pragma endregion
 	   
 #pragma region Fusion Thread
-	fusionThread = std::thread([&stopped, &programState]() {
-		const int maxIntegrations = 10;
-		int integrations = 0;
-		while (!stopped) {
-			if (calibrateCameras || !fuseFrames) {
-				continue;
-			}
-			
-			voxelgrid->integrateFramesCPU(pipelines, bundleAdjustment.relativeTransformations);
+	//fusionThread = std::thread([&stopped, &programState]() {
+	//	const int maxIntegrations = 10;
+	//	int integrations = 0;
+	//	while (!stopped) {
+	//		if (calibrateCameras || !fuseFrames) {
+	//			continue;
+	//		}
+	//		
+	//		//voxelgrid->integrateFramesCPU(pipelines, bundleAdjustment.relativeTransformations);
 
-			integrations++;
-			if (integrations >= maxIntegrations) {
-				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
-				fuseFrames.store(false);
-				break;
-			}
-		}
-		});
+	//		integrations++;
+	//		if (integrations >= maxIntegrations) {
+	//			std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
+	//			fuseFrames.store(false);
+	//			break;
+	//		}
+	//	}
+	//	});
 #pragma endregion
 
 #pragma region Main loop
@@ -308,20 +307,20 @@ int main(int argc, char* argv[]) try {
 	{
 		// per-frame time logic
 		// --------------------
-		float currentFrame = glfwGetTime();
+		double currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
-
+		
 		// Retina display (Mac OS) have double the pixel density
 		int w2, h2;
 		glfwGetFramebufferSize(window, &w2, &h2);
 		const bool isRetinaDisplay = w2 == width * 2 && h2 == width * 2;
 
 		const float aspect = 1.0f * width / height;
-
+		
 		// -------------------------------------------------------------------------------
 		processInput(window);
 
@@ -329,12 +328,22 @@ int main(int argc, char* argv[]) try {
 		glm::mat4 view = camera.GetViewMatrix();
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
+
 		vc::rendering::startFrame(window);
+		//optimizationProblem->calculateTransformations();
+				
+		float alpha = 1.0f;
+		if (overlayCharacteristicPoints) {
+			alpha = 0.1;
+		}
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
 			int x = i % 2;
-			int y = floor(i / 2);
+			int y = (int)floor(i / 2);
+
+			pipelines[i]->rendering->requestVertexRecalculation();
+
 			if (state.renderState == RenderState::ONLY_COLOR) {
 				pipelines[i]->renderColor(x, y, aspect, width, height);
 			}
@@ -342,22 +351,27 @@ int main(int argc, char* argv[]) try {
 				pipelines[i]->renderDepth(x, y, aspect, width, height);
 			}
 			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-				pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
+				pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, optimizationProblem->getBestRelativeTransformation(i, 0), renderCoordinateSystem, alpha);
 				if (renderVoxelgrid) {
 					voxelgrid->renderGrid(model, view, projection);
 				}
 			}
 			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-				pipelines[i]->renderAllPointclouds(model, view, projection, width, height, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
+				pipelines[i]->renderAllPointclouds(model, view, projection, width, height, optimizationProblem->getBestRelativeTransformation(i, 0), renderCoordinateSystem, alpha);
 			}
 		}
+
+		if (overlayCharacteristicPoints || state.renderState == RenderState::ONLY_CHARACTERISTIC_POINTS) {
+			optimizationProblem->render(model, view, projection);
+		}
+
 		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 			voxelgrid->renderGrid(model, view, projection);
 		}
-
-		/*if (state.renderState == RenderState::VOXELGRID) {
-			voxelgrid->renderField(model, view, projection);
-		}*/
+		if (state.renderState == RenderState::VOXELGRID) {
+			//voxelgrid->renderField(model, view, projection);
+		}
+			   		 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
 		glfwSwapBuffers(window);
@@ -391,31 +405,6 @@ catch (const std::exception & e)
 }
 #pragma endregion
 
-#pragma region Helper functions
-
-template<typename T, typename V>
-std::vector<T> extractKeys(std::map<T, V> const& input_map) {
-	std::vector<T> retval;
-	for (auto const& element : input_map) {
-		retval.emplace_back(element.first);
-	}
-	return retval;
-}
-
-
-template<typename T>
-std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
-	std::vector<T> c;
-
-	for (T x : a) {
-		if (std::find(b.begin(), b.end(), x) != b.end()) {
-			c.emplace_back(x);
-		}
-	}
-
-	return c;
-}
-
 void setCalibration(bool calibrate) {
 	fuseFrames.store(!calibrate);
 	calibrateCameras.store(calibrate);
@@ -439,16 +428,16 @@ bool isKeyPressed(GLFWwindow* window, int key) {
 void processInput(GLFWwindow* window)
 {
 	if (isKeyPressed(window, GLFW_KEY_W)) {
-		camera.ProcessKeyboard(FORWARD, deltaTime);
+		camera.ProcessKeyboard(Camera_Movement::FORWARD, deltaTime);
 	}
 	if (isKeyPressed(window, GLFW_KEY_S)) {
-		camera.ProcessKeyboard(BACKWARD, deltaTime);
+		camera.ProcessKeyboard(Camera_Movement::BACKWARD, deltaTime);
 	}
 	if (isKeyPressed(window, GLFW_KEY_A)) {
-		camera.ProcessKeyboard(LEFT, deltaTime);
+		camera.ProcessKeyboard(Camera_Movement::LEFT, deltaTime);
 	}
 	if (isKeyPressed(window, GLFW_KEY_D)) {
-		camera.ProcessKeyboard(RIGHT, deltaTime);
+		camera.ProcessKeyboard(Camera_Movement::RIGHT, deltaTime);
 	}
 }
 
@@ -484,7 +473,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			break;
 		}
 		case GLFW_KEY_5: {
-			//state.renderState = RenderState::VOXELGRID;
+			state.renderState = RenderState::ONLY_CHARACTERISTIC_POINTS;
+			//for (int i = 0; i < pipelines.size() && i < 4; ++i)
+			//{
+			//	pipelines[i]->rendering->requestVertexRecalculation();
+			//}
 			break;
 		}
 		case GLFW_KEY_V: {
@@ -506,6 +499,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			renderCoordinateSystem = !renderCoordinateSystem;
 			break;
 		}
+		case GLFW_KEY_O: {
+			overlayCharacteristicPoints = !overlayCharacteristicPoints;
+			break;
+		}
 		}
 	}
 }
@@ -519,6 +516,8 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	// height will be significantly larger than specified on retina displays.
 	glfwMakeContextCurrent(window);
 	glViewport(0, 0, width, height - 50);
+	SCR_HEIGHT = height;
+	SCR_WIDTH = width;
 }
 
 
@@ -534,8 +533,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 			firstMouse = false;
 		}
 
-		float xoffset = lastX - xpos;
-		float yoffset = ypos - lastY; // reversed since y-coordinates go from bottom to top
+		float xoffset = (float)(lastX - xpos);
+		float yoffset = (float)(ypos - lastY); // reversed since y-coordinates go from bottom to top
 		//float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
 
 		lastX = xpos;
@@ -545,26 +544,6 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 		camera.ProcessMouseMovement(xoffset, yoffset);
 	}
 }
-//
-//void processMouse(float xoffset, float yoffset, GLboolean constrainPitch ) {
-//	xoffset *= MouseSensitivity;
-//	yoffset *= MouseSensitivity;
-//
-//	Yaw += xoffset;
-//	Pitch += yoffset;
-//
-//	// Make sure that when pitch is out of bounds, screen doesn't get flipped
-//	if (constrainPitch)
-//	{
-//		if (Pitch > 89.0f)
-//			Pitch = 89.0f;
-//		if (Pitch < -89.0f)
-//			Pitch = -89.0f;
-//	}
-//	model = glm::mat4(1.0f);
-//	model = glm::rotate(model, glm::radians(Pitch), glm::vec3(1.0f, 0.0f, 0.0f));
-//	model = glm::rotate(model, glm::radians(Yaw), glm::vec3(0.0f, 1.0f, 0.0f));
-//}
 
 void mouse_button_callback(GLFWwindow*, int button, int action, int mods)
 {

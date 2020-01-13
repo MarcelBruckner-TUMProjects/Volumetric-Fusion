@@ -5,6 +5,7 @@ in vec2 texCoord;
 
 uniform sampler2D color_frame;
 uniform vec4 color;
+uniform float alpha;
 
 void main()
 {
@@ -14,6 +15,7 @@ void main()
     }
     
     FragColor = texture(color_frame, texCoord);
+    FragColor.w = alpha;
 //    FragColor = vec4(texCoord, 0.0, 1.0f);
 //    FragColor = vec4(0.7f, 0.8f, 0.8f, 1.0f);
 }

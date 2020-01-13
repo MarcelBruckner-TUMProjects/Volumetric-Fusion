@@ -32,8 +32,11 @@
 #include <cmath>
 #include <map>
 #include <functional>
+#include <vector>
 
 #include "Processing.hpp"
+
+#include "ceres/ceres.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -51,7 +54,8 @@ namespace vc::data {
 		rs2_intrinsics intrinsics;
 		cv::Matx33f K;
 		glm::mat3 world2cam;
-		glm::mat3 cam2world;
+		Eigen::Matrix3d cam2world;
+		glm::mat3 cam2world_glm;
 		std::vector<float> distCoeffs;
 
 		float depthScale;
@@ -66,17 +70,23 @@ namespace vc::data {
 				0, 0, 1
 			);
 
-			world2cam = glm::transpose(glm::mat3(
-				intrinsics.fx, 0, intrinsics.ppx,
-				0, intrinsics.fy, intrinsics.ppy,
-				0, 0, 1
-			));
-
-			cam2world = glm::mat3(
+			world2cam = glm::mat3(
 				1.0f / intrinsics.fx, 0, (-intrinsics.ppx) / intrinsics.fx,
 				0, 1.0f / intrinsics.fy, (-intrinsics.ppy) / intrinsics.fy,
 				0, 0, 1
 			);
+
+			cam2world_glm = glm::mat3(
+				1.0f / intrinsics.fx, 0, (-intrinsics.ppx) / intrinsics.fx,
+				0, 1.0f / intrinsics.fy, (-intrinsics.ppy) / intrinsics.fy,
+				0, 0, 1
+			);
+
+			cam2world << 
+				1.0f / intrinsics.fx, 0, (-intrinsics.ppx) / intrinsics.fx,
+				0, 1.0f / intrinsics.fy, (-intrinsics.ppy) / intrinsics.fy,
+				0, 0, 1
+			;
 
 			for (float c : intrinsics.coeffs) {
 				distCoeffs.push_back(c);
@@ -87,9 +97,9 @@ namespace vc::data {
 	class Data {
 	public:
 
+		unsigned long long frameId;
 		std::string deviceName;
 
-		unsigned long long frameId;
 		//texture tex;
 		rs2::colorizer colorizer;
 		rs2::frame  filteredColorFrames;

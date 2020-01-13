@@ -4,17 +4,10 @@
     <ClCompile Include="glad\src\glad.c" />
     <ClCompile Include="MultiFileStream.cpp" />
     <ClCompile Include="std_image.cpp" />
-    <ClCompile Include="ReprojectionError.hpp">
-      <Filter>OptimizationMethods</Filter>
-    </ClCompile>
-    <ClCompile Include="Structs.hpp">
-      <Filter>MarchingCubes</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.hpp" />
     <ClInclude Include="CaptureDevice.hpp" />
-    <ClInclude Include="ComputeShader.hpp" />
     <ClInclude Include="Data.hpp" />
     <ClInclude Include="Enums.hpp" />
     <ClInclude Include="FileAccess.hpp" />
@@ -26,28 +19,39 @@
     <ClInclude Include="Settings.hpp" />
     <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
-    <ClInclude Include="Voxelgrid.hpp" />
-    <ClInclude Include="Optimization.hpp" />
-    <ClInclude Include="PointCorrespondenceError.hpp">
-      <Filter>OptimizationMethods</Filter>
-    </ClInclude>
+    <ClInclude Include="Tables.hpp" />
     <ClInclude Include="Utils.hpp" />
-    <ClInclude Include="Tables.hpp">
-      <Filter>MarchingCubes</Filter>
+    <ClInclude Include="ComputeShader.hpp">
+      <Filter>Shader</Filter>
     </ClInclude>
     <ClInclude Include="MarchingCubes.hpp">
-      <Filter>MarchingCubes</Filter>
+      <Filter>Surface</Filter>
+    </ClInclude>
+    <ClInclude Include="Voxelgrid.hpp">
+      <Filter>Surface</Filter>
+    </ClInclude>
+    <ClInclude Include="optimization\BundleAdjustment.hpp">
+      <Filter>Optimization</Filter>
+    </ClInclude>
+    <ClInclude Include="optimization\CharacteristicPoints.hpp">
+      <Filter>Optimization</Filter>
+    </ClInclude>
+    <ClInclude Include="optimization\OptimizationProblem.hpp">
+      <Filter>Optimization</Filter>
+    </ClInclude>
+    <ClInclude Include="optimization\PointCorrespondenceError.hpp">
+      <Filter>Optimization</Filter>
+    </ClInclude>
+    <ClInclude Include="optimization\Procrustes.hpp">
+      <Filter>Optimization</Filter>
+    </ClInclude>
+    <ClInclude Include="optimization\ReprojectionError.hpp">
+      <Filter>Optimization</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="readme.md" />
-    <None Include="shader\texture.vs">
-      <Filter>Shader</Filter>
-    </None>
-    <None Include="shader\texture.fs">
-      <Filter>Shader</Filter>
-    </None>
     <None Include="shader\voxelgrid_trippy.vs">
       <Filter>Shader</Filter>
     </None>
@@ -60,7 +64,25 @@
     <None Include="shader\voxelgrid_cube.fs">
       <Filter>Shader</Filter>
     </None>
-    <None Include="shader\pointcloud.vs">
+    <None Include="shader\voxelgrid.vert">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\voxelgrid.frag">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\texture.vs">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\texture.fs">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\characteristic_points.geom">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\characteristic_points.frag">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\characteristic_points.vert">
       <Filter>Shader</Filter>
     </None>
     <None Include="shader\coordinate.fs">
@@ -69,16 +91,13 @@
     <None Include="shader\coordinate.vs">
       <Filter>Shader</Filter>
     </None>
-    <None Include="shader\pointcloud_new.vert">
-      <Filter>Shader</Filter>
-    </None>
     <None Include="shader\pointcloud.frag">
       <Filter>Shader</Filter>
     </None>
-    <None Include="shader\voxelgrid.vert">
+    <None Include="shader\pointcloud_new.vert">
       <Filter>Shader</Filter>
     </None>
-    <None Include="shader\voxelgrid.frag">
+    <None Include="shader\pointcloud.vs">
       <Filter>Shader</Filter>
     </None>
     <None Include="shader\compute_shader.comp">
@@ -87,13 +106,13 @@
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Shader">
-      <UniqueIdentifier>{0756d57a-0053-4b05-9f92-a9a0ee2a40e0}</UniqueIdentifier>
+      <UniqueIdentifier>{1deb950f-b28b-452f-a104-a921bb528824}</UniqueIdentifier>
     </Filter>
-    <Filter Include="OptimizationMethods">
-      <UniqueIdentifier>{4fca5f87-8acd-40b3-9188-9f595e9eca06}</UniqueIdentifier>
+    <Filter Include="Optimization">
+      <UniqueIdentifier>{2d99aaa0-4acb-4f99-9578-5cfe43107894}</UniqueIdentifier>
     </Filter>
-    <Filter Include="MarchingCubes">
-      <UniqueIdentifier>{d3232733-ff98-4d43-8039-45e184cc344a}</UniqueIdentifier>
+    <Filter Include="Surface">
+      <UniqueIdentifier>{c78fb1b3-e661-4c6e-9bf2-13294fd052aa}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

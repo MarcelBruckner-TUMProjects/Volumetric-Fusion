@@ -56,7 +56,7 @@ namespace vc::processing {
 				auto res = src.allocate_video_frame(f.get_profile(), f);
 
 				// copy from cv --> frame
-				memcpy((void*)res.get_data(), image.data, w * h * factor);
+				memcpy((void*)res.get_data(), image.data, (size_t)(w) * (size_t)(h) * (size_t)(factor));
 
 				// Send the resulting frame to the output queue
 				src.frame_ready(res);
@@ -107,7 +107,7 @@ namespace vc::processing {
 		void startCharucoProcessing(vc::data::Camera camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
+				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04f, 0.02f, dictionary);
 
 				cv::aruco::detectMarkers(image, dictionary, markerCorners, ids);
 
@@ -134,7 +134,7 @@ namespace vc::processing {
 						// if charuco pose is valid
 						if (valid) {
 							if (visualize) {
-								cv::aruco::drawAxis(image, camera.K, camera.distCoeffs, rotation, translation, 0.1);
+								cv::aruco::drawAxis(image, camera.K, camera.distCoeffs, rotation, translation, 0.1f);
 							}
 
 							hasMarkersDetected = true;

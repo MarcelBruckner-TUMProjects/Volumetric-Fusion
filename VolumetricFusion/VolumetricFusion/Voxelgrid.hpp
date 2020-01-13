@@ -68,7 +68,7 @@ namespace vc::fusion {
 		std::vector<float> points;
 
 		int hashFunc(int x, int y, int z) {
-			std::cout << z * sizeNormalized.y * sizeNormalized.x + y * sizeNormalized.x + x << std::endl;
+			//std::cout << z * sizeNormalized.y * sizeNormalized.x + y * sizeNormalized.x + x << std::endl;
 			return z * sizeNormalized.y * sizeNormalized.x + y * sizeNormalized.x + x;
 		}
 
@@ -94,7 +94,7 @@ namespace vc::fusion {
 
 						tsdf[hash] = (1.0f * i++ / num_gridPoints) * 2.0f - 1.0f;
 
-						ss << vc::utils::toString(&voxelPosition) << " (" << hash << ") --> " << tsdf[hash];
+						//ss << vc::utils::toString(&voxelPosition) << " (" << hash << ") --> " << tsdf[hash];
 						//std::cout << ss.str() << std::endl;
 						//continue;
 
@@ -388,7 +388,7 @@ namespace vc::fusion {
 						//continue;
 
 						glm::vec3 projectedVoxelCenter = world2CameraProjection * voxelPosition;
-						ss << " --> " << vc::utils::toString(&projectedVoxelCenter);
+						//ss << " --> " << vc::utils::toString(&projectedVoxelCenter);
 
 						float z = projectedVoxelCenter.z;
 
@@ -398,7 +398,7 @@ namespace vc::fusion {
 
 						glm::vec2 pixelCoordinate = glm::vec2(projectedVoxelCenter.x, projectedVoxelCenter.y) / z;
 						//pixelCoordinate /= 2.0f;
-						ss << " --> " << vc::utils::toString(&pixelCoordinate) << " & " << z;
+						//ss << " --> " << vc::utils::toString(&pixelCoordinate) << " & " << z;
 
 						if (pixelCoordinate.x < 0 || pixelCoordinate.y < 0 ||
 							pixelCoordinate.x >= depth_width || pixelCoordinate.y >= depth_height) {
@@ -472,7 +472,6 @@ namespace vc::fusion {
 			/*std::cout << std::fixed << "Min: (" << totalMin.x << "," << totalMin.y << "," << totalMin.z << ")" << std::endl;
 			std::cout << std::fixed << "Max: (" << totalMax.x << "," << totalMax.y << "," << totalMax.z << ")" << std::endl;
 			integratedFrames++;
-
 			std::cout << std::endl;*/
 		}
 

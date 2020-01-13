@@ -21,13 +21,14 @@
   <ItemGroup>
     <ClCompile Include="glad\src\glad.c" />
     <ClCompile Include="MultiFileStream.cpp" />
-    <ClCompile Include="ReprojectionError.hpp" />
     <ClCompile Include="std_image.cpp" />
-    <ClCompile Include="Structs.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="readme.md" />
+    <None Include="shader\characteristic_points.frag" />
+    <None Include="shader\characteristic_points.geom" />
+    <None Include="shader\characteristic_points.vert" />
     <None Include="shader\compute_shader.comp" />
     <None Include="shader\coordinate.fs" />
     <None Include="shader\coordinate.vs" />
@@ -59,8 +60,12 @@
     <ClInclude Include="glad\include\KHR\khrplatform.h" />
     <ClInclude Include="ImGuiHelpers.hpp" />
     <ClInclude Include="MarchingCubes.hpp" />
-    <ClInclude Include="Optimization.hpp" />
-    <ClInclude Include="PointCorrespondenceError.hpp" />
+    <ClInclude Include="optimization\BundleAdjustment.hpp" />
+    <ClInclude Include="optimization\CharacteristicPoints.hpp" />
+    <ClInclude Include="optimization\OptimizationProblem.hpp" />
+    <ClInclude Include="optimization\PointCorrespondenceError.hpp" />
+    <ClInclude Include="optimization\Procrustes.hpp" />
+    <ClInclude Include="optimization\ReprojectionError.hpp" />
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />
