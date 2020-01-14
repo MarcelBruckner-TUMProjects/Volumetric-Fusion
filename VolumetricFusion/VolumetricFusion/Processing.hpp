@@ -107,7 +107,8 @@ namespace vc::processing {
 		cv::Vec3d rotation, translation;
 		
 		void startCharucoProcessing(vc::camera::PinholeCamera camera) {
-			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
+
+			const auto charucoPoseEstimation = [camera, this](cv::Mat& image, unsigned long long frameId) {
 				try {
 					cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 					cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04f, 0.02f, dictionary);
@@ -134,8 +135,7 @@ namespace vc::processing {
 								cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
 							}
 
-							std::cout << camera.distCoeffs.size() << std::endl;
-							if (camera.distCoeffs.size() < 5) {
+							if (camera.depthScale < 0) {
 								return;
 							}
 

@@ -76,15 +76,17 @@ namespace vc::camera {
 
 			K = cv::Matx33f(0.0f);
 
-			world2cam = glm::mat3();
+			world2cam = glm::mat3(1.0f);
 
-			cam2world_glm = glm::mat3();
+			cam2world_glm = glm::mat3(1.0f);
 
 			cam2world = Eigen::Matrix3d::Identity();
 
 			for (int i = 0; i < 5; i++) {
 				distCoeffs.push_back(0.0f);
 			}
+
+			depthScale = -1;
 		}
 	};
 }
