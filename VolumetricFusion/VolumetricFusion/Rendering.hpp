@@ -41,6 +41,7 @@
 #include <pcl/surface/marching_cubes.h>
 #include <pcl/surface/marching_cubes_rbf.h>
 #include <pcl/surface/marching_cubes_hoppe.h>
+#include <pcl/surface/poisson.h>
 #include <pcl/console/print.h>
 #include <pcl/console/parse.h>
 #include <pcl/console/time.h>
@@ -377,18 +378,20 @@ namespace vc::rendering {
 
         pcl::PolygonMesh::Ptr mesh_ptr;
 
-    public:
-        SurfaceRendering(const float* points, const int pointCount) {
+        const float* points;
+        const int pointCount;
+
+        void constructPointCloud() {
+            // https://github.com/IntelRealSense/librealsense/blob/master/wrappers/pcl/pcl/rs-pcl.cpp
+            std::cout << "Constructing point cloud ... ";
+            pcl::console::TicToc tt;
+            tt.tic();
+
             std::uint32_t rgb_color_green(0x00FF00);
             std::uint32_t rgb_color_red(0xFF0000);
             std::uint32_t rgb_color_blue(0x0000FF);
             std::uint32_t rgb_color_yellow(0xFFFF00);
 
-            pcl::console::TicToc tt;
-
-            // https://github.com/IntelRealSense/librealsense/blob/master/wrappers/pcl/pcl/rs-pcl.cpp
-            std::cout << "Constructing point cloud ... ";
-            tt.tic();
             this->cloud_ptr = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>);
             this->cloud_ptr->width = static_cast<std::uint32_t>(pointCount / 3);
             this->cloud_ptr->height = 1;
@@ -402,13 +405,18 @@ namespace vc::rendering {
                 point.rgb = *reinterpret_cast<float*>(&rgb_color_yellow);
                 this->cloud_ptr->points.push_back(point);
             }
-            std::cout << "done in " << tt.toc() << "ms" << std::endl;
 
-            // Downsampling: http://pointclouds.org/documentation/tutorials/voxel_grid.php
-            pcl::VoxelGrid<pcl::PCLPointCloud2> vg;
+            std::cout << "done in " << tt.toc() << "ms" << std::endl;
+        }
+
+        void downsample() {
             std::cout << "Downsampling ... ";
-            auto oldCloudSize = this->cloud_ptr->points.size();
+            pcl::console::TicToc tt;
             tt.tic();
+
+            // http://pointclouds.org/documentation/tutorials/voxel_grid.php
+            pcl::VoxelGrid<pcl::PCLPointCloud2> vg;
+            auto oldCloudSize = this->cloud_ptr->points.size();
             pcl::PCLPointCloud2::Ptr cloud_ptr2(new pcl::PCLPointCloud2);
             pcl::toPCLPointCloud2(*this->cloud_ptr, *cloud_ptr2);
             pcl::PCLPointCloud2::Ptr cloud_filtered(new pcl::PCLPointCloud2());
@@ -416,11 +424,16 @@ namespace vc::rendering {
             vg.setLeafSize(0.01f, 0.01f, 0.01f);
             vg.filter(*cloud_filtered);
             pcl::fromPCLPointCloud2(*cloud_filtered, *this->cloud_ptr);
-            std::cout << "done in " << tt.toc() << "ms (was=" << oldCloudSize << ", is=" << this->cloud_ptr->points.size() << ")" << std::endl;
 
+            std::cout << "done in " << tt.toc() << "ms (was=" << oldCloudSize << ", is=" << this->cloud_ptr->points.size() << ")" << std::endl;
+        }
+
+        void smooth() {
             // http://pointclouds.org/documentation/tutorials/resampling.php
             std::cout << "Smoothing ... ";
+            pcl::console::TicToc tt;
             tt.tic();
+
             pcl::MovingLeastSquares<pcl::PointXYZRGB, pcl::PointXYZRGB> mls;
             mls.setInputCloud(this->cloud_ptr);
             mls.setSearchRadius(0.01);
@@ -429,22 +442,19 @@ namespace vc::rendering {
             mls.setUpsamplingMethod(pcl::MovingLeastSquares<pcl::PointXYZRGB, pcl::PointXYZRGB>::SAMPLE_LOCAL_PLANE);
             mls.setUpsamplingRadius(0.005);
             mls.setUpsamplingStepSize(0.003);
+
             pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_smoothed(new pcl::PointCloud<pcl::PointXYZRGB>());
             mls.process(*cloud_smoothed);
             this->cloud_ptr = cloud_smoothed;
+
             std::cout << "done in " << tt.toc() << "ms" << std::endl;
+        }
 
-            // Transformations?
-            //Eigen::Matrix4f transform0 = Eigen::Matrix4f::Identity();
-            //glm::mat4 rt0 = relativeTransformations[1];
-            //transform0(0, 0) = rt0[0][0]; transform0(0, 1) = rt0[0][1]; transform0(0, 2) = rt0[0][2]; transform0(0, 3) = rt0[0][3];
-            //transform0(1, 0) = rt0[1][0]; transform0(1, 1) = rt0[1][1]; transform0(1, 2) = rt0[1][2]; transform0(1, 3) = rt0[1][3];
-            //transform0(2, 0) = rt0[2][0]; transform0(2, 1) = rt0[2][1]; transform0(2, 2) = rt0[2][2]; transform0(2, 3) = rt0[2][3];
-            //transform0(3, 0) = rt0[3][0]; transform0(3, 1) = rt0[3][1]; transform0(3, 2) = rt0[3][2]; transform0(3, 3) = rt0[3][3];
-            //std::cout << "Transform1: " << transform0 << ", glm1: " << glm::to_string(rt0) << std::endl;
-
+        void computeNormals() {
             std::cout << "Computing normals ... ";
+            pcl::console::TicToc tt;
             tt.tic();
+
             // Create the normal estimation class, and pass the input dataset to it
             //pcl::NormalEstimation<pcl::PointXYZRGB, pcl::Normal> ne;
             pcl::NormalEstimationOMP<pcl::PointXYZRGB, pcl::Normal> ne;
@@ -461,10 +471,16 @@ namespace vc::rendering {
             ne.compute(*this->normals_ptr);
             // maybe use computePointNormal instead since the point cloud should be ordered and therefore the nearest neighbors 
             // should be known
+
             std::cout << "done in " << tt.toc() << "ms (size: " << normals_ptr->points.size() << " =? " << cloud_ptr->points.size() << ")" << std::endl;
 
+        }
+
+        void constructFinalPointcloud() {
             std::cout << "Combining point cloud and normals ... ";
+            pcl::console::TicToc tt;
             tt.tic();
+
             // Initialization part
             this->cloud_normals_ptr = pcl::PointCloud<pcl::PointXYZRGBNormal>::Ptr(new pcl::PointCloud<pcl::PointXYZRGBNormal>);
             this->cloud_normals_ptr->width = this->cloud_ptr->width;
@@ -473,7 +489,7 @@ namespace vc::rendering {
             this->cloud_normals_ptr->points.reserve(this->cloud_normals_ptr->width * this->cloud_normals_ptr->height);
             // Assignment part
             for (int i = 0; i < this->normals_ptr->points.size(); i++)
-            { 
+            {
                 pcl::PointXYZRGBNormal cn_point;
                 cn_point.x = this->cloud_ptr->points[i].x;
                 cn_point.y = this->cloud_ptr->points[i].y;
@@ -487,20 +503,61 @@ namespace vc::rendering {
                 cn_point.normal_z = this->normals_ptr->points[i].normal_z;
                 this->cloud_normals_ptr->points.push_back(cn_point);
             }
-            std::cout << "done in " << tt.toc() << "ms" << std::endl;
 
-            std::cout << "Running Marching Cubes (Hoppe) ... ";
-            pcl::MarchingCubes<pcl::PointXYZRGBNormal>* mc = new pcl::MarchingCubesHoppe<pcl::PointXYZRGBNormal>();
-            mc->setIsoLevel(0.001f);
-            //mc->setGridResolution(100, 100, 100);
-            mc->setGridResolution(25, 25, 25);
-            mc->setPercentageExtendGrid(0.0f);
-            mc->setInputCloud(this->cloud_normals_ptr);
+            std::cout << "done in " << tt.toc() << "ms" << std::endl;
+        }
+
+        void extractMeshWithMarchingCubesHoppe() {
+            std::cout << "Extract mesh with Marching Cubes (Hoppe) ... ";
+            pcl::console::TicToc tt;
             tt.tic();
-            this->mesh_ptr = pcl::PolygonMesh::Ptr(new pcl::PolygonMesh);
-            mc->reconstruct(*this->mesh_ptr);
-            std::cout << "done in " << tt.toc() << "ms" << std::endl;
 
+            pcl::MarchingCubesHoppe<pcl::PointXYZRGBNormal> mc;
+            mc.setIsoLevel(0.1f);
+            mc.setGridResolution(100, 100, 100);
+            //mc.setGridResolution(25, 25, 25);
+            mc.setPercentageExtendGrid(0.0f);
+            mc.setInputCloud(this->cloud_normals_ptr);
+            this->mesh_ptr = pcl::PolygonMesh::Ptr(new pcl::PolygonMesh);
+            mc.reconstruct(*this->mesh_ptr);
+
+            std::cout << "done in " << tt.toc() << "ms" << std::endl;
+        }
+
+        void extractMeshWithMarchingCubesRBF() {
+            std::cout << "Extract mesh with Marching Cubes (RBF) ... ";
+            pcl::console::TicToc tt;
+            tt.tic();
+
+            pcl::MarchingCubesRBF<pcl::PointXYZRGBNormal> mc;
+            //(reinterpret_cast<pcl::MarchingCubesRBF<pcl::PointXYZRGBNormal>*> (mc))->setOffSurfaceDisplacement(0.01f);
+            mc.setIsoLevel(0.01f);
+            mc.setOffSurfaceDisplacement(0.1f);
+            //mc.setGridResolution(100, 100, 100);
+            mc.setGridResolution(25, 25, 25);
+            mc.setPercentageExtendGrid(0.5f);
+            mc.setInputCloud(this->cloud_normals_ptr);
+            this->mesh_ptr = pcl::PolygonMesh::Ptr(new pcl::PolygonMesh);
+            mc.reconstruct(*this->mesh_ptr);
+
+            std::cout << "done in " << tt.toc() << "ms" << std::endl;
+        }
+
+        void extractMeshWithPoisson() {
+            std::cout << "Extract mesh with Poisson ... ";
+            pcl::console::TicToc tt;
+            tt.tic();
+
+            pcl::Poisson<pcl::PointXYZRGBNormal> poisson;
+            poisson.setDepth(9);
+            poisson.setInputCloud(this->cloud_normals_ptr);
+            this->mesh_ptr = pcl::PolygonMesh::Ptr(new pcl::PolygonMesh);
+            poisson.reconstruct(*this->mesh_ptr);
+
+            std::cout << "done in " << tt.toc() << "ms" << std::endl;
+        }
+
+        void save() {
             //tt.tic();
             //std::cout << "Savinng to 'rendered_cloud.pcd'";
             //pcl::io::savePCDFile("rendered_cloud.pcd", *this->cloud_ptr);
@@ -513,43 +570,66 @@ namespace vc::rendering {
             //std::cout << "done in " << tt.toc() << "ms" << std::endl;
         }
 
+    public:
+        SurfaceRendering(const float* points, const int pointCount) : points(points), pointCount(pointCount) {
+
+            pcl::console::TicToc tt;
+            tt.tic();
+
+            this->constructPointCloud();
+            this->downsample();
+            this->smooth();
+            this->computeNormals();
+            this->constructFinalPointcloud();
+            this->extractMeshWithMarchingCubesHoppe();
+            //this->extractMeshWithMarchingCubesRBF();
+            //this->extractMeshWithPoisson();
+
+            std::cout << "Total runtime: " << tt.toc() << "ms" << std::endl;
+
+            //this->save();
+        }
+
         ~SurfaceRendering() {
             // delete anything?
         }
 
         void render() {
-            std::cout << "Rendering ... ";
-            pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
-            //pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb_blue(this->cloud_ptr);
-            //viewer->addPointCloud<pcl::PointXYZRGB>(this->cloud_ptr, rgb_blue, "pc 0");
-            //viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "pc 0");
-            viewer->setBackgroundColor(0.8f, 0.8f, 0.8f);
-            viewer->addCoordinateSystem(0.1);
-            viewer->initCameraParameters();
-            //viewer->registerKeyboardCallback(&keyboardEventOccurred, (void*)NULL);
+            pcl::visualization::PCLVisualizer::Ptr viewer_cloud(new pcl::visualization::PCLVisualizer("Point Cloud"));
+            pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGB> rgb(this->cloud_ptr);
+            viewer_cloud->addPointCloud<pcl::PointXYZRGB>(this->cloud_ptr, rgb, "pc 0");
+            viewer_cloud->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "pc 0");
+            viewer_cloud->setBackgroundColor(0.2f, 0.2f, 0.2f);
+            viewer_cloud->addCoordinateSystem(0.1);
+            viewer_cloud->initCameraParameters();
 
-            // bug fix for: viewer->addPolygonMesh(*this->mesh_ptr, "polygon_o");
+            pcl::visualization::PCLVisualizer::Ptr viewer_mesh(new pcl::visualization::PCLVisualizer("Mesh"));
+            viewer_mesh->addPolygonMesh(*this->mesh_ptr, "polygon_o");
+            // setPointCloudRenderingProperties instead of setShapeRenderingProperties (https://github.com/PointCloudLibrary/pcl/issues/1111)
+            viewer_mesh->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 1.0, 0.8, "polygon_o");
+            //viewer_mesh->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_SHADING, pcl::visualization::PCL_VISUALIZER_SHADING_GOURAUD, "polygon_o");
+
+            // bug fix for: viewer_mesh->addPolygonMesh(*this->mesh_ptr, "polygon_o");
             // https://github.com/PointCloudLibrary/pcl/issues/178#issuecomment-327410610
-            vtkSmartPointer<vtkPolyData> poly_data;
-            pcl::VTKUtils::mesh2vtk(*this->mesh_ptr, poly_data);
-            viewer->addModelFromPolyData(poly_data, "poly_data", 0);
-            viewer->setShapeRenderingProperties(
-                pcl::visualization::PCL_VISUALIZER_SHADING,
-                pcl::visualization::PCL_VISUALIZER_SHADING_PHONG, 
-                "poly_data"
-            );
-            viewer->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 0.5, 0.5, 0, "poly_data");
-            viewer->setShapeRenderingProperties(
-                pcl::visualization::PCL_VISUALIZER_REPRESENTATION, 
-                pcl::visualization::PCL_VISUALIZER_REPRESENTATION_SURFACE, 
-                "poly_data"
-            );
+            //vtkSmartPointer<vtkPolyData> poly_data;
+            //pcl::VTKUtils::mesh2vtk(*this->mesh_ptr, poly_data);
+            //viewer_mesh->addModelFromPolyData(poly_data, "poly_data", 0);
+            //viewer_mesh->setShapeRenderingProperties(
+            //    pcl::visualization::PCL_VISUALIZER_SHADING,
+            //    pcl::visualization::PCL_VISUALIZER_SHADING_PHONG, 
+            //    "poly_data"
+            //);
+            //viewer_mesh->setShapeRenderingProperties(pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 1.0, 0, "poly_data");
+            //viewer_mesh->setShapeRenderingProperties(
+            //    pcl::visualization::PCL_VISUALIZER_REPRESENTATION, 
+            //    pcl::visualization::PCL_VISUALIZER_REPRESENTATION_SURFACE, 
+            //    "poly_data"
+            //);
 
-            //while (!viewer->wasStopped()) {
-            //    viewer->spinOnce(100);
+            //while (!viewer_mesh->wasStopped()) {
+            //    viewer_mesh->spin();
             //    std::this_thread::sleep_for(100ms);
             //}
-            std::cout << "done" << std::endl;
         }
     };
 }

@@ -108,8 +108,9 @@ float lastFrame = 0.0f;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::PCL);
+//vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::PCL);
 //vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::MULTI_POINTCLOUD);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::MULTI_POINTCLOUD);
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
@@ -251,10 +252,12 @@ int main(int argc, char* argv[]) try {
 
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i]->processing->visualize = visualizeCharucoResults;
+
+		pipelines[i]->filters.emplace_back(new rs2::threshold_filter(0.0f, 0.8f));
+		pipelines[i]->enabledFilters = true;
 	}
 
 #pragma region Camera Calibration Thread
-
 	setCalibration(calibrateCameras);
 	calibrationThread = std::thread([&stopped, &programState, &relativeTransformations]() {
 		while (!stopped) {
@@ -453,16 +456,6 @@ int main(int argc, char* argv[]) try {
 			voxelgrid->renderField(model, view, projection);
 		}
 
-		if (state.renderState == RenderState::PCL) {
-
-			if (sr == nullptr) {
-				auto depthFrame0 = pipelines[0]->data->filteredDepthFrames;
-				auto points0 = pipelines[0]->data->pointclouds.calculate(depthFrame0);
-				const float* vertices_0 = reinterpret_cast<const float*>(points0.get_vertices());
-				sr = new vc::rendering::SurfaceRendering(vertices_0, points0.size());
-				sr->render();
-			}
-		}
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
 		glfwSwapBuffers(window);
@@ -593,7 +586,15 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			break;
 		}
 		case GLFW_KEY_7: {
-			state.renderState = RenderState::PCL;
+			if (sr == nullptr) {
+				auto depthFrame0 = pipelines[0]->data->filteredDepthFrames;
+				auto points0 = pipelines[0]->data->pointclouds.calculate(depthFrame0);
+				const float* vertices_0 = reinterpret_cast<const float*>(points0.get_vertices());
+				sr = new vc::rendering::SurfaceRendering(vertices_0, points0.size());
+				sr->render();
+				delete sr;
+				sr = nullptr;
+			}
 			break;
 		}
 		case GLFW_KEY_V: {

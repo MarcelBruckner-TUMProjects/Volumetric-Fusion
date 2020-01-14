@@ -40,6 +40,9 @@ namespace vc::capture {
 		int masterSlaveId = 0;
 		rs2::pipeline_profile activeProfile = nullptr;
 
+		bool enabledFilters = false;
+		std::vector<rs2::filter*> filters;
+
 		void startPipeline() {
 			activeProfile = this->pipeline->start(this->cfg);
 			isPipelineRunning->store(true);
@@ -202,14 +205,16 @@ namespace vc::capture {
 					data->filteredColorFrames = colorFrame;
 
 					// Apply filters.
-					/*for (auto&& filter : data->filters) {
-						filteredDepthFrame = filter->process(filteredDepthFrame);
-					}*/
+					if (enabledFilters) {
+						for (auto&& filter : this->filters) {
+							filteredDepthFrame = filter->process(filteredDepthFrame);
+						}
+					}
 
 					// Push filtered & original data to their respective queues
 					data->filteredDepthFrames = filteredDepthFrame;
 
-					data->colorizedDepthFrames = data->colorizer.process(depthFrame);		// Colorize the depth frame with a color map
+					data->colorizedDepthFrames = data->colorizer.process(filteredDepthFrame);		// Colorize the depth frame with a color map
 
 					//data->points = data->pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
 					//data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud
