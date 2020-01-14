@@ -64,6 +64,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 void setCalibration();
+void addPipeline(std::shared_ptr<  vc::capture::CaptureDevice> pipeline);
 
 // settings
 int SCR_WIDTH = 800 * 2;
@@ -95,7 +96,7 @@ double lastFrame = 0.0;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::VOLUMETRIC_FUSION);
 //std::vector<vc::imgui::PipelineGUI> pipelineGuis;
 vc::imgui::AllPipelinesGUI* allPipelinesGui;
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
@@ -103,17 +104,16 @@ std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 bool visualizeCharucoResults = true;
 bool overlayCharacteristicPoints = true;
 
-bool renderVoxelgrid = false;
 vc::fusion::Voxelgrid* voxelgrid;
-std::atomic_bool calibrateCameras = true;
+vc::imgui::VoxelgridGUI* voxelgridGUI = new vc::imgui::VoxelgridGUI(voxelgrid);
+
+std::atomic_bool calibrateCameras = false;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
 vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
 vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment();
 vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState, setCalibration, &calibrateCameras);
-
-void addPipeline(std::shared_ptr<  vc::capture::CaptureDevice> pipeline);
 
 int main(int argc, char* argv[]) try {	
 	////vc::optimization::MockProcrustes().optimize();
@@ -261,42 +261,20 @@ int main(int argc, char* argv[]) try {
 			if (!optimizationProblem->optimize(pipelines)) {
 				continue;
 			}
-
-			//setCalibration(false);
-			//vc::utils::sleepFor("After optimization", 2000);
-
-			//if (programState.allMarkersDetected) 
-			if(false)
-			{
-				calibrateCameras = false;
-				setCalibration();
-				// start fusion thread logic
-				//fuseFrames.store(true);
-
-			}
 		}
 	});
 #pragma endregion
 	   
 #pragma region Fusion Thread
-	//fusionThread = std::thread([&stopped, &programState]() {
-	//	const int maxIntegrations = 10;
-	//	int integrations = 0;
-	//	while (!stopped) {
-	//		if (calibrateCameras || !fuseFrames) {
-	//			continue;
-	//		}
-	//		
-	//		//voxelgrid->integrateFramesCPU(pipelines, bundleAdjustment.relativeTransformations);
-
-	//		integrations++;
-	//		if (integrations >= maxIntegrations) {
-	//			std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
-	//			fuseFrames.store(false);
-	//			break;
-	//		}
-	//	}
-	//	});
+	fusionThread = std::thread([&stopped, &programState]() {
+		while (!stopped) {
+			if (calibrateCameras || !fuseFrames) {
+				continue;
+			}
+			
+			//voxelgrid->integrateFramesCPU(pipelines, optimizationProblem->bestTransformations);
+		}
+		});
 #pragma endregion
 
 #pragma region Main loop
@@ -340,15 +318,14 @@ int main(int argc, char* argv[]) try {
 		programGui->render();
 
 		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
+			if (state.renderState == RenderState::VOLUMETRIC_FUSION) {
+				voxelgridGUI->render();
+			}
 			if (calibrateCameras) {
 				optimizationProblemGUI->render();
 			}
 			allPipelinesGui->render();
 		}
-		//vc::imgui::test();
-
-		//ImGui::InputText("string", buf, IM_ARRAYSIZE(buf));
-		//ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
@@ -366,11 +343,12 @@ int main(int argc, char* argv[]) try {
 					x = -1;
 					y = -1;
 				}
-				vc::rendering::setViewport(width, height, x, y);
-				pipelines[i]->renderPointcloud(model, view, projection, optimizationProblem->getBestRelativeTransformation(i, 0), allPipelinesGui->alphas[i]);
-				if (renderVoxelgrid) {
+				if (state.renderState == RenderState::VOLUMETRIC_FUSION && voxelgridGUI->renderVoxelgrid) {
 					voxelgrid->renderGrid(model, view, projection);
 				}
+				vc::rendering::setViewport(width, height, x, y);
+				pipelines[i]->renderPointcloud(model, view, projection, optimizationProblem->getBestRelativeTransformation(i, 0), allPipelinesGui->alphas[i]);
+				
 				if (calibrateCameras && optimizationProblemGUI->highlightMarkerCorners) {
 					optimizationProblem->render(model, view, projection, i);
 				}
@@ -489,10 +467,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			for (auto pipe : pipelines) {
 				pipe->chArUco->visualize = visualizeCharucoResults;
 			}
-			break;
-		}
-		case GLFW_KEY_G: {
-			renderVoxelgrid = !renderVoxelgrid;
 			break;
 		}
 		case GLFW_KEY_C: {

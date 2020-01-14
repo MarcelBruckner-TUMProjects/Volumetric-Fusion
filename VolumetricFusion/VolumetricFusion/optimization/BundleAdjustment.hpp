@@ -180,20 +180,21 @@ namespace vc::optimization {
             ceres::Solver::Options options;
             options.num_threads = 8;
             options.linear_solver_type = ceres::DENSE_QR;
-            options.minimizer_progress_to_stdout = true;
+            options.minimizer_progress_to_stdout = verbose;
             options.max_num_iterations = 500;
-            options.update_state_every_iteration = true;
+            options.update_state_every_iteration = false;
             //options.callbacks.emplace_back(new LoggingCallback(this));
             ceres::Solver::Summary summary;
             ceres::Solve(options, problem, &summary);
-            std::cout << summary.FullReport() << "\n";
-            
             calculateTransformations();
 
-            std::cout << vc::utils::toString("Initial", initialTransformations);
-            std::cout << vc::utils::toString("Final", bestTransformations);
+            if (verbose) {
+                std::cout << summary.FullReport() << "\n";
+                std::cout << vc::utils::toString("Initial", initialTransformations);
+                std::cout << vc::utils::toString("Final", bestTransformations);
 
-            std::cout << std::endl;
+                std::cout << std::endl;
+            }
         }
 
         bool solvePointCorrespondenceError() {

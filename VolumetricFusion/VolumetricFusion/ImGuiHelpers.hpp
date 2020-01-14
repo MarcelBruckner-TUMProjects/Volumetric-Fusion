@@ -9,6 +9,7 @@
 #include "Data.hpp"
 #include "optimization/OptimizationProblem.hpp"
 #include "Enums.hpp"
+#include "Voxelgrid.hpp"
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_opengl3.h"
@@ -139,6 +140,25 @@ namespace vc::imgui {
 			if (ImGui::Button("Reset")) {
 				optimizationProblem->reset();
 			}
+			ImGui::End();
+		}
+	};
+
+	class VoxelgridGUI {
+	private:
+		vc::fusion::Voxelgrid* voxelgrid;
+
+	public:
+		bool renderVoxelgrid = true;
+		
+		VoxelgridGUI(vc::fusion::Voxelgrid* voxelgrid) : voxelgrid(voxelgrid){}
+
+		void render() {
+			ImGui::Begin("Voxelgrid");
+			ImGui::Text("Editable settings of the voxelgrid.");
+
+			ImGui::Checkbox("Render voxelgrid", &renderVoxelgrid);
+
 			ImGui::End();
 		}
 	};
