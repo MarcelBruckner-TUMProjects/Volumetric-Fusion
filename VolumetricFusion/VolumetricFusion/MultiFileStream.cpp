@@ -268,9 +268,10 @@ int main(int argc, char* argv[]) try {
 			//if (programState.allMarkersDetected) 
 			if(false)
 			{
+				calibrateCameras = false;
 				setCalibration();
 				// start fusion thread logic
-				fuseFrames.store(true);
+				//fuseFrames.store(true);
 
 			}
 		}
@@ -386,7 +387,7 @@ int main(int argc, char* argv[]) try {
 
 	stopped.store(true);
 	for (int i = 0; i < pipelines.size(); i++) {
-		pipelines[i]->stopPipeline();
+		pipelines[i]->terminate();
 	}
 	calibrationThread.join();
 	fusionThread.join();

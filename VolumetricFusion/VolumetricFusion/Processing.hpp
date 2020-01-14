@@ -18,6 +18,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "Utils.hpp"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -107,40 +108,57 @@ namespace vc::processing {
 		
 		void startCharucoProcessing(vc::camera::PinholeCamera camera) {
 			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
-				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04f, 0.02f, dictionary);
+				try {
+					cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+					cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04f, 0.02f, dictionary);
 
-				cv::aruco::detectMarkers(image, dictionary, markerCorners, ids);
+					cv::aruco::detectMarkers(image, dictionary, markerCorners, ids);
 
-				/*int i = 0;
-				for (auto corner_list : markerCorners) {
-					std::cout << ids[i++] << std::endl;
-					for (auto corner : corner_list) {
-						std::cout << corner << std::endl;
-					}
-				}*/
-
-				// if at least one marker detected
-				if (ids.size() > 0) {
-					if (visualize) {
-						cv::aruco::drawDetectedMarkers(image, markerCorners, ids);
-					}
-					cv::aruco::interpolateCornersCharuco(markerCorners, ids, image, board, charucoCorners, charucoIds);
-					// if at least one charuco corner detected
-					if (charucoIds.size() > 0) {
-						if (visualize) {
-							cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
+					/*int i = 0;
+					for (auto corner_list : markerCorners) {
+						std::cout << ids[i++] << std::endl;
+						for (auto corner : corner_list) {
+							std::cout << corner << std::endl;
 						}
-						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.K, camera.distCoeffs, rotation, translation);
-						// if charuco pose is valid
-						if (valid) {
+					}*/
+
+					// if at least one marker detected
+					if (ids.size() > 0) {
+						if (visualize) {
+							cv::aruco::drawDetectedMarkers(image, markerCorners, ids);
+						}
+						cv::aruco::interpolateCornersCharuco(markerCorners, ids, image, board, charucoCorners, charucoIds);
+						// if at least one charuco corner detected
+						if (charucoIds.size() > 0) {
 							if (visualize) {
-								cv::aruco::drawAxis(image, camera.K, camera.distCoeffs, rotation, translation, 0.1f);
+								cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
 							}
 
-							hasMarkersDetected = true;
+							std::cout << camera.distCoeffs.size() << std::endl;
+							if (camera.distCoeffs.size() < 5) {
+								return;
+							}
+
+							bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.K, camera.distCoeffs, rotation, translation);
+							// if charuco pose is valid
+							if (valid) {
+								if (visualize) {
+									cv::aruco::drawAxis(image, camera.K, camera.distCoeffs, rotation, translation, 0.1f);
+								}
+
+								hasMarkersDetected = true;
+							}
 						}
 					}
+				}
+				catch (const cv::Exception & e) {
+					std::cerr << vc::utils::asHeader("OpenCV - Error in Charuco block") << e.what() << std::endl;
+				}
+				catch (const rs2::error & e) {
+					std::cerr << vc::utils::asHeader("RS2 - Error in Charuco block") << e.what() << std::endl;
+				}
+				catch (const std::exception & e) {
+					std::cerr << vc::utils::asHeader("Error in Charuco block") << e.what() << std::endl;
 				}
 			};
 

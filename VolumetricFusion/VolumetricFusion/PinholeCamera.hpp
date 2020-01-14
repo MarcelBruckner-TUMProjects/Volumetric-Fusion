@@ -24,9 +24,11 @@
 namespace vc::camera {
 
 	class PinholeCamera {
+	protected:
+		PinholeCamera() {}
+
 	public:
 		// Pose estimation camera stuff
-		rs2_intrinsics intrinsics;
 		cv::Matx33f K;
 		glm::mat3 world2cam;
 		Eigen::Matrix3d cam2world;
@@ -34,10 +36,9 @@ namespace vc::camera {
 		std::vector<float> distCoeffs;
 
 		float depthScale;
-
+				
 		PinholeCamera(rs2_intrinsics intrinsics, float depthScale = 0.0f) {
 			this->depthScale = depthScale;
-			this->intrinsics = intrinsics;
 
 			K = cv::Matx33f(
 				intrinsics.fx, 0, intrinsics.ppx,
@@ -69,6 +70,23 @@ namespace vc::camera {
 		}
 	};
 
+	class MockPinholeCamera : public PinholeCamera {
+	public:
+		MockPinholeCamera() : PinholeCamera() {
+
+			K = cv::Matx33f(0.0f);
+
+			world2cam = glm::mat3();
+
+			cam2world_glm = glm::mat3();
+
+			cam2world = Eigen::Matrix3d::Identity();
+
+			for (int i = 0; i < 5; i++) {
+				distCoeffs.push_back(0.0f);
+			}
+		}
+	};
 }
 
 #endif // !_PINHOLE_CAMERA_HEADER
