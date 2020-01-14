@@ -20,9 +20,12 @@ const char* glsl_version = "#version 330";
 namespace vc::imgui {
 	class ProgramGUI {
 		vc::enums::RenderState* renderState;
-
+		void (*calibrationCallback)();
+		std::atomic_bool* calibrateCameras;
+		
 	public:
-		ProgramGUI(vc::enums::RenderState* renderState) : renderState(renderState) {}
+		ProgramGUI(vc::enums::RenderState* renderState, void (*calibrationCallback)(), std::atomic_bool* calibrateCameras) :
+			renderState(renderState), calibrationCallback(calibrationCallback), calibrateCameras(calibrateCameras) {}
 
 		void render() {
 			ImGui::Begin("Program Info");
@@ -31,12 +34,20 @@ namespace vc::imgui {
 			{
 				auto nn = static_cast<vc::enums::RenderState>(n);
 				auto name = vc::enums::renderStateToName[nn];
-				std::stringstream ss;
-				ss << "View: " << name;
+				//std::stringstream ss;
+				//ss << "View: " << name;
 				auto value = (int)*renderState == n;
-				if (ImGui::Selectable(ss.str().c_str(), value)) {
+				if (ImGui::Selectable(name, value)) {
 					*renderState = nn;
 				}
+			}
+			
+			ImGui::Separator();
+
+			bool checked = calibrateCameras->load();
+			if (ImGui::Checkbox("Calibrate", &checked)) {
+				calibrateCameras->store(checked);
+				calibrationCallback();
 			}
 			
 			ImGui::Separator();
@@ -66,26 +77,46 @@ namespace vc::imgui {
 
 	class AllPipelinesGUI {
 	private:
-		std::vector<PipelineGUI>* pipelines;
+		std::vector<std::shared_ptr<vc::capture::CaptureDevice>>* pipelines;
 
 	public:
-		float alpha = 1.0f;
+		float overallAlpha = 1.0f;
 		float rotationSpeed = 0.0f;
+		std::vector<float> alphas;
 
-		AllPipelinesGUI(std::vector<PipelineGUI>* pipelines) : pipelines(pipelines) {}
+		AllPipelinesGUI(std::vector<std::shared_ptr<vc::capture::CaptureDevice>>* pipelines) : 
+			pipelines(pipelines) 
+		{
+			for (int i = 0; i < 4; i++)
+			{
+				alphas.emplace_back(overallAlpha);
+			}
+		}
 
 		void render() {
 			ImGui::Begin("Pointclouds");
 			ImGui::Text("Editable settings of all pointclouds.");
 
-			if (ImGui::SliderFloat("Alpha", &alpha, 0.0f, 1.0f)) {
-				for (auto& pipe : *pipelines)
+			if (ImGui::SliderFloat("Overall alpha", &overallAlpha, 0.0f, 1.0f)) {
+				for (int i = 0; i < 4; i++)
 				{
-					pipe.alpha = alpha;
+					alphas[i] = overallAlpha;
 				}
 			}
 
-			ImGui::SliderFloat("Rotation speed", &rotationSpeed, -1.0f, 1.0f);
+			for (int i = 0; i < pipelines->size(); i++)
+			{
+				ImGui::Separator();
+				std::stringstream ss;
+				ss << "Pipeline: " << (*pipelines)[i]->data->deviceName;
+				ImGui::Text(ss.str().c_str());
+				ss = std::stringstream();
+				ss << "Alpha" << "##" << i;
+				ImGui::SliderFloat(ss.str().c_str(), &alphas[i], 0.0f, 1.0f);
+			}
+
+			//ImGui::Separator();
+			//ImGui::SliderFloat("Rotation speed", &rotationSpeed, -1.0f, 1.0f);
 			ImGui::End();
 		}
 	};
@@ -105,7 +136,9 @@ namespace vc::imgui {
 			ImGui::Text("Editable settings of the camera calibration.");
 
 			ImGui::Checkbox("Highlight marker corners", &highlightMarkerCorners);
-
+			if (ImGui::Button("Reset")) {
+				optimizationProblem->reset();
+			}
 			ImGui::End();
 		}
 	};

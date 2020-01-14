@@ -51,12 +51,7 @@ namespace vc::optimization {
 
         std::vector<CharacteristicPointsRenderer> characteristicPointsRenderers;
 
-        std::vector<double> bestErrors = {
-            DBL_MAX,
-            DBL_MAX,
-            DBL_MAX,
-            DBL_MAX
-        };
+        std::vector<double> bestErrors;
 
         virtual void clear() {
             characteristicPoints = {
@@ -82,33 +77,48 @@ namespace vc::optimization {
             CharacteristicPoints()
         };
 
-        std::vector<Eigen::Matrix4d> currentTranslations = {
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity()
-        };
-        std::vector<Eigen::Matrix4d> currentRotations = {
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity()
-        };
-        std::vector<Eigen::Matrix4d> currentScales = {
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity()
-        };
+        std::vector<Eigen::Matrix4d> currentTranslations;
+        std::vector<Eigen::Matrix4d> currentRotations;
+        std::vector<Eigen::Matrix4d> currentScales;
 
-        std::vector<Eigen::Matrix4d> bestTransformations = {
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity(),
-            Eigen::Matrix4d::Identity()
-        };
+        std::vector<Eigen::Matrix4d> bestTransformations;
+
+        void reset() {
+             currentTranslations = {
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity()
+            };
+             currentRotations = {
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity()
+            };
+             currentScales = {
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity()
+            };
+
+             bestTransformations = {
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity(),
+                Eigen::Matrix4d::Identity()
+            };
+             bestErrors = {
+                DBL_MAX,
+                DBL_MAX,
+                DBL_MAX,
+                DBL_MAX
+            };
+        }
 
         OptimizationProblem(bool verbose = false, long sleepDuration = -1l) : verbose(verbose), sleepDuration(sleepDuration) {
+            reset();
             clear();
         }
 

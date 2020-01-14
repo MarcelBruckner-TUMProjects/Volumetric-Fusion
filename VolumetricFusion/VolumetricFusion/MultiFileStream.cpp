@@ -63,7 +63,7 @@ void mouse_button_callback(GLFWwindow*, int button, int action, int mods);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
-void setCalibration(bool calibrate);
+void setCalibration();
 
 // settings
 int SCR_WIDTH = 800 * 2;
@@ -96,7 +96,7 @@ double lastFrame = 0.0;
 bool mouseButtonDown[4] = { false, false, false, false };
 
 vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
-std::vector<vc::imgui::PipelineGUI> pipelineGuis;
+//std::vector<vc::imgui::PipelineGUI> pipelineGuis;
 vc::imgui::AllPipelinesGUI* allPipelinesGui;
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
@@ -111,7 +111,7 @@ std::atomic_bool renderCoordinateSystem = false;
 
 vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
 vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment();
-vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState);
+vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState, setCalibration, &calibrateCameras);
 
 void addPipeline(std::shared_ptr<  vc::capture::CaptureDevice> pipeline);
 
@@ -221,7 +221,7 @@ int main(int argc, char* argv[]) try {
 		}
 	}
 
-	allPipelinesGui = new vc::imgui::AllPipelinesGUI(&pipelineGuis);
+	allPipelinesGui = new vc::imgui::AllPipelinesGUI(&pipelines);
 
 	if (pipelines.size() <= 0) {
 		throw(rs2::error("No device or file found!"));
@@ -251,7 +251,7 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Camera Calibration Thread
 
-	setCalibration(calibrateCameras);
+	setCalibration();
 	calibrationThread = std::thread([&stopped, &programState]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
@@ -268,7 +268,7 @@ int main(int argc, char* argv[]) try {
 			//if (programState.allMarkersDetected) 
 			if(false)
 			{
-				setCalibration(false);
+				setCalibration();
 				// start fusion thread logic
 				fuseFrames.store(true);
 
@@ -338,8 +338,10 @@ int main(int argc, char* argv[]) try {
 
 		programGui->render();
 
-		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-			optimizationProblemGUI->render();
+		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
+			if (calibrateCameras) {
+				optimizationProblemGUI->render();
+			}
 			allPipelinesGui->render();
 		}
 		//vc::imgui::test();
@@ -358,18 +360,17 @@ int main(int argc, char* argv[]) try {
 			else if (state.renderState == RenderState::ONLY_DEPTH) {
 				pipelines[i]->renderDepth(x, y, aspect, width, height);
 			}
-			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-				pipelineGuis[i].render();
-				if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
+				if (state.renderState != RenderState::MULTI_POINTCLOUD) {
 					x = -1;
 					y = -1;
 				}
 				vc::rendering::setViewport(width, height, x, y);
-				pipelines[i]->renderPointcloud(model, view, projection, optimizationProblem->getBestRelativeTransformation(i, 0), pipelineGuis[i].alpha);
+				pipelines[i]->renderPointcloud(model, view, projection, optimizationProblem->getBestRelativeTransformation(i, 0), allPipelinesGui->alphas[i]);
 				if (renderVoxelgrid) {
 					voxelgrid->renderGrid(model, view, projection);
 				}
-				if (optimizationProblemGUI->highlightMarkerCorners) {
+				if (calibrateCameras && optimizationProblemGUI->highlightMarkerCorners) {
 					optimizationProblem->render(model, view, projection, i);
 				}
 			}
@@ -410,9 +411,9 @@ catch (const std::exception & e)
 }
 #pragma endregion
 
-void setCalibration(bool calibrate) {
-	fuseFrames.store(!calibrate);
-	calibrateCameras.store(calibrate);
+void setCalibration() {
+	fuseFrames.store(!calibrateCameras);
+	calibrateCameras.store(calibrateCameras);
 	for (int i = 0; i < pipelines.size(); i++) {
 		if (calibrateCameras) {
 			pipelines[i]->setResolutions(CALIBRATION_COLOR_STREAM, CALIBRATION_DEPTH_STREAM);
@@ -427,7 +428,6 @@ void setCalibration(bool calibrate) {
 void addPipeline(std::shared_ptr<vc::capture::CaptureDevice> pipeline)
 {
 	pipelines.emplace_back(pipeline);
-	pipelineGuis.emplace_back(vc::imgui::PipelineGUI(pipeline));
 }
 
 bool isKeyPressed(GLFWwindow* window, int key) {
@@ -495,7 +495,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			break;
 		}
 		case GLFW_KEY_C: {
-			setCalibration(!calibrateCameras);
+			calibrateCameras.store(calibrateCameras.load());
+			setCalibration();
 			break;
 		}
 		case GLFW_KEY_L: {
@@ -544,7 +545,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 		lastY = ypos;
 
 		//processMouse(xoffset, yoffset);
-		//camera.ProcessMouseMovement(xoffset, yoffset);
+		camera.ProcessMouseMovement(xoffset, yoffset);
 	}
 }
 

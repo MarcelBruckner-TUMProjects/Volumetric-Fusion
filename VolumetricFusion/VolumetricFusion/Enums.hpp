@@ -11,7 +11,7 @@ namespace vc::enums {
 		ONLY_DEPTH,
 		MULTI_POINTCLOUD,
 		CALIBRATED_POINTCLOUD,
-		VOXELGRID,
+		VOLUMETRIC_FUSION,
 		COUNT
 	};
 
@@ -20,7 +20,7 @@ namespace vc::enums {
 		{RenderState::ONLY_DEPTH, "Only Depth"},
 		{RenderState::MULTI_POINTCLOUD, "Multi Pointclouds"},
 		{RenderState::CALIBRATED_POINTCLOUD, "Aligned Pointclouds"},
-		{RenderState::VOXELGRID, "Voxelgrid"}
+		{RenderState::VOLUMETRIC_FUSION, "Fused mesh"}
 	};
 
 	enum class CaptureState {
