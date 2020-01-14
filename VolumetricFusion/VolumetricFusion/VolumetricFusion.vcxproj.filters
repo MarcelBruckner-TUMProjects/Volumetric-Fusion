@@ -39,9 +39,6 @@
     <ClInclude Include="stb_image.h" />
     <ClInclude Include="Tables.hpp" />
     <ClInclude Include="Utils.hpp" />
-    <ClInclude Include="ComputeShader.hpp">
-      <Filter>Shader</Filter>
-    </ClInclude>
     <ClInclude Include="MarchingCubes.hpp">
       <Filter>Surface</Filter>
     </ClInclude>
@@ -147,6 +144,9 @@
       <Filter>Shader</Filter>
     </None>
     <None Include="shader\compute_shader.comp">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\voxelgrid.geom">
       <Filter>Shader</Filter>
     </None>
   </ItemGroup>

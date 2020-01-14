@@ -44,6 +44,7 @@
     <None Include="shader\texture.fs" />
     <None Include="shader\texture.vs" />
     <None Include="shader\voxelgrid.frag" />
+    <None Include="shader\voxelgrid.geom" />
     <None Include="shader\voxelgrid.vert" />
     <None Include="shader\voxelgrid_cube.fs" />
     <None Include="shader\voxelgrid_cube.vs" />
@@ -59,7 +60,6 @@
     <ClInclude Include="..\..\include\dearImgui\examples\libs\gl3w\GL\glcorearb.h" />
     <ClInclude Include="camera.hpp" />
     <ClInclude Include="CaptureDevice.hpp" />
-    <ClInclude Include="ComputeShader.hpp" />
     <ClInclude Include="Data.hpp" />
     <ClInclude Include="Enums.hpp" />
     <ClInclude Include="FileAccess.hpp" />

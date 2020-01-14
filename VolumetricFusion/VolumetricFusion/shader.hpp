@@ -55,6 +55,11 @@ namespace vc::rendering {
 			setVec3(name, vec.x, vec.y, vec.z);
 		}
 
+		void setVec3(const std::string& name, const Eigen::Vector3d vec) const
+		{
+			setVec3(name, vec[0], vec[1], vec[2]);
+		}
+
 		// ------------------------------------------------------------------------
 		void setVec3(const std::string& name, const float x, const float y, const float z) const
 		{
@@ -131,7 +136,7 @@ namespace vc::rendering {
 			}
 			
 			if (shaderPath == "") {
-				std::cout << "Skipping " << name << std::endl;
+				//std::cout << "Skipping " << name << std::endl;
 				return -1;
 			}
 

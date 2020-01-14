@@ -30,7 +30,7 @@ namespace vc::camera {
 	public:
 		// Pose estimation camera stuff
 		cv::Matx33f K;
-		glm::mat3 world2cam;
+		Eigen::Matrix3d world2cam;
 		Eigen::Matrix3d cam2world;
 		glm::mat3 cam2world_glm;
 		std::vector<float> distCoeffs;
@@ -46,11 +46,11 @@ namespace vc::camera {
 				0, 0, 1
 			);
 
-			world2cam = glm::mat3(
-				1.0f / intrinsics.fx, 0, (-intrinsics.ppx) / intrinsics.fx,
-				0, 1.0f / intrinsics.fy, (-intrinsics.ppy) / intrinsics.fy,
+			world2cam <<
+				intrinsics.fx, 0, intrinsics.ppx,
+				0, intrinsics.fy, intrinsics.ppy,
 				0, 0, 1
-			);
+			;
 
 			cam2world_glm = glm::mat3(
 				1.0f / intrinsics.fx, 0, (-intrinsics.ppx) / intrinsics.fx,
@@ -76,7 +76,7 @@ namespace vc::camera {
 
 			K = cv::Matx33f(0.0f);
 
-			world2cam = glm::mat3(1.0f);
+			world2cam = Eigen::Matrix3d::Identity();
 
 			cam2world_glm = glm::mat3(1.0f);
 

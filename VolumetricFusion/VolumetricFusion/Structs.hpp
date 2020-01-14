@@ -6,15 +6,17 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "ceres/ceres.h"
+
 namespace vc::fusion {
     class Triangle {
     public:
-        glm::vec3 p[3];
+        Eigen::Vector3d p[3];
     };
 
     class GridCell {
     public:
-        glm::vec3 p[8];
+        Eigen::Vector3d p[8];
         float val[8];
     };
 }

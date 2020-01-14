@@ -10,6 +10,7 @@
 #include "optimization/OptimizationProblem.hpp"
 #include "Enums.hpp"
 #include "Voxelgrid.hpp"
+#include "camera.hpp"
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_opengl3.h"
@@ -19,17 +20,25 @@
 const char* glsl_version = "#version 330";
 
 namespace vc::imgui {
+	const unsigned int WINDOW_FLAGS = 0
+		//| ImGuiWindowFlags_NoMove
+		| ImGuiWindowFlags_AlwaysAutoResize
+		;
+
 	class ProgramGUI {
 		vc::enums::RenderState* renderState;
 		void (*calibrationCallback)();
 		std::atomic_bool* calibrateCameras;
-		
+		vc::io::Camera* camera;
+
 	public:
-		ProgramGUI(vc::enums::RenderState* renderState, void (*calibrationCallback)(), std::atomic_bool* calibrateCameras) :
-			renderState(renderState), calibrationCallback(calibrationCallback), calibrateCameras(calibrateCameras) {}
+		bool showCoordinateSystem;
+		
+		ProgramGUI(vc::enums::RenderState* renderState, void (*calibrationCallback)(), std::atomic_bool* calibrateCameras, vc::io::Camera* camera) :
+			renderState(renderState), calibrationCallback(calibrationCallback), calibrateCameras(calibrateCameras), camera(camera) {}
 
 		void render() {
-			ImGui::Begin("Program Info");
+			ImGui::Begin("Program Info", nullptr, WINDOW_FLAGS);
 
 			for (int n = 0; n < (int)vc::enums::RenderState::COUNT; n++)
 			{
@@ -42,15 +51,44 @@ namespace vc::imgui {
 					*renderState = nn;
 				}
 			}
-			
-			ImGui::Separator();
+						
+			if (*renderState != vc::enums::RenderState::ONLY_COLOR && *renderState != vc::enums::RenderState::ONLY_DEPTH) {
+				ImGui::Separator();
+				bool checked = calibrateCameras->load();
+				if (ImGui::Checkbox("Calibrate", &checked)) {
+					calibrateCameras->store(checked);
+					calibrationCallback();
+				}
 
-			bool checked = calibrateCameras->load();
-			if (ImGui::Checkbox("Calibrate", &checked)) {
-				calibrateCameras->store(checked);
-				calibrationCallback();
+				ImGui::Separator();
+				ImGui::Checkbox("Coordinate system", &showCoordinateSystem);
+
+				ImGui::Separator();
+
+				float width = ImGui::GetWindowWidth();
+				ImGui::Text("Camera properties");
+				ImGui::PushItemWidth(width * 0.25f);
+				ImGui::InputFloat("X", &camera->Position.x);
+				ImGui::SameLine(0.33f * width);
+				ImGui::InputFloat("Y", &camera->Position.y);
+				ImGui::SameLine(0.66f * width);
+				ImGui::InputFloat("Z", &camera->Position.z);
+
+				ImGui::PushItemWidth(width * 0.33f);
+				ImGui::InputFloat("Yaw", &camera->Yaw);
+				ImGui::SameLine(0.5f * width);
+				ImGui::InputFloat("Pitch", &camera->Pitch);
+
+				ImGui::PushItemWidth(width * 0.65f);
+				ImGui::SliderFloat("Speed", &camera->MovementSpeed, 1.0f, 10.0f);
+				ImGui::SliderFloat("Sensitivity", &camera->MouseSensitivity, 0.01f, 1.0f);
+				ImGui::SliderFloat("Zoom", &camera->Zoom, 1.0f, 90.0f);
+
+				if (ImGui::Button("Reset camera")) {
+					*camera = vc::io::Camera(glm::vec3(0.0f, 0.0f, -1.0f));
+				}
 			}
-			
+
 			ImGui::Separator();
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 			ImGui::End();
@@ -67,7 +105,7 @@ namespace vc::imgui {
 		PipelineGUI(std::shared_ptr<vc::capture::CaptureDevice> pipeline) : pipeline(pipeline) {}
 
 		void render() {
-			ImGui::Begin(("Pointcloud " + pipeline->data->deviceName).c_str());
+			ImGui::Begin(("Pointcloud " + pipeline->data->deviceName).c_str(), nullptr, WINDOW_FLAGS);
 			ImGui::Text("Editable settings of pointclouds.");
 
 			ImGui::SliderFloat("Alpha", &alpha, 0.0f, 1.0f);
@@ -95,7 +133,7 @@ namespace vc::imgui {
 		}
 
 		void render() {
-			ImGui::Begin("Pointclouds");
+			ImGui::Begin("Pointclouds", nullptr, WINDOW_FLAGS);
 			ImGui::Text("Editable settings of all pointclouds.");
 
 			if (ImGui::SliderFloat("Overall alpha", &overallAlpha, 0.0f, 1.0f)) {
@@ -118,6 +156,7 @@ namespace vc::imgui {
 
 			//ImGui::Separator();
 			//ImGui::SliderFloat("Rotation speed", &rotationSpeed, -1.0f, 1.0f);
+			//ImGui::SetWindowPos(ImVec2(5, 5), true);
 			ImGui::End();
 		}
 	};
@@ -133,7 +172,7 @@ namespace vc::imgui {
 			optimizationProblem(optimizationProblem) {}
 
 		void render() {
-			ImGui::Begin("Optimization");
+			ImGui::Begin("Optimization", nullptr, WINDOW_FLAGS);
 			ImGui::Text("Editable settings of the camera calibration.");
 
 			ImGui::Checkbox("Highlight marker corners", &highlightMarkerCorners);
@@ -154,7 +193,7 @@ namespace vc::imgui {
 		VoxelgridGUI(vc::fusion::Voxelgrid* voxelgrid) : voxelgrid(voxelgrid){}
 
 		void render() {
-			ImGui::Begin("Voxelgrid");
+			ImGui::Begin("Voxelgrid", nullptr, WINDOW_FLAGS);
 			ImGui::Text("Editable settings of the voxelgrid.");
 
 			ImGui::Checkbox("Render voxelgrid", &renderVoxelgrid);
@@ -163,13 +202,12 @@ namespace vc::imgui {
 		}
 	};
 
-	void init(GLFWwindow* window, int* window_width, int* window_height) {
+	ImGuiIO init(GLFWwindow* window, int window_width, int window_height) {
 		static bool isInitialized = false;
 
-		if (!isInitialized) {
 			ImGui::CreateContext();
 			ImGuiIO& io = ImGui::GetIO(); (void)io;
-			io.DisplaySize = ImVec2(*window_width, *window_height);
+			io.DisplaySize = ImVec2(window_width, window_height);
 			unsigned char* pixels;
 			int width = 100;
 			int height = 100;
@@ -179,10 +217,12 @@ namespace vc::imgui {
 
 			ImGui::StyleColorsLight();
 			isInitialized = true;
-		}
+			return io;
 	}
 
-	void startFrame() {
+	void startFrame(ImGuiIO* io, int window_width, int window_height) {
+		io->DisplaySize = ImVec2(window_width, window_height);
+
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();

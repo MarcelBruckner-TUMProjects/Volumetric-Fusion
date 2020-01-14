@@ -80,14 +80,11 @@ std::vector<int> CALIBRATION_COLOR_STREAM = { 1920, 1080 };
 std::vector<int> CALIBRATION_DEPTH_STREAM = { 1280, 720 };
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
+vc::io::Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
 //Camera camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.f);
 double lastX = SCR_WIDTH / 2.0f;
 double lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
-float MouseSensitivity = 0.1f;
-float Yaw = 0;
-float Pitch = 0;
 
 // timing
 double deltaTime = 0.0;	// time between current frame and last frame
@@ -107,13 +104,15 @@ bool overlayCharacteristicPoints = true;
 vc::fusion::Voxelgrid* voxelgrid;
 vc::imgui::VoxelgridGUI* voxelgridGUI = new vc::imgui::VoxelgridGUI(voxelgrid);
 
+vc::rendering::CoordinateSystem* coordinateSystem;
+
 std::atomic_bool calibrateCameras = false;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 
 vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
 vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment();
-vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState, setCalibration, &calibrateCameras);
+vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState, setCalibration, &calibrateCameras, &camera);
 
 int main(int argc, char* argv[]) try {	
 	////vc::optimization::MockProcrustes().optimize();
@@ -176,10 +175,10 @@ int main(int argc, char* argv[]) try {
 		}
 	});
 
-	vc::imgui::init(window, &SCR_WIDTH, &SCR_HEIGHT);
-	vc::imgui::init(window, &SCR_WIDTH, &SCR_HEIGHT);
+	ImGuiIO io = vc::imgui::init(window, SCR_WIDTH, SCR_HEIGHT);
 
 	voxelgrid = new vc::fusion::Voxelgrid();
+	coordinateSystem = new vc::rendering::CoordinateSystem();
 	optimizationProblem->setupOpenGL();
 	optimizationProblemGUI = new vc::imgui::OptimizationProblemGUI(optimizationProblem);
 
@@ -272,7 +271,7 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 			
-			//voxelgrid->integrateFramesCPU(pipelines, optimizationProblem->bestTransformations);
+			voxelgrid->integrateFramesCPU(pipelines, optimizationProblem->bestTransformations);
 		}
 		});
 #pragma endregion
@@ -313,7 +312,7 @@ int main(int argc, char* argv[]) try {
 
 		glfwPollEvents();
 
-		vc::imgui::startFrame();
+		vc::imgui::startFrame(&io, SCR_WIDTH, SCR_HEIGHT);
 
 		programGui->render();
 
@@ -343,10 +342,13 @@ int main(int argc, char* argv[]) try {
 					x = -1;
 					y = -1;
 				}
+				vc::rendering::setViewport(width, height, x, y);
 				if (state.renderState == RenderState::VOLUMETRIC_FUSION && voxelgridGUI->renderVoxelgrid) {
 					voxelgrid->renderGrid(model, view, projection);
 				}
-				vc::rendering::setViewport(width, height, x, y);
+				if (programGui->showCoordinateSystem) {
+					coordinateSystem->render(model, view, projection);
+				}
 				pipelines[i]->renderPointcloud(model, view, projection, optimizationProblem->getBestRelativeTransformation(i, 0), allPipelinesGui->alphas[i]);
 				
 				if (calibrateCameras && optimizationProblemGUI->highlightMarkerCorners) {
@@ -418,16 +420,16 @@ bool isKeyPressed(GLFWwindow* window, int key) {
 void processInput(GLFWwindow* window)
 {
 	if (isKeyPressed(window, GLFW_KEY_W)) {
-		camera.ProcessKeyboard(Camera_Movement::FORWARD, deltaTime);
+		camera.ProcessKeyboard(vc::io::Camera_Movement::FORWARD, deltaTime);
 	}
 	if (isKeyPressed(window, GLFW_KEY_S)) {
-		camera.ProcessKeyboard(Camera_Movement::BACKWARD, deltaTime);
+		camera.ProcessKeyboard(vc::io::Camera_Movement::BACKWARD, deltaTime);
 	}
 	if (isKeyPressed(window, GLFW_KEY_A)) {
-		camera.ProcessKeyboard(Camera_Movement::LEFT, deltaTime);
+		camera.ProcessKeyboard(vc::io::Camera_Movement::LEFT, deltaTime);
 	}
 	if (isKeyPressed(window, GLFW_KEY_D)) {
-		camera.ProcessKeyboard(Camera_Movement::RIGHT, deltaTime);
+		camera.ProcessKeyboard(vc::io::Camera_Movement::RIGHT, deltaTime);
 	}
 }
 

@@ -11,7 +11,10 @@
 #include <chrono>
 #include <thread>
 
+#define NAME_AND_VALUE(name) vc::utils::nameAndValue(#name, (name))
+
 namespace vc::utils {
+	
 	std::string asHeader(std::string header) {
 		std::stringstream ss;
 
@@ -22,7 +25,14 @@ namespace vc::utils {
 
 		return ss.str();
 	}
-	
+
+	template <typename T>
+	std::string nameAndValue(char* name, T value) {
+		std::stringstream ss;
+		ss << asHeader(name) << value << std::endl;
+		return ss.str();
+	}
+
 	void sleepFor(std::string message, long milliseconds, bool verbose = false) {
 		if (milliseconds < 0) {
 			return;
