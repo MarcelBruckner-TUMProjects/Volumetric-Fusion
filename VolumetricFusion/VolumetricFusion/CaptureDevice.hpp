@@ -164,7 +164,6 @@ namespace vc::capture {
 		}
 
 		void captureThreadFunction() {
-			rs2::align alignToColor(RS2_STREAM_COLOR);
 
 			while (!stopped->load()) //While application is running
 			{
@@ -173,8 +172,12 @@ namespace vc::capture {
 				}
 
 				try {
-					rs2::frameset frameset = pipeline->wait_for_frames(); // Wait for next set of frames from the camera
+					rs2::frameset frameset;
+					if (!pipeline->poll_for_frames(&frameset)) {
+						continue;
+					}
 
+					rs2::align alignToColor(RS2_STREAM_COLOR);
 					frameset = alignToColor.process(frameset);
 
 					rs2::frame depthFrame = frameset.get_depth_frame(); //Take the depth frame from the frameset
@@ -204,7 +207,8 @@ namespace vc::capture {
 					// Push filtered & original data to their respective queues
 					data->filteredDepthFrames = filteredDepthFrame;
 
-					data->colorizedDepthFrames = data->colorizer.process(depthFrame);		// Colorize the depth frame with a color map
+					rs2::colorizer colorizer;
+					data->colorizedDepthFrames = colorizer.process(depthFrame);		// Colorize the depth frame with a color map
 
 					//data->points = data->pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
 					//data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud

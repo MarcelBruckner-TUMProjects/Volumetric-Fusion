@@ -40,16 +40,19 @@ namespace vc::imgui {
 		void render() {
 			ImGui::Begin("Program Info", nullptr, WINDOW_FLAGS);
 
-			for (int n = 0; n < (int)vc::enums::RenderState::COUNT; n++)
-			{
-				auto nn = static_cast<vc::enums::RenderState>(n);
-				auto name = vc::enums::renderStateToName[nn];
-				//std::stringstream ss;
-				//ss << "View: " << name;
-				auto value = (int)*renderState == n;
-				if (ImGui::Selectable(name, value)) {
-					*renderState = nn;
+			if (ImGui::TreeNode("View")) {
+				for (int n = 0; n < (int)vc::enums::RenderState::COUNT; n++)
+				{
+					auto nn = static_cast<vc::enums::RenderState>(n);
+					auto name = vc::enums::renderStateToName[nn];
+					//std::stringstream ss;
+					//ss << "View: " << name;
+					auto value = (int)*renderState == n;
+					if (ImGui::Selectable(name, value)) {
+						*renderState = nn;
+					}
 				}
+				ImGui::TreePop();
 			}
 						
 			if (*renderState != vc::enums::RenderState::ONLY_COLOR && *renderState != vc::enums::RenderState::ONLY_DEPTH) {
