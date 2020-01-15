@@ -66,6 +66,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 void setCalibration();
 void addPipeline(std::shared_ptr<  vc::capture::CaptureDevice> pipeline);
+void volumetricFusion();
 
 // settings
 int SCR_WIDTH = 800 * 2;
@@ -265,25 +266,6 @@ int main(int argc, char* argv[]) try {
 	});
 #pragma endregion
 	   
-#pragma region Fusion Thread
-	fusionThread = std::thread([&stopped, &programState]() {
-		while (!stopped) {
-			if (calibrateCameras || !fuseFrames) {
-				continue;
-			}
-
-			if (voxelgridGUI->fuse) {
-				voxelgrid->integrateFramesCPU(pipelines, optimizationProblem->bestTransformations);
-
-				if (voxelgridGUI->marchingCubes) {
-					vc::fusion::marchingCubes(voxelgrid);
-					voxelgridGUI->marchingCubes = false;
-				}
-			}
-		}
-		});
-#pragma endregion
-
 #pragma region Main loop
 
 	float f = 0;
@@ -333,6 +315,8 @@ int main(int argc, char* argv[]) try {
 			}
 			allPipelinesGui->render();
 		}
+
+		volumetricFusion();
 
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
@@ -399,6 +383,20 @@ catch (const std::exception & e)
 	return EXIT_FAILURE;
 }
 #pragma endregion
+
+void volumetricFusion() {
+	if (voxelgridGUI->fuse) {
+		//voxelgrid->integrateFramesCPU(pipelines, optimizationProblem->bestTransformations);
+		voxelgrid->integrateFrameGPU(voxelgridGUI->tsdf_value);
+
+		voxelgridGUI->fuse = false;
+
+		if (voxelgridGUI->marchingCubes) {
+			vc::fusion::marchingCubes(voxelgrid);
+			voxelgridGUI->marchingCubes = false;
+		}
+	}
+}
 
 void setCalibration() {
 	fuseFrames.store(!calibrateCameras);

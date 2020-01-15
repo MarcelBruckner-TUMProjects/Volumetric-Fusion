@@ -194,6 +194,7 @@ namespace vc::imgui {
 		bool renderVoxelgrid = true;
 		bool fuse = false;
 		bool marchingCubes = false;
+		float tsdf_value;
 
 		VoxelgridGUI(vc::fusion::Voxelgrid* voxelgrid) : voxelgrid(voxelgrid){}
 
@@ -206,6 +207,10 @@ namespace vc::imgui {
 			ImGui::Checkbox("Fuse", &fuse);
 
 			ImGui::Checkbox("Marching cubes after frame", &marchingCubes);			
+
+			ImGui::Separator();
+
+			fuse = ImGui::SliderFloat("TSDF test value", &tsdf_value, -1, 1);
 
 			ImGui::End();
 		}

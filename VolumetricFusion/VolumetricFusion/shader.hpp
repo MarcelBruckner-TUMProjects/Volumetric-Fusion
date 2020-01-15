@@ -88,6 +88,11 @@ namespace vc::rendering {
 			glUniform3fv(glGetUniformLocation(ID, name.c_str()), count, vec);
 		}
 
+		void checkError() {
+			char infoLog[4096];
+			glGetShaderInfoLog(ID, 4095, NULL, infoLog);
+			std::cout << infoLog << std::endl;
+		}
 	protected:
 		// utility function for checking shader compilation/linking errors.
 		// ------------------------------------------------------------------------
@@ -114,6 +119,7 @@ namespace vc::rendering {
 				}
 			}
 		}
+
 		
 		void attachIfValid(unsigned int shaderId) {
 			if (shaderId != (unsigned int)-1) {

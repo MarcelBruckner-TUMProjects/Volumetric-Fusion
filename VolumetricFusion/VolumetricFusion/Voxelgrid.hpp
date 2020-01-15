@@ -14,9 +14,18 @@
 namespace vc::fusion {
 	const int INVALID_TSDF_VALUE = 5;
 
+	   
 	class Voxelgrid {
 	private:
-		unsigned int VBOs[4], VAO;
+		GLuint VAO;
+
+		GLuint vbo;;
+
+		struct Vertex {
+			GLfloat pos[4];
+			GLfloat tsdf[4];
+		} *verts;
+
 		vc::rendering::Shader* gridShader;
 		vc::rendering::Shader* tsdfComputeShader;
 		vc::rendering::Shader* voxelgridComputeShader;
@@ -38,54 +47,17 @@ namespace vc::fusion {
 
 		int num_gridPoints;
 
-		std::vector<float> points;
-
 		int hashFunc(int x, int y, int z) {
 			return z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x;
 		}
 
-		Voxelgrid(const float resolution = 0.05f, const Eigen::Vector3d size = Eigen::Vector3d(2.0, 2.0, 2.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
+		Voxelgrid(const float resolution = 0.1f, const Eigen::Vector3d size = Eigen::Vector3d(2.0, 2.0, 2.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
 			: resolution(resolution), origin(origin), size(size), sizeHalf(size / 2.0f), sizeNormalized((size / resolution) + Eigen::Vector3d(1.0, 1.0, 1.0)), num_gridPoints((sizeNormalized[0] * sizeNormalized[1] * sizeNormalized[2]))
 		{
 			reset();
 
-			//int i = 0;
-			//std::vector<std::thread> threads;
-			//for (int z = 0; z < sizeNormalized[2]; z++)
-			//{
-			//	for (int y = 0; y < sizeNormalized[1]; y++)
-			//	{
-			//		threads.emplace_back(std::thread([this, y, z]() {
-			//			for (int x = 0; x < sizeNormalized[0]; x++)
-			//			{
-			//				//std::stringstream ss;
-			//				Eigen::Vector3d voxelPosition = getVoxelPosition(x, y, z);
-
-			//				int hash = this->hashFunc(x, y, z);
-
-			//				//ss << NAME_AND_VALUE(x);
-			//				//ss << NAME_AND_VALUE(y);
-			//				//ss << NAME_AND_VALUE(z);
-			//				//ss << NAME_AND_VALUE(hash);
-
-			//				//tsdf[hash] = ((1.0f * i++) / num_gridPoints) * 2.0f - 1.0f;
-
-			//				points[hash * 3 + 0] = (voxelPosition[0]);
-			//				points[hash * 3 + 1] = (voxelPosition[1]);
-			//				points[hash * 3 + 2] = (voxelPosition[2]);
-
-			//				//std::cout << ss.str();
-			//			}
-			//		}));
-			//	}
-			//	for (auto& thread : threads)
-			//	{
-			//		thread.join();
-			//	}
-			//	threads = std::vector<std::thread>();
-			//	std::cout << "Initialized layer " << z << std::endl;
-			//}
-
+			verts = new Vertex[num_gridPoints];
+			
 			if (initializeShader) {
 				initializeOpenGL();
 			}
@@ -94,37 +66,63 @@ namespace vc::fusion {
 		void initializeOpenGL() {
 			gridShader = new vc::rendering::VertexFragmentShader("shader/voxelgrid.vert", "shader/voxelgrid.frag", "shader/voxelgrid.geom");
 			//tsdfComputeShader = new vc::rendering::ComputeShader("shader/tsdf.comp");
-			//voxelgridComputeShader = new vc::rendering::ComputeShader("shader/voxelgrid.comp");
+			voxelgridComputeShader = new vc::rendering::ComputeShader("shader/voxelgrid.comp");
 
 			glGenVertexArrays(1, &VAO);
-			glGenBuffers(4, VBOs);
+			glGenBuffers(1, &vbo);
 
-			setTSDF();
+			//setTSDF();
+
+			compute();
 		}
 
-		void setTSDF() {
+		void setComputeShader() {
 			glBindVertexArray(VAO);
+			glBindBuffer(GL_ARRAY_BUFFER, vbo);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * num_gridPoints, verts, GL_DYNAMIC_COPY);
 
-			glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]);
-			glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(float), points.data(), GL_STATIC_DRAW);
-
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+			glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0); // Vertex Attrib. 0
 			glEnableVertexAttribArray(0);
-
-			glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
-			glBufferData(GL_ARRAY_BUFFER, num_gridPoints * sizeof(float), tsdf.data(), GL_STATIC_DRAW);
-
-			glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 1 * sizeof(float), (void*)0);
+			glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)16); // Vertex Attrib. 1
 			glEnableVertexAttribArray(1);
 
-			glBindBuffer(GL_ARRAY_BUFFER, VBOs[2]);
-			glBufferData(GL_ARRAY_BUFFER, num_gridPoints * sizeof(float), weights.data(), GL_STATIC_DRAW);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, vbo);
+		}
 
-			glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 1 * sizeof(float), (void*)0);
-			glEnableVertexAttribArray(2);
+		void compute(float new_tsdf = INVALID_TSDF_VALUE) {
+			setComputeShader();
+
+			voxelgridComputeShader->use();
+			voxelgridComputeShader->setInt("INVALID_TSDF_VALUE", INVALID_TSDF_VALUE);
+			voxelgridComputeShader->setFloat("resolution", resolution);
+			voxelgridComputeShader->setFloat("new_tsdf", new_tsdf);
+			voxelgridComputeShader->setVec3("sizeHalf", sizeHalf);
+			voxelgridComputeShader->setVec3("sizeNormalized", sizeNormalized);
+			voxelgridComputeShader->setVec3("origin", origin);
+			//voxelgridComputeShader->setMat4("coordinate_correction", vc::rendering::COORDINATE_CORRECTION);
+
+			glDispatchCompute(num_gridPoints, 1, 1);
+			//voxelgridComputeShader->checkError();
+
+			glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbo);
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Vertex) * num_gridPoints, verts);
+
+
+			for (int i = 0; i < 50 && i < num_gridPoints; i++) {
+				std::cout << 
+					verts[i].pos[0] << ", " << verts[i].pos[1] << ", " << verts[i].pos[2] << ", " << verts[i].pos[3] << " | " <<
+					verts[i].tsdf[0] << ", " << verts[i].tsdf[1] << ", " << verts[i].tsdf[2] << ", " << verts[i].tsdf[3] << " | "
+					<< std::endl;
+			}
+			std::cout << "";
 		}
 
 		void renderGrid(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
+			
+			glBindVertexArray(VAO);
+
 			gridShader->use();
 
 			gridShader->setFloat("cube_radius", resolution * 0.1f);
@@ -134,7 +132,6 @@ namespace vc::fusion {
 			gridShader->setMat4("projection", projection);
 			gridShader->setMat4("coordinate_correction", vc::rendering::COORDINATE_CORRECTION);
 
-			setTSDF();
 
 			glDrawArrays(GL_POINTS, 0, num_gridPoints);
 			glBindVertexArray(0);
@@ -152,7 +149,7 @@ namespace vc::fusion {
 		void reset() {
 			tsdf = std::vector<float>(num_gridPoints);
 			weights = std::vector<float>(num_gridPoints);
-			points = std::vector<float>(3 * num_gridPoints);
+			//points = std::vector<float>(3 * num_gridPoints);
 
 			integratedFrames = 0;
 		}
@@ -162,6 +159,10 @@ namespace vc::fusion {
 				//continue;
 				integrateFrameCPU(pipelines[i], relativeTransformations[i], i, pipelines[i]->data->frameId);
 			}
+		}
+
+		void integrateFrameGPU(float new_tsdf) {
+			compute(new_tsdf);
 		}
 
 		void integrateFrameCPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, const int pipelineId, const int frameId) {
@@ -176,6 +177,9 @@ namespace vc::fusion {
 			//		return;
 			//	}
 			//}
+
+
+			return;
 
 			Eigen::Matrix3d world2CameraProjection = pipeline->depth_camera->world2cam;
 			rs2::depth_frame* depth_frame;
