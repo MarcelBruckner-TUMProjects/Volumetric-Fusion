@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include "Utils.hpp"
 #include "Structs.hpp"
+//#include "MarchingCubes.hpp"
 
 namespace vc::fusion {
 	const int INVALID_TSDF_VALUE = 5;
@@ -17,6 +18,8 @@ namespace vc::fusion {
 	private:
 		unsigned int VBOs[4], VAO;
 		vc::rendering::Shader* gridShader;
+		vc::rendering::Shader* tsdfComputeShader;
+		vc::rendering::Shader* voxelgridComputeShader;
 
 		int integratedFrames = 0;
 
@@ -28,10 +31,10 @@ namespace vc::fusion {
 		Eigen::Vector3d size;
 		Eigen::Vector3d sizeNormalized;
 		Eigen::Vector3d sizeHalf;
-		Eigen::Vector3d origin ;
+		Eigen::Vector3d origin;
 
-		float* tsdf;
-		float* weights;
+		std::vector<float> tsdf;
+		std::vector<float> weights;
 
 		int num_gridPoints;
 
@@ -41,31 +44,47 @@ namespace vc::fusion {
 			return z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x;
 		}
 
-		Voxelgrid(const float resolution = 1.f, const Eigen::Vector3d size = Eigen::Vector3d(2.0, 2.0, 2.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
-			: resolution(resolution), origin(origin), size(size), sizeHalf(size / 2.0f), sizeNormalized((size / resolution) + Eigen::Vector3d(1.0, 1.0, 1.0)), num_gridPoints((sizeNormalized[0]* sizeNormalized[1]* sizeNormalized[2]))
+		Voxelgrid(const float resolution = 0.05f, const Eigen::Vector3d size = Eigen::Vector3d(2.0, 2.0, 2.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
+			: resolution(resolution), origin(origin), size(size), sizeHalf(size / 2.0f), sizeNormalized((size / resolution) + Eigen::Vector3d(1.0, 1.0, 1.0)), num_gridPoints((sizeNormalized[0] * sizeNormalized[1] * sizeNormalized[2]))
 		{
 			reset();
 
-			int i = 0;
-			for (int z = 0; z < sizeNormalized[2]; z++)
-			{
-				for (int y = 0; y < sizeNormalized[1]; y++)
-				{
-					for (int x = 0; x < sizeNormalized[0]; x++)
-					{
-						std::stringstream ss;
-						Eigen::Vector3d voxelPosition = getVoxelPosition(x, y, z);
+			//int i = 0;
+			//std::vector<std::thread> threads;
+			//for (int z = 0; z < sizeNormalized[2]; z++)
+			//{
+			//	for (int y = 0; y < sizeNormalized[1]; y++)
+			//	{
+			//		threads.emplace_back(std::thread([this, y, z]() {
+			//			for (int x = 0; x < sizeNormalized[0]; x++)
+			//			{
+			//				//std::stringstream ss;
+			//				Eigen::Vector3d voxelPosition = getVoxelPosition(x, y, z);
 
-						int hash = this->hashFunc(x, y, z);
+			//				int hash = this->hashFunc(x, y, z);
 
-						//tsdf[hash] = ((1.0f * i++) / num_gridPoints) * 2.0f - 1.0f;
-						
-						points.push_back(voxelPosition[0]);
-						points.push_back(voxelPosition[1]);
-						points.push_back(voxelPosition[2]);
-					}
-				}
-			}
+			//				//ss << NAME_AND_VALUE(x);
+			//				//ss << NAME_AND_VALUE(y);
+			//				//ss << NAME_AND_VALUE(z);
+			//				//ss << NAME_AND_VALUE(hash);
+
+			//				//tsdf[hash] = ((1.0f * i++) / num_gridPoints) * 2.0f - 1.0f;
+
+			//				points[hash * 3 + 0] = (voxelPosition[0]);
+			//				points[hash * 3 + 1] = (voxelPosition[1]);
+			//				points[hash * 3 + 2] = (voxelPosition[2]);
+
+			//				//std::cout << ss.str();
+			//			}
+			//		}));
+			//	}
+			//	for (auto& thread : threads)
+			//	{
+			//		thread.join();
+			//	}
+			//	threads = std::vector<std::thread>();
+			//	std::cout << "Initialized layer " << z << std::endl;
+			//}
 
 			if (initializeShader) {
 				initializeOpenGL();
@@ -74,6 +93,8 @@ namespace vc::fusion {
 
 		void initializeOpenGL() {
 			gridShader = new vc::rendering::VertexFragmentShader("shader/voxelgrid.vert", "shader/voxelgrid.frag", "shader/voxelgrid.geom");
+			//tsdfComputeShader = new vc::rendering::ComputeShader("shader/tsdf.comp");
+			//voxelgridComputeShader = new vc::rendering::ComputeShader("shader/voxelgrid.comp");
 
 			glGenVertexArrays(1, &VAO);
 			glGenBuffers(4, VBOs);
@@ -91,13 +112,13 @@ namespace vc::fusion {
 			glEnableVertexAttribArray(0);
 
 			glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
-			glBufferData(GL_ARRAY_BUFFER, num_gridPoints * sizeof(float), tsdf, GL_STATIC_DRAW);
+			glBufferData(GL_ARRAY_BUFFER, num_gridPoints * sizeof(float), tsdf.data(), GL_STATIC_DRAW);
 
 			glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 1 * sizeof(float), (void*)0);
 			glEnableVertexAttribArray(1);
 
 			glBindBuffer(GL_ARRAY_BUFFER, VBOs[2]);
-			glBufferData(GL_ARRAY_BUFFER, num_gridPoints * sizeof(float), weights, GL_STATIC_DRAW);
+			glBufferData(GL_ARRAY_BUFFER, num_gridPoints * sizeof(float), weights.data(), GL_STATIC_DRAW);
 
 			glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 1 * sizeof(float), (void*)0);
 			glEnableVertexAttribArray(2);
@@ -106,7 +127,7 @@ namespace vc::fusion {
 		void renderGrid(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
 			gridShader->use();
 
-			gridShader->setFloat("cube_radius", 0.05f);
+			gridShader->setFloat("cube_radius", resolution * 0.1f);
 			gridShader->setVec3("size", size);
 			gridShader->setMat4("model", model);
 			gridShader->setMat4("view", view);
@@ -114,7 +135,7 @@ namespace vc::fusion {
 			gridShader->setMat4("coordinate_correction", vc::rendering::COORDINATE_CORRECTION);
 
 			setTSDF();
-			
+
 			glDrawArrays(GL_POINTS, 0, num_gridPoints);
 			glBindVertexArray(0);
 		}
@@ -122,23 +143,16 @@ namespace vc::fusion {
 		Eigen::Vector3d getVoxelPosition(int x, int y, int z) {
 			Eigen::Vector3d voxelPosition = Eigen::Vector3d(x, y, z);
 			voxelPosition *= resolution;
-				voxelPosition -= sizeHalf;
+			voxelPosition -= sizeHalf;
 			voxelPosition += origin;
 			return voxelPosition;
 		}
 
 
 		void reset() {
-			delete[] tsdf;
-			delete[] weights;
-
-			tsdf = new float[num_gridPoints];
-			weights = new float[num_gridPoints];
-
-			for (int i = 0; i < num_gridPoints; i++) {
-				weights[i] = 0;
-				tsdf[i] = INVALID_TSDF_VALUE;
-			}
+			tsdf = std::vector<float>(num_gridPoints);
+			weights = std::vector<float>(num_gridPoints);
+			points = std::vector<float>(3 * num_gridPoints);
 
 			integratedFrames = 0;
 		}
@@ -179,96 +193,130 @@ namespace vc::fusion {
 
 			integratedFramesPerPipeline[pipelineId].push_back(frameId);
 
+			std::vector<std::thread> threads;
 			for (int z = 0; z < sizeNormalized[2]; z++)
 			{
+				int yy = 0;
 				for (int y = 0; y < sizeNormalized[1]; y++)
 				{
-					for (int x = 0; x < sizeNormalized[0]; x++)
-					{
-						std::stringstream ss;
-						Eigen::Vector3d voxelPosition = getVoxelPosition(x, y, z);
 
-						int hash = this->hashFunc(x, y, z);
+					threads.emplace_back(std::thread([&, y, z]() {
+						for (int x = 0; x < sizeNormalized[0]; x++)
+						{
+							std::stringstream ss;
+							Eigen::Vector3d voxelPosition = getVoxelPosition(x, y, z);
 
-						ss << NAME_AND_VALUE(hash);
-						ss << NAME_AND_VALUE(voxelPosition);
+							int hash = this->hashFunc(x, y, z);
 
-						Eigen::Vector3d projectedVoxelCenter = world2CameraProjection * voxelPosition;
-						ss << NAME_AND_VALUE(projectedVoxelCenter);
+							ss << NAME_AND_VALUE(hash);
+							ss << NAME_AND_VALUE(voxelPosition);
 
-						float z = projectedVoxelCenter[2];
+							Eigen::Vector3d projectedVoxelCenter = world2CameraProjection * voxelPosition;
+							ss << NAME_AND_VALUE(projectedVoxelCenter);
 
-						if (z <= 0) {
-							tsdf[hash] = INVALID_TSDF_VALUE;
-							ss << vc::utils::asHeader("Invalid because z <= 0");
-						}
-						else {
-							Eigen::Vector2d pixelCoordinate = Eigen::Vector2d(projectedVoxelCenter[0], projectedVoxelCenter[1]) / z;
-							ss << NAME_AND_VALUE(pixelCoordinate);
+							float z = projectedVoxelCenter[2];
 
-							//pixelCoordinate += Eigen::Vector2d(depth_width, depth_height);
-							//pixelCoordinate /= 2.0f;
-
-							//ss << NAME_AND_VALUE(pixelCoordinate);
-
-							if (pixelCoordinate[0] < 0 || pixelCoordinate[1] < 0 ||
-								pixelCoordinate[0] >= depth_width || pixelCoordinate[1] >= depth_height) {
+							if (z <= 0) {
 								tsdf[hash] = INVALID_TSDF_VALUE;
-								ss << vc::utils::asHeader("Invalid because pixel not in image");
+								ss << vc::utils::asHeader("Invalid because z <= 0");
 							}
 							else {
-								float real_depth = depth_frame->get_distance(pixelCoordinate[0], pixelCoordinate[1]);
-								ss << NAME_AND_VALUE(z);
-								ss << NAME_AND_VALUE(real_depth);
+								Eigen::Vector2d pixelCoordinate = Eigen::Vector2d(projectedVoxelCenter[0], projectedVoxelCenter[1]) / z;
+								ss << NAME_AND_VALUE(pixelCoordinate);
 
-								float tsdf_value = z - real_depth;
+								//pixelCoordinate += Eigen::Vector2d(depth_width, depth_height);
+								pixelCoordinate /= 2.0f;
 
-								ss << NAME_AND_VALUE(tsdf_value);
-		
-								float clamped_tsdf_value = std::clamp(tsdf_value, -1.0f, 1.0f);
+								ss << NAME_AND_VALUE(pixelCoordinate);
 
-								ss << NAME_AND_VALUE(clamped_tsdf_value);
+								if (pixelCoordinate[0] < 0 || pixelCoordinate[1] < 0 ||
+									pixelCoordinate[0] >= depth_width || pixelCoordinate[1] >= depth_height) {
+									tsdf[hash] = INVALID_TSDF_VALUE;
+									ss << vc::utils::asHeader("Invalid because pixel not in image");
+								}
+								else {
+									try {
+										float real_depth = depth_frame->get_distance(pixelCoordinate[0], pixelCoordinate[1]);
+										ss << NAME_AND_VALUE(z);
+										ss << NAME_AND_VALUE(real_depth);
 
-								tsdf[hash] = clamped_tsdf_value;
+										if (real_depth <= 0) {
+											tsdf[hash] = INVALID_TSDF_VALUE;
+											ss << vc::utils::asHeader("Invalid because no value in depth image");
+										}
+										else {
+											float tsdf_value = real_depth - z;
+											tsdf_value *= -1;
 
-								//float old_tsdf = tsdf[hash];
-								//int old_weight = weights[hash];
-								//weights[hash] += 1;
-								//tsdf[hash] = (old_tsdf * old_weight + clamped_tsdf_value) / weights[hash];
-								//isSet[hash] = 7;
+											ss << NAME_AND_VALUE(tsdf_value);
+
+											float clamped_tsdf_value = std::clamp(tsdf_value, -1.0f, 1.0f);
+
+											ss << NAME_AND_VALUE(clamped_tsdf_value);
+
+											tsdf[hash] = clamped_tsdf_value;
+
+											//float old_tsdf = tsdf[hash];
+											//int old_weight = weights[hash];
+											//weights[hash] += 1;
+											//tsdf[hash] = (old_tsdf * old_weight + clamped_tsdf_value) / weights[hash];
+											//isSet[hash] = 7;
+										}
+									}
+									catch (rs2::error&) {
+										std::cout << "error in retrieving depth" << std::endl;
+									}
+								}
 							}
 						}
-						//std::cout << ss.str();
-						//std::cout << std::endl;
+
+						//if (voxelPosition[0] == 0 && voxelPosition[1] == 0) {
+						//	std::cout << ss.str();
+						//	std::cout << std::endl;
+						//}
+					}));
+					if (yy++ >= vc::utils::NUM_THREADS) {
+						for (auto& thread : threads)
+						{
+							thread.join();
+						}
+						threads = std::vector<std::thread>();
+						yy = 0;
 					}
 				}
+				std::cout << "Calculated TSDF layer " << z << std::endl;
 			}
+
+			for (auto& thread : threads)
+			{
+				thread.join();
+			}
+
+			//vc::utils::sleepFor("", 1000);
 		}
 
-		vc::fusion::GridCell getGridCell(int x, int y, int z) {
-			vc::fusion::GridCell cell;
+		bool getGridCell(int x, int y, int z, vc::fusion::GridCell* cell) {
+			cell->corners[0] = getVoxelPosition(x - 1, y - 1, z);
+			cell->corners[1] = getVoxelPosition(x, y - 1, z);
+			cell->corners[2] = getVoxelPosition(x, y - 1, z - 1);
+			cell->corners[3] = getVoxelPosition(x - 1, y - 1, z - 1);
 
-			cell.p[0] = getVoxelPosition(x - 1, y - 1, z);
-			cell.p[1] = getVoxelPosition(x, y - 1, z);
-			cell.p[2] = getVoxelPosition(x, y - 1, z - 1);
-			cell.p[3] = getVoxelPosition(x - 1, y - 1, z - 1);
+			cell->corners[4] = getVoxelPosition(x - 1, y, z);
+			cell->corners[5] = getVoxelPosition(x, y, z);
+			cell->corners[6] = getVoxelPosition(x, y, z - 1);
+			cell->corners[7] = getVoxelPosition(x - 1, y, z - 1);
 
-			cell.p[4] = getVoxelPosition(x - 1, y, z);
-			cell.p[5] = getVoxelPosition(x, y, z);
-			cell.p[6] = getVoxelPosition(x, y, z - 1);
-			cell.p[7] = getVoxelPosition(x - 1, y, z - 1);
+			cell->tsdfs[0] = tsdf[hashFunc(x - 1, y - 1, z)];
+			cell->tsdfs[1] = tsdf[hashFunc(x, y - 1, z)];
+			cell->tsdfs[2] = tsdf[hashFunc(x, y - 1, z - 1)];
+			cell->tsdfs[3] = tsdf[hashFunc(x - 1, y - 1, z - 1)];
 
-			cell.val[0] = tsdf[hashFunc(x - 1, y - 1, z)];
-			cell.val[1] = tsdf[hashFunc(x, y - 1, z)];
-			cell.val[2] = tsdf[hashFunc(x, y - 1, z - 1)];
-			cell.val[3] = tsdf[hashFunc(x - 1, y - 1, z - 1)];
+			cell->tsdfs[4] = tsdf[hashFunc(x - 1, y, z)];
+			cell->tsdfs[5] = tsdf[hashFunc(x, y, z)];
+			cell->tsdfs[6] = tsdf[hashFunc(x, y, z - 1)];
+			cell->tsdfs[7] = tsdf[hashFunc(x - 1, y, z - 1)];
 
-			cell.val[4] = tsdf[hashFunc(x - 1, y, z)];
-			cell.val[5] = tsdf[hashFunc(x, y, z)];
-			cell.val[6] = tsdf[hashFunc(x, y, z - 1)];
-			cell.val[7] = tsdf[hashFunc(x - 1, y, z - 1)];
-
-			return cell;
+			return true;
 		}
 
 		Eigen::Vector3d* getVoxelCorners(int x, int y, int z) {

@@ -20,15 +20,19 @@ void main()
     
     float t = tsdf;
 
+    // Blue: invalid point
     if(t > 1){
         vs_out.color = vec4(0.0, 0.0, 1.0, 0.4);
         return;
     }
 
-//    t = 1;
     if(t < 0) {
-        vs_out.color = vec4(1.0f + t, 0.0f, 0.0f, 1.0);
-    } else {
-        vs_out.color = vec4(1.0f - t, t, 0.0f, 1.0);
+        // Red: Behind poindcloud
+        vs_out.color = vec4(0.0f, 1.0f + t, 0.0f, 1.0);
+    } 
+    else
+    {
+        // Green: Infront of pointcloud
+        vs_out.color = vec4(1.0f - t, 0.0f, 0.0f, 1.0);
     }
 }

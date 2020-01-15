@@ -28,7 +28,7 @@ namespace vc::optimization {
         std::map<int, std::vector<Eigen::Vector4d>> markerCorners;
         std::map<int, Eigen::Vector4d> charucoCorners;
 
-        std::vector<glm::vec3> allForRendering;
+        std::vector<Eigen::Vector3d> allForRendering;
 
         ACharacteristicPoints(){}
 
@@ -37,7 +37,7 @@ namespace vc::optimization {
             markerCorners(markerCorners), charucoCorners(charucoCorners) {}
 
 
-        std::vector<glm::vec3> getAllVerticesForRendering() {
+        std::vector<Eigen::Vector3d> getAllVerticesForRendering() {
             return allForRendering;
 
             //std::vector<float> vertices;
@@ -213,7 +213,7 @@ namespace vc::optimization {
                 for (int cornerId = 0; cornerId < markerCorners[j].size(); cornerId++) {
                     auto point = pixel2Point(markerCorners[j][cornerId]);
                     this->markerCorners[markerId].emplace_back();
-                    allForRendering.push_back(glm::vec3(point[0], point[1], point[2]));
+                    allForRendering.push_back(Eigen::Vector3d(point[0], point[1], point[2]));
                 }
             }
 
@@ -225,7 +225,7 @@ namespace vc::optimization {
                 int charucoId = charucoIds[j];
                 auto point = pixel2Point(charucoCorners[j]);
                 this->charucoCorners[charucoId] = point;
-                allForRendering.push_back(glm::vec3(point[0], point[1], point[2]));
+                allForRendering.push_back(Eigen::Vector3d(point[0], point[1], point[2]));
             }
         }
 
@@ -292,9 +292,9 @@ namespace vc::optimization {
             glBindVertexArray(VAO);
             glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
-            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), vertices.data(), GL_DYNAMIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Eigen::Vector3d), vertices.data(), GL_DYNAMIC_DRAW);
 
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 1 * sizeof(glm::vec3), (void*)0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 1 * sizeof(Eigen::Vector3d), (void*)0);
             glEnableVertexAttribArray(0);
             //glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)3);
             //glEnableVertexAttribArray(1);

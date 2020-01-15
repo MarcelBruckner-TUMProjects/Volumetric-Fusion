@@ -1,0 +1,54 @@
+#version 430
+
+uniform float resolution;
+uniform float resolutionInv;
+uniform vec3 size;
+uniform vec3 sizeHalf;
+uniform vec3 sizeNormalized;
+uniform vec3 origin;
+uniform mat4 relativeTransformation;
+
+struct VtxData {
+   vec3  vtx_pos;     
+}; 
+
+struct TsdfData {
+   float tsdf_value;      
+}; 
+
+struct WeightsData {
+   float weights_value;      
+}; 
+
+layout (local_size_x = 1) in;
+layout (std140, binding = 0) buffer VertexBuffer {
+   VtxData verts [];
+};
+layout (std140, binding = 1) buffer TsdfBuffer {
+   TsdfData tsdfs [];
+};
+layout (std140, binding = 2) buffer WeightsBuffer {
+   WeightsData weights [];
+};
+
+vec3 unhash(uint hash){
+    int x = int(hash % int(sizeNormalized.x));
+    int y = int(int(hash / sizeNormalized.x) % int(sizeNormalized.y));
+    int z = int(int(hash/ int(sizeNormalized.x * sizeNormalized.y)) % int(sizeNormalized.z));
+
+    vec3 pos = vec3(x, y, z);
+    pos *= resolution;
+    pos -= sizeHalf;
+    pos += origin;
+
+    return pos;
+}
+
+void main(){	
+    uint hash = gl_LocalInvocationIndex;
+
+    vec3 pos = unhash(hash);
+
+    weights[hash].weights_value = hash;
+    tsdfs[hash].tsdf_value = hash;
+}

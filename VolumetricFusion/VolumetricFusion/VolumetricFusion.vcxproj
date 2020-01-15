@@ -43,6 +43,8 @@
     <None Include="shader\pointcloud_new.vert" />
     <None Include="shader\texture.fs" />
     <None Include="shader\texture.vs" />
+    <None Include="shader\tsdf.comp" />
+    <None Include="shader\voxelgrid.comp" />
     <None Include="shader\voxelgrid.frag" />
     <None Include="shader\voxelgrid.geom" />
     <None Include="shader\voxelgrid.vert" />

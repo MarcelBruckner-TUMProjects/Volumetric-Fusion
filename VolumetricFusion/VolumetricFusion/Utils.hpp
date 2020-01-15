@@ -14,6 +14,8 @@
 #define NAME_AND_VALUE(name) vc::utils::nameAndValue(#name, (name))
 
 namespace vc::utils {
+
+	const int NUM_THREADS = 32;
 	
 	std::string asHeader(std::string header) {
 		std::stringstream ss;
@@ -206,6 +208,17 @@ namespace vc::utils {
 		ss << header << std::endl << value;
 		return asHeader(ss.str());
 	}
+
+	bool isValid(Eigen::Vector3d v) {
+		for (int i = 0; i < 3; i++)
+		{
+			if (std::abs(v[i]) > 10e2) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 }
 
 #endif // !_UTILS_HEADER

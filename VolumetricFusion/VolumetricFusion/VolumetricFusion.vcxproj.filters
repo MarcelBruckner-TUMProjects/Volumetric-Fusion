@@ -149,6 +149,12 @@
     <None Include="shader\voxelgrid.geom">
       <Filter>Shader</Filter>
     </None>
+    <None Include="shader\tsdf.comp">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\voxelgrid.comp">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Shader">

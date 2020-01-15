@@ -114,10 +114,18 @@ namespace vc::rendering {
 				}
 			}
 		}
-	};
+		
+		void attachIfValid(unsigned int shaderId) {
+			if (shaderId != (unsigned int)-1) {
+				glAttachShader(ID, shaderId);
+			}
+		}
 
-	class VertexFragmentShader : public Shader {
-	public :
+		void deleteIfValid(unsigned int shaderId) {
+			if (shaderId != (unsigned int)-1) {
+				glDeleteShader(shaderId);
+			}
+		}
 		unsigned int compileShader(const char* shaderPath, int type) {
 			std::string name;
 			switch (type) {
@@ -130,11 +138,14 @@ namespace vc::rendering {
 			case GL_GEOMETRY_SHADER:
 				name = "GEOMETRY";
 				break;
+			case GL_COMPUTE_SHADER:
+				name = "COMPUTE";
+				break;
 			default:
 				std::cerr << "(" << name << ") Can only compile shaders of types: GL_VERTEX_SHADER, GL_FRAGMENT_SHADER, GL_GEOMETRY_SHADER" << std::endl;
 				return -1;
 			}
-			
+
 			if (shaderPath == "") {
 				//std::cout << "Skipping " << name << std::endl;
 				return -1;
@@ -172,18 +183,10 @@ namespace vc::rendering {
 
 			return vertexShader;
 		}
+	};
 
-		void attachIfValid(unsigned int shaderId) {
-			if (shaderId != (unsigned int)-1) {
-				glAttachShader(ID, shaderId);
-			}
-		}
-
-		void deleteIfValid(unsigned int shaderId) {
-			if (shaderId != (unsigned int)-1) {
-				glDeleteShader(shaderId);
-			}
-		}
+	class VertexFragmentShader : public Shader {
+	public :
 
 		VertexFragmentShader(const char* vertexPath, const char* fragmentPath, const char* geometryPath = "") : Shader()
 		{			
@@ -204,46 +207,18 @@ namespace vc::rendering {
 		}
 	};
 
-	class ComputeShader : Shader
+	class ComputeShader : public Shader
 	{
 	public:
 		ComputeShader(const char* computeShaderPath) : Shader()
 		{
-			// 1. retrieve the vertex/fragment source code from filePath
-			std::string computeShaderCode;
-			std::ifstream ComputeShaderFile;
-			// ensure ifstream objects can throw exceptions:
-			ComputeShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-			try
-			{
-				// open files
-				ComputeShaderFile.open(computeShaderPath);
-				std::stringstream vShaderStream;
-				// read file's buffer contents into streams
-				vShaderStream << ComputeShaderFile.rdbuf();
-				// close file handlers
-				ComputeShaderFile.close();
-				// convert stream into string
-				computeShaderCode = vShaderStream.str();
-			}
-			catch (std::ifstream::failure e)
-			{
-				std::cout << "ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ" << std::endl;
-			}
-			const char* cShaderCode = computeShaderCode.c_str();
-			// 2. compile shaders
-			unsigned int computeShader;
-			// vertex shader
-			computeShader = glCreateShader(GL_COMPUTE_SHADER);
-			glShaderSource(computeShader, 1, &cShaderCode, NULL);
-			glCompileShader(computeShader);
-			checkCompileErrors(computeShader, "COMPUTE");
+			unsigned int computeShader = compileShader(computeShaderPath, GL_COMPUTE_SHADER);
 
 			// shader Program
 			ID = glCreateProgram();
-			glAttachShader(ID, computeShader);
+			attachIfValid(computeShader);
 			glLinkProgram(ID);
-			checkCompileErrors(ID, "COMPUTE PROGRAM");
+			checkCompileErrors(ID, "PROGRAM");
 			// delete the shaders as they're linked into our program now and no longer necessery
 			glDeleteShader(computeShader);
 

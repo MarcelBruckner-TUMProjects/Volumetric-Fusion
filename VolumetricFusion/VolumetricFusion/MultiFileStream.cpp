@@ -46,6 +46,7 @@ using namespace vc::enums;
 #include "shader.hpp"
 #include <VolumetricFusion\Voxelgrid.hpp>
 //#include <io.h>
+#include "MarchingCubes.hpp"
 
 #include "optimization/optimizationProblem.hpp"
 #include "optimization/BundleAdjustment.hpp"
@@ -270,8 +271,15 @@ int main(int argc, char* argv[]) try {
 			if (calibrateCameras || !fuseFrames) {
 				continue;
 			}
-			
-			voxelgrid->integrateFramesCPU(pipelines, optimizationProblem->bestTransformations);
+
+			if (voxelgridGUI->fuse) {
+				voxelgrid->integrateFramesCPU(pipelines, optimizationProblem->bestTransformations);
+
+				if (voxelgridGUI->marchingCubes) {
+					vc::fusion::marchingCubes(voxelgrid);
+					voxelgridGUI->marchingCubes = false;
+				}
+			}
 		}
 		});
 #pragma endregion

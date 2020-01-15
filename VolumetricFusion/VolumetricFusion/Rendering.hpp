@@ -32,11 +32,11 @@ namespace vc::rendering {
         0,0,0, 1.0f
     );
 
-    const glm::vec3 DEBUG_COLORS[4] = {
-        glm::vec3(1.0f, 0.0f, 0.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f),
-        glm::vec3(0.0f, 0.0f, 1.0f),
-        glm::vec3(1.0f, 1.0f, 1.0f)
+    const Eigen::Vector3d DEBUG_COLORS[4] = {
+        Eigen::Vector3d(1.0f, 0.0f, 0.0f),
+        Eigen::Vector3d(0.0f, 1.0f, 0.0f),
+        Eigen::Vector3d(0.0f, 0.0f, 1.0f),
+        Eigen::Vector3d(1.0f, 1.0f, 1.0f)
     };
 
     const float COLOR_vertices[] = {

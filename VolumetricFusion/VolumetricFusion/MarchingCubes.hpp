@@ -5,11 +5,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include <VolumetricFusion\Voxelgrid.hpp>
+#include "Voxelgrid.hpp"
 
 #include "Utils.hpp"
 #include "Tables.hpp"
 #include "Structs.hpp"
+#include "ceres/ceres.h"
 
 #include <iostream>
 #include <fstream>
@@ -17,125 +18,157 @@
 #include <math.h>
 
 namespace vc::fusion {
+    class Voxelgrid;
 
-    void exportToPly(std::vector<vc::fusion::Triangle> triangles);
-        glm::vec3 VertexInterp(int isolevel, glm::vec3 p1, glm::vec3 p2, float valp1, float valp2);
-    int Polygonise(vc::fusion::GridCell grid, double isolevel, vc::fusion::Triangle* triangles);
+    void exportToPly(std::vector<vc::fusion::Triangle*> triangles);
+        Eigen::Vector3d VertexInterp(int isolevel, Eigen::Vector3d p1, Eigen::Vector3d p2, float valp1, float valp2);
+        std::vector< vc::fusion::Triangle*> Polygonise(vc::fusion::GridCell grid, double isolevel);
 
     void marchingCubes(vc::fusion::Voxelgrid* voxelgrid) {
-        std::vector<vc::fusion::Triangle> triangles;
+        int snx = voxelgrid->sizeNormalized[0];
+        int sny = voxelgrid->sizeNormalized[1];
+        int snz = voxelgrid->sizeNormalized[2];
 
-        int snx = voxelgrid->sizeNormalized.x;
-        int sny = voxelgrid->sizeNormalized.y;
-        int snz = voxelgrid->sizeNormalized.z;
+        std::vector<vc::fusion::Triangle*> triangles(snx * sny * snz * 5);
 
+        std::vector<std::thread> threads;
+        int i = 0;
+        int yy = 0;
         for (int z = 1; z < snz; z++)
         {
             for (int y = 1; y < sny; y++)
             {
-                for (int x = 1; x < snx; x++)
-                {
-                    std::stringstream ss;
-
-                    vc::fusion::GridCell cell = voxelgrid->getGridCell(x, y, z);
-                    vc::fusion::Triangle* new_triangles = new vc::fusion::Triangle[10];
-                    int num_new_triangles = Polygonise(cell, 0.0, new_triangles);
-
-                    for (int i = 0; i < num_new_triangles; i++)
+                threads.emplace_back(std::thread([&, y, z]() {
+                    for (int x = 1; x < snx; x++)
                     {
-                        triangles.emplace_back(new_triangles[i]);
-                    }
+                        std::stringstream ss;
 
-                    std::cout << ss.str() << std::endl;
+                        vc::fusion::GridCell cell;
+                        if (!voxelgrid->getGridCell(x, y, z, &cell)) {
+                            continue;
+                        }
+                        
+                        std::vector<vc::fusion::Triangle*> new_triangles = Polygonise(cell, 0.0);
+
+                        for (auto& triangle : new_triangles)
+                        {
+                            if (triangle) {
+                                triangles[i++] = triangle;
+                            }
+                        }
+                    }
+                }));
+                if (yy++ >= vc::utils::NUM_THREADS) {
+                    for (auto& thread : threads)
+                    {
+                        thread.join();
+                    }
+                    threads = std::vector<std::thread>();
+                    yy = 0;
                 }
             }
+            std::cout << "Calculated Marching Cubes layer " << z << std::endl;
         }
 
-        exportToPly(triangles);
+        for (auto& thread : threads)
+        {
+            thread.join();
+        }
+
+        std::vector<vc::fusion::Triangle*> finalTriangles(0);
+        finalTriangles.insert(finalTriangles.end(), triangles.begin(), triangles.begin() + i);
+        exportToPly(finalTriangles);
     }
 
 
-    int Polygonise(vc::fusion::GridCell grid, double isolevel, vc::fusion::Triangle* triangles) {
+    std::vector< vc::fusion::Triangle*> Polygonise(vc::fusion::GridCell grid, double isolevel) {
+        std::vector<vc::fusion::Triangle*> triangles;
+
         int i, ntriang;
         int cubeindex;
-        glm::vec3 vertlist[12];
+        Eigen::Vector3d vertlist[12];
 
         /*
           Determine the index into the edge table which
           tells us which vertices are inside of the surface
        */
         cubeindex = 0;
-        if (grid.val[0] < isolevel) cubeindex |= 1;
-        if (grid.val[1] < isolevel) cubeindex |= 2;
-        if (grid.val[2] < isolevel) cubeindex |= 4;
-        if (grid.val[3] < isolevel) cubeindex |= 8;
-        if (grid.val[4] < isolevel) cubeindex |= 16;
-        if (grid.val[5] < isolevel) cubeindex |= 32;
-        if (grid.val[6] < isolevel) cubeindex |= 64;
-        if (grid.val[7] < isolevel) cubeindex |= 128;
+        if (grid.tsdfs[0] < isolevel) cubeindex |= 1;
+        if (grid.tsdfs[1] < isolevel) cubeindex |= 2;
+        if (grid.tsdfs[2] < isolevel) cubeindex |= 4;
+        if (grid.tsdfs[3] < isolevel) cubeindex |= 8;
+        if (grid.tsdfs[4] < isolevel) cubeindex |= 16;
+        if (grid.tsdfs[5] < isolevel) cubeindex |= 32;
+        if (grid.tsdfs[6] < isolevel) cubeindex |= 64;
+        if (grid.tsdfs[7] < isolevel) cubeindex |= 128;
 
         /* Cube is entirely in/out of the surface */
-        if (edgeTable[cubeindex] == 0)
-            return(0);
-
-        /* Find the vertices where the surface intersects the cube */
-        if (edgeTable[cubeindex] & 1)
-            vertlist[0] =
-            VertexInterp(isolevel, grid.p[0], grid.p[1], grid.val[0], grid.val[1]);
-        if (edgeTable[cubeindex] & 2)
-            vertlist[1] =
-            VertexInterp(isolevel, grid.p[1], grid.p[2], grid.val[1], grid.val[2]);
-        if (edgeTable[cubeindex] & 4)
-            vertlist[2] =
-            VertexInterp(isolevel, grid.p[2], grid.p[3], grid.val[2], grid.val[3]);
-        if (edgeTable[cubeindex] & 8)
-            vertlist[3] =
-            VertexInterp(isolevel, grid.p[3], grid.p[0], grid.val[3], grid.val[0]);
-        if (edgeTable[cubeindex] & 16)
-            vertlist[4] =
-            VertexInterp(isolevel, grid.p[4], grid.p[5], grid.val[4], grid.val[5]);
-        if (edgeTable[cubeindex] & 32)
-            vertlist[5] =
-            VertexInterp(isolevel, grid.p[5], grid.p[6], grid.val[5], grid.val[6]);
-        if (edgeTable[cubeindex] & 64)
-            vertlist[6] =
-            VertexInterp(isolevel, grid.p[6], grid.p[7], grid.val[6], grid.val[7]);
-        if (edgeTable[cubeindex] & 128)
-            vertlist[7] =
-            VertexInterp(isolevel, grid.p[7], grid.p[4], grid.val[7], grid.val[4]);
-        if (edgeTable[cubeindex] & 256)
-            vertlist[8] =
-            VertexInterp(isolevel, grid.p[0], grid.p[4], grid.val[0], grid.val[4]);
-        if (edgeTable[cubeindex] & 512)
-            vertlist[9] =
-            VertexInterp(isolevel, grid.p[1], grid.p[5], grid.val[1], grid.val[5]);
-        if (edgeTable[cubeindex] & 1024)
-            vertlist[10] =
-            VertexInterp(isolevel, grid.p[2], grid.p[6], grid.val[2], grid.val[6]);
-        if (edgeTable[cubeindex] & 2048)
-            vertlist[11] =
-            VertexInterp(isolevel, grid.p[3], grid.p[7], grid.val[3], grid.val[7]);
-
-        /* Create the triangle */
-        ntriang = 0;
-        for (i = 0; triTable[cubeindex][i] != -1; i += 3) {
-            triangles[ntriang].p[0] = vertlist[triTable[cubeindex][i]];
-            triangles[ntriang].p[1] = vertlist[triTable[cubeindex][i + 1]];
-            triangles[ntriang].p[2] = vertlist[triTable[cubeindex][i + 2]];
-            ntriang++;
+        if (edgeTable[cubeindex] == 0) {
+            return triangles;
         }
 
-        return(ntriang);
+        /* Find the vertices where the surface intersects the cube */
+        if (edgeTable[cubeindex] & 1 && grid.tsdfs[0] != vc::fusion::INVALID_TSDF_VALUE  && grid.tsdfs[1] != vc::fusion::INVALID_TSDF_VALUE)
+            vertlist[0] =
+            VertexInterp(isolevel, grid.corners[0], grid.corners[1], grid.tsdfs[0], grid.tsdfs[1]);
+        if (edgeTable[cubeindex] & 2 && grid.tsdfs[1] != vc::fusion::INVALID_TSDF_VALUE && grid.tsdfs[2] != vc::fusion::INVALID_TSDF_VALUE)
+            vertlist[1] =
+            VertexInterp(isolevel, grid.corners[1], grid.corners[2], grid.tsdfs[1], grid.tsdfs[2]);
+        if (edgeTable[cubeindex] & 4 && grid.tsdfs[2] != vc::fusion::INVALID_TSDF_VALUE && grid.tsdfs[3] != vc::fusion::INVALID_TSDF_VALUE)
+            vertlist[2] =
+            VertexInterp(isolevel, grid.corners[2], grid.corners[3], grid.tsdfs[2], grid.tsdfs[3]);
+        if (edgeTable[cubeindex] & 8 && grid.tsdfs[3] != vc::fusion::INVALID_TSDF_VALUE && grid.tsdfs[0] != vc::fusion::INVALID_TSDF_VALUE)
+            vertlist[3] =
+            VertexInterp(isolevel, grid.corners[3], grid.corners[0], grid.tsdfs[3], grid.tsdfs[0]);
+        if (edgeTable[cubeindex] & 16 && grid.tsdfs[4] != vc::fusion::INVALID_TSDF_VALUE && grid.tsdfs[5] != vc::fusion::INVALID_TSDF_VALUE)
+            vertlist[4] =
+            VertexInterp(isolevel, grid.corners[4], grid.corners[5], grid.tsdfs[4], grid.tsdfs[5]);
+        if (edgeTable[cubeindex] & 32 && grid.tsdfs[5] != vc::fusion::INVALID_TSDF_VALUE && grid.tsdfs[6] != vc::fusion::INVALID_TSDF_VALUE)
+            vertlist[5] =
+            VertexInterp(isolevel, grid.corners[5], grid.corners[6], grid.tsdfs[5], grid.tsdfs[6]);
+        if (edgeTable[cubeindex] & 64 && grid.tsdfs[6] != vc::fusion::INVALID_TSDF_VALUE && grid.tsdfs[7] != vc::fusion::INVALID_TSDF_VALUE)
+            vertlist[6] =
+            VertexInterp(isolevel, grid.corners[6], grid.corners[7], grid.tsdfs[6], grid.tsdfs[7]);
+        if (edgeTable[cubeindex] & 128 && grid.tsdfs[7] != vc::fusion::INVALID_TSDF_VALUE && grid.tsdfs[4] != vc::fusion::INVALID_TSDF_VALUE)
+            vertlist[7] =
+            VertexInterp(isolevel, grid.corners[7], grid.corners[4], grid.tsdfs[7], grid.tsdfs[4]);
+        if (edgeTable[cubeindex] & 256 && grid.tsdfs[0] != vc::fusion::INVALID_TSDF_VALUE && grid.tsdfs[4] != vc::fusion::INVALID_TSDF_VALUE)
+            vertlist[8] =
+            VertexInterp(isolevel, grid.corners[0], grid.corners[4], grid.tsdfs[0], grid.tsdfs[4]);
+        if (edgeTable[cubeindex] & 512 && grid.tsdfs[1] != vc::fusion::INVALID_TSDF_VALUE && grid.tsdfs[5] != vc::fusion::INVALID_TSDF_VALUE)
+            vertlist[9] =
+            VertexInterp(isolevel, grid.corners[1], grid.corners[5], grid.tsdfs[1], grid.tsdfs[5]);
+        if (edgeTable[cubeindex] & 1024 && grid.tsdfs[2] != vc::fusion::INVALID_TSDF_VALUE && grid.tsdfs[6] != vc::fusion::INVALID_TSDF_VALUE)
+            vertlist[10] =
+            VertexInterp(isolevel, grid.corners[2], grid.corners[6], grid.tsdfs[2], grid.tsdfs[6]);
+        if (edgeTable[cubeindex] & 2048 && grid.tsdfs[3] != vc::fusion::INVALID_TSDF_VALUE && grid.tsdfs[7] != vc::fusion::INVALID_TSDF_VALUE)
+            vertlist[11] =
+            VertexInterp(isolevel, grid.corners[3], grid.corners[7], grid.tsdfs[3], grid.tsdfs[7]);
+
+        /* Create the triangle */
+        for (i = 0; triTable[cubeindex][i] != -1; i += 3) {
+            auto a = vertlist[triTable[cubeindex][i]];
+            auto b = vertlist[triTable[cubeindex][i + 1]];
+            auto c = vertlist[triTable[cubeindex][i + 2]];
+            if (vc::utils::isValid(a) && vc::utils::isValid(b) && vc::utils::isValid(c)) {
+                auto triangle = new vc::fusion::Triangle(a, b, c);
+                if (triangle) {
+                    triangles.emplace_back(triangle);
+                }
+            }
+        }
+
+        return triangles;
     }
 
     /*
        Linearly interpolate the position where an isosurface cuts
        an edge between two vertices, each with their own scalar value
     */
-    glm::vec3 VertexInterp(int isolevel, glm::vec3 p1, glm::vec3 p2, float valp1, float valp2)
+    Eigen::Vector3d VertexInterp(int isolevel, Eigen::Vector3d p1, Eigen::Vector3d p2, float valp1, float valp2)
     {
         double mu;
-        glm::vec3 p;
+        Eigen::Vector3d p;
 
         if (std::abs(isolevel - valp1) < 0.00001)
             return(p1);
@@ -144,9 +177,9 @@ namespace vc::fusion {
         if (std::abs(valp1 - valp2) < 0.00001)
             return(p1);
         mu = (isolevel - valp1) / (valp2 - valp1);
-        p.x = p1.x + mu * (p2.x - p1.x);
-        p.y = p1.y + mu * (p2.y - p1.y);
-        p.z = p1.z + mu * (p2.z - p1.z);
+        p[0] = p1[0] + mu * (p2[0] - p1[0]);
+        p[1] = p1[1] + mu * (p2[1] - p1[1]);
+        p[2] = p1[2] + mu * (p2[2] - p1[2]);
 
         return(p);
     }
@@ -159,7 +192,7 @@ namespace vc::fusion {
         marchingCubes(new vc::fusion::FourCellMockVoxelGrid());
     }
 
-    void exportToPly(std::vector<vc::fusion::Triangle> triangles) {
+    void exportToPly(std::vector<vc::fusion::Triangle*> triangles) {
         std::ofstream ply_file;
         ply_file.open("plys/marching_cube.ply");
 
@@ -178,10 +211,22 @@ namespace vc::fusion {
         ply_file << "property list uchar int vertex_indices\n";
         ply_file << "end_header\n";
 
+        int i = 0;
         for (auto triangle : triangles) {
-            for (auto vertex : triangle.p) {
-                ply_file << vertex.x << " " << vertex.y << " " << vertex.z << "\n";
+            for (auto vertex : triangle->vertices) {
+                if (vc::utils::isValid(vertex)) {
+                    for (int i = 0; i < 3; i++)
+                    {
+                        ply_file << vertex[i] << " ";
+                    }
+                    ply_file << "\n";
+                }
+                else {
+                    std::cout << "error with triangle " << i << std::endl;
+                }
             }
+            i++;
+
         }
 
         for (int i = 0; i < triangles.size(); i++) {
@@ -189,6 +234,8 @@ namespace vc::fusion {
         }
 
         ply_file.close();
+
+        std::cout << "Written ply" << std::endl;
     }
 }
 

@@ -192,7 +192,9 @@ namespace vc::imgui {
 
 	public:
 		bool renderVoxelgrid = true;
-		
+		bool fuse = false;
+		bool marchingCubes = false;
+
 		VoxelgridGUI(vc::fusion::Voxelgrid* voxelgrid) : voxelgrid(voxelgrid){}
 
 		void render() {
@@ -200,6 +202,10 @@ namespace vc::imgui {
 			ImGui::Text("Editable settings of the voxelgrid.");
 
 			ImGui::Checkbox("Render voxelgrid", &renderVoxelgrid);
+
+			ImGui::Checkbox("Fuse", &fuse);
+
+			ImGui::Checkbox("Marching cubes after frame", &marchingCubes);			
 
 			ImGui::End();
 		}
