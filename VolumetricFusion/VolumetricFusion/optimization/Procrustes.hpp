@@ -103,37 +103,28 @@ namespace vc::optimization {
 
             std::stringstream ss;
 
-            ss << vc::utils::toString("Uncentered Source points:", sourcePoints) << std::endl;
-            ss << vc::utils::toString("Uncentered Target points:", targetPoints) << std::endl;
-            
-            std::map<unsigned long long, Eigen::Vector4d> filteredSourcePoints;
-            std::map<unsigned long long, Eigen::Vector4d> filteredTargetPoints;
+            const unsigned int nPoints = hashes.size();
+            Eigen::MatrixXd sourceMatrix(nPoints, 3);
+            Eigen::MatrixXd targetMatrix(nPoints, 3);
 
-            for (auto& hash : hashes)
+            for (int i = 0; i < nPoints; i++)
             {
-                filteredSourcePoints[hash] = (sourcePoints[hash] - sourceMean) / sourceDistance * targetDistance;
-                filteredTargetPoints[hash] = targetPoints[hash] - targetMean;
+                sourceMatrix.block<1, 3>(i, 0) = (sourcePoints[hashes[i]] - sourceMean).block<3,1>(0,0).transpose();
+                targetMatrix.block<1, 3>(i, 0) = (targetPoints[hashes[i]] - targetMean).block<3, 1>(0, 0).transpose();
             }
 
-            ss << vc::utils::toString("Mean centered Source points:", filteredSourcePoints) << std::endl;
-            ss << vc::utils::toString("Mean centered Target points:", filteredTargetPoints) << std::endl;
+            Eigen::Matrix3d A = sourceMatrix.transpose() * targetMatrix;
+            Eigen::JacobiSVD<Eigen::Matrix3d> svd(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
 
-            Eigen::Matrix4d A = Eigen::Matrix4d();
-            A <<
-                filteredTargetPoints[hashes[4]] - filteredTargetPoints[hashes[0]],
-                filteredTargetPoints[hashes[3]] - filteredTargetPoints[hashes[0]],
-                filteredTargetPoints[hashes[2]] - filteredTargetPoints[hashes[0]],
-                filteredTargetPoints[hashes[1]] - filteredTargetPoints[hashes[0]];
-            Eigen::Matrix4d B = Eigen::Matrix4d();
-            B <<
-                filteredSourcePoints[hashes[4]] - filteredSourcePoints[hashes[0]],
-                filteredSourcePoints[hashes[3]] - filteredSourcePoints[hashes[0]],
-                filteredSourcePoints[hashes[2]] - filteredSourcePoints[hashes[0]],
-                filteredSourcePoints[hashes[1]] - filteredSourcePoints[hashes[0]];
+            const Eigen::Matrix3d& U = svd.matrixU();
+            const Eigen::Matrix3d& V = svd.matrixV();
 
-            Eigen::JacobiSVD<Eigen::Matrix4d> svd = Eigen::JacobiSVD<Eigen::Matrix4d>(B * A.transpose(), Eigen::ComputeFullU | Eigen::ComputeFullV);
+            const float d = (U * V.transpose()).determinant();
+            Eigen::Matrix3d D = Eigen::Matrix3d::Identity();
+            D(2,2) = d;
 
-            auto result = Eigen::Matrix4d(svd.matrixU() * svd.matrixV().transpose());
+            Eigen::Matrix4d result = Eigen::Matrix4d::Identity();
+            result.block<3,3>(0,0) = U* D* V.transpose();
 
             ss << vc::utils::toString("Rotation: ", result);
 

@@ -108,7 +108,7 @@ vc::imgui::VoxelgridGUI* voxelgridGUI = new vc::imgui::VoxelgridGUI(voxelgrid);
 
 vc::rendering::CoordinateSystem* coordinateSystem;
 
-std::atomic_bool calibrateCameras = false;
+std::atomic_bool calibrateCameras = true;
 std::atomic_bool fuseFrames = false;
 std::atomic_bool renderCoordinateSystem = false;
 

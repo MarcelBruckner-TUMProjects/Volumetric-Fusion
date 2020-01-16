@@ -272,14 +272,13 @@ namespace vc::optimization {
         }
 
         void initializeWithProcrustes() {
-            vc::optimization::Procrustes procrustes = vc::optimization::Procrustes();
+            vc::optimization::Procrustes procrustes = vc::optimization::Procrustes(verbose);
             procrustes.characteristicPoints = characteristicPoints;
             if (procrustes.optimizeOnPoints()) {
                 bestTransformations = procrustes.bestTransformations;
                 currentRotations = procrustes.currentRotations;
                 currentTranslations = procrustes.currentTranslations;
                 currentScales = procrustes.currentScales;
-                needsRecalculation = true;
                 hasProcrustesInitialization = true;
                 setup();
             }
@@ -304,7 +303,7 @@ namespace vc::optimization {
                     scales[i][j] = scale[j];
                 }
             }
-            needsRecalculation = true;
+            calculateTransformations();
         }
 
         bool vc::optimization::OptimizationProblem::specific_optimize() {

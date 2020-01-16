@@ -165,7 +165,7 @@ namespace vc::optimization {
 
                 for (int cornerId = 0; cornerId < markerCorners[j].size(); cornerId++) {
                     auto point = pixel2Point(markerCorners[j][cornerId]);
-                    this->markerCorners[markerId].emplace_back();
+                    this->markerCorners[markerId].emplace_back(point);
                     allForRendering.push_back(glm::vec3(point[0], point[1], point[2]));
                 }
             }
