@@ -36,3 +36,4 @@ A multi-view RGB-D Capture Setup is built using 4 [Intel® RealSense™ Depth Ca
 - [ReFusion](https://github.com/PRBonn/refusion)
 - [KinectFusion](https://github.com/chrdiller/KinectFusionApp)
 - [ReFusion](https://github.com/PRBonn/refusion)
+- [Kintinuous - Real-time large scale dense visual SLAM system](https://github.com/mp3guy/Kintinuous)
