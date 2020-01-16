@@ -51,7 +51,7 @@ namespace vc::fusion {
 			return z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x;
 		}
 
-		Voxelgrid(const float resolution = 0.1f, const Eigen::Vector3d size = Eigen::Vector3d(2.0, 2.0, 2.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
+		Voxelgrid(const float resolution = 0.05f, const Eigen::Vector3d size = Eigen::Vector3d(2.0, 2.0, 2.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
 			: resolution(resolution), origin(origin), size(size), sizeHalf(size / 2.0f), sizeNormalized((size / resolution) + Eigen::Vector3d(1.0, 1.0, 1.0)), num_gridPoints((sizeNormalized[0] * sizeNormalized[1] * sizeNormalized[2]))
 		{
 			reset();
@@ -73,7 +73,7 @@ namespace vc::fusion {
 
 			//setTSDF();
 
-			compute();
+			compute(INVALID_TSDF_VALUE, true);
 		}
 
 		void setComputeShader() {
@@ -89,7 +89,7 @@ namespace vc::fusion {
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, vbo);
 		}
 
-		void compute(float new_tsdf = INVALID_TSDF_VALUE) {
+		void compute(float new_tsdf = INVALID_TSDF_VALUE, bool setPosition = false) {
 			setComputeShader();
 
 			voxelgridComputeShader->use();
@@ -99,6 +99,7 @@ namespace vc::fusion {
 			voxelgridComputeShader->setVec3("sizeHalf", sizeHalf);
 			voxelgridComputeShader->setVec3("sizeNormalized", sizeNormalized);
 			voxelgridComputeShader->setVec3("origin", origin);
+			voxelgridComputeShader->setBool("setPosition", setPosition);
 			//voxelgridComputeShader->setMat4("coordinate_correction", vc::rendering::COORDINATE_CORRECTION);
 
 			glDispatchCompute(num_gridPoints, 1, 1);
@@ -109,14 +110,13 @@ namespace vc::fusion {
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbo);
 			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Vertex) * num_gridPoints, verts);
 
-
-			for (int i = 0; i < 50 && i < num_gridPoints; i++) {
-				std::cout << 
-					verts[i].pos[0] << ", " << verts[i].pos[1] << ", " << verts[i].pos[2] << ", " << verts[i].pos[3] << " | " <<
-					verts[i].tsdf[0] << ", " << verts[i].tsdf[1] << ", " << verts[i].tsdf[2] << ", " << verts[i].tsdf[3] << " | "
-					<< std::endl;
-			}
-			std::cout << "";
+			//for (int i = 0; i < 50 && i < num_gridPoints; i++) {
+			//	std::cout << 
+			//		verts[i].pos[0] << ", " << verts[i].pos[1] << ", " << verts[i].pos[2] << ", " << verts[i].pos[3] << " | " <<
+			//		verts[i].tsdf[0] << ", " << verts[i].tsdf[1] << ", " << verts[i].tsdf[2] << ", " << verts[i].tsdf[3] << " | "
+			//		<< std::endl;
+			//}
+			//std::cout << "";
 		}
 
 		void renderGrid(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {

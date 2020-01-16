@@ -182,6 +182,11 @@ namespace vc::optimization {
             return true;
         }
 
+        virtual void calculateTransformations() {
+            // STUB for testing
+        }
+
+
         virtual bool init(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
             clear();
 

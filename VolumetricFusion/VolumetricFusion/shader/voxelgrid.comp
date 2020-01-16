@@ -10,6 +10,7 @@ uniform vec3 origin;
 uniform mat4 relativeTransformation;
 uniform mat4 coordinate_correction;
 uniform float new_tsdf;
+uniform bool setPosition;
 
 layout (local_size_x = 1) in;
 
@@ -41,8 +42,9 @@ vec3 unhash(uint hash){
 void main(){	
     uint hash = gl_GlobalInvocationID.x;
 
-    vec3 pos = unhash(hash);
-
-    verts[hash].vtx_pos = vec4(pos, 1.0f);
+    if(setPosition){
+        vec3 pos = unhash(hash);
+        verts[hash].vtx_pos = vec4(pos, 1.0f);
+    }
     verts[hash].vtx_tsdf = vec4(hash, new_tsdf, 0, 1);
 }

@@ -298,7 +298,7 @@ int main(int argc, char* argv[]) try {
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
 
 		vc::rendering::startFrame(window);
-		//optimizationProblem->calculateTransformations();
+		optimizationProblem->calculateTransformations();
 
 		glfwPollEvents();
 

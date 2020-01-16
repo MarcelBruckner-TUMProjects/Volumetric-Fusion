@@ -182,7 +182,7 @@ namespace vc::optimization {
             options.linear_solver_type = ceres::DENSE_QR;
             options.minimizer_progress_to_stdout = verbose;
             options.max_num_iterations = 500;
-            options.update_state_every_iteration = false;
+            options.update_state_every_iteration = true;
             //options.callbacks.emplace_back(new LoggingCallback(this));
             ceres::Solver::Summary summary;
             ceres::Solve(options, problem, &summary);
@@ -274,14 +274,18 @@ namespace vc::optimization {
         void initializeWithProcrustes() {
             vc::optimization::Procrustes procrustes = vc::optimization::Procrustes();
             procrustes.characteristicPoints = characteristicPoints;
-            procrustes.optimizeOnPoints();
-            bestTransformations = procrustes.bestTransformations;
-            currentRotations = procrustes.currentRotations;
-            currentTranslations = procrustes.currentTranslations;
-            currentScales = procrustes.currentScales;
-            needsRecalculation = true;
-            hasProcrustesInitialization = true;
-            setup();
+            if (procrustes.optimizeOnPoints()) {
+                bestTransformations = procrustes.bestTransformations;
+                currentRotations = procrustes.currentRotations;
+                currentTranslations = procrustes.currentTranslations;
+                currentScales = procrustes.currentScales;
+                needsRecalculation = true;
+                hasProcrustesInitialization = true;
+                setup();
+            }
+            else {
+                hasProcrustesInitialization = false;
+            }
         }
 
         void setup() {
@@ -306,6 +310,7 @@ namespace vc::optimization {
         bool vc::optimization::OptimizationProblem::specific_optimize() {
             if (!hasProcrustesInitialization) {
                 initializeWithProcrustes();
+                return false;
             }
 
             if (!solvePointCorrespondenceError()) {

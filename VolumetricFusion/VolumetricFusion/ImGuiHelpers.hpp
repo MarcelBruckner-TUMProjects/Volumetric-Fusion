@@ -191,7 +191,7 @@ namespace vc::imgui {
 		vc::fusion::Voxelgrid* voxelgrid;
 
 	public:
-		bool renderVoxelgrid = true;
+		bool renderVoxelgrid = false;
 		bool fuse = false;
 		bool marchingCubes = false;
 		float tsdf_value;

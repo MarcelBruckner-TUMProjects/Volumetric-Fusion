@@ -33,13 +33,15 @@ namespace vc::optimization {
 
             for (int i = 1; i < characteristicPoints.size(); i++)
             {
-                calculateRelativetranformation(characteristicPoints[i], characteristicPoints[0], i);
+                if (!calculateRelativetranformation(characteristicPoints[i], characteristicPoints[0], i)) {
+                    return false;
+                }
             }
 
             return true;
         }
 
-        void calculateRelativetranformation(ACharacteristicPoints& source, ACharacteristicPoints& target, int index) {
+        bool calculateRelativetranformation(ACharacteristicPoints& source, ACharacteristicPoints& target, int index) {
             std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(source.getHashes(verbose), target.getHashes(verbose));
 
             if (matchingHashes.size() <= 4) {
@@ -48,7 +50,7 @@ namespace vc::optimization {
                 currentTranslations[index] = Eigen::Matrix4d::Identity();
                 currentRotations[index] = Eigen::Matrix4d::Identity();
                 currentScales[index] = Eigen::Matrix4d::Identity();
-                return;
+                return false;
             }
 
             auto& sourcePoints = source.getFilteredPoints(matchingHashes, verbose);
@@ -90,6 +92,8 @@ namespace vc::optimization {
             currentTranslations[index] = finalTrans;
             currentRotations[index] = rotation;
             currentScales[index] = scaling;
+
+            return true;
         }
 
         Eigen::Matrix4d estimateRotation(std::vector<unsigned long long> hashes,
