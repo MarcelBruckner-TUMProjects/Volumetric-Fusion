@@ -189,12 +189,12 @@ namespace vc::imgui {
 	class VoxelgridGUI {
 	private:
 		vc::fusion::Voxelgrid* voxelgrid;
-
+		const float truncationDistanceRange = 1.0f;
 	public:
-		bool renderVoxelgrid = false;
+		bool renderVoxelgrid = true;
 		bool fuse = false;
 		bool marchingCubes = false;
-		float tsdf_value;
+		float truncationDistance = truncationDistanceRange / 2.0f;
 
 		VoxelgridGUI(vc::fusion::Voxelgrid* voxelgrid) : voxelgrid(voxelgrid){}
 
@@ -210,7 +210,7 @@ namespace vc::imgui {
 
 			ImGui::Separator();
 
-			fuse = ImGui::SliderFloat("TSDF test value", &tsdf_value, -1, 1);
+			fuse = ImGui::SliderFloat("Truncation distance", &truncationDistance, 0, truncationDistanceRange);
 
 			ImGui::End();
 		}

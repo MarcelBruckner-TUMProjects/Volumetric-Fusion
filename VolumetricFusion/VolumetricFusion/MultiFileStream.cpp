@@ -66,7 +66,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 void setCalibration();
 void addPipeline(std::shared_ptr<  vc::capture::CaptureDevice> pipeline);
-void volumetricFusion();
+void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance);
 
 // settings
 int SCR_WIDTH = 800 * 2;
@@ -108,8 +108,7 @@ vc::imgui::VoxelgridGUI* voxelgridGUI = new vc::imgui::VoxelgridGUI(voxelgrid);
 
 vc::rendering::CoordinateSystem* coordinateSystem;
 
-std::atomic_bool calibrateCameras = true;
-std::atomic_bool fuseFrames = false;
+std::atomic_bool calibrateCameras = false;
 std::atomic_bool renderCoordinateSystem = false;
 
 vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
@@ -315,9 +314,7 @@ int main(int argc, char* argv[]) try {
 			}
 			allPipelinesGui->render();
 		}
-
-		volumetricFusion();
-
+		
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
 			int x = i % 2;
@@ -345,6 +342,10 @@ int main(int argc, char* argv[]) try {
 				
 				if (calibrateCameras && optimizationProblemGUI->highlightMarkerCorners) {
 					optimizationProblem->render(model, view, projection, i);
+				}
+
+				if (voxelgridGUI->fuse) {
+					volumetricFusion(pipelines[i], optimizationProblem->getBestRelativeTransformation(i, 0), voxelgridGUI->truncationDistance);
 				}
 			}
 		}
@@ -384,10 +385,9 @@ catch (const std::exception & e)
 }
 #pragma endregion
 
-void volumetricFusion() {
-	if (voxelgridGUI->fuse) {
+void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance) {
 		//voxelgrid->integrateFramesCPU(pipelines, optimizationProblem->bestTransformations);
-		voxelgrid->integrateFrameGPU(voxelgridGUI->tsdf_value);
+		voxelgrid->integrateFrameGPU(pipeline, relativeTransformation, voxelgridGUI->truncationDistance);
 
 		voxelgridGUI->fuse = false;
 
@@ -395,11 +395,9 @@ void volumetricFusion() {
 			vc::fusion::marchingCubes(voxelgrid);
 			voxelgridGUI->marchingCubes = false;
 		}
-	}
 }
 
 void setCalibration() {
-	fuseFrames.store(!calibrateCameras);
 	calibrateCameras.store(calibrateCameras);
 	for (int i = 0; i < pipelines.size(); i++) {
 		if (calibrateCameras) {

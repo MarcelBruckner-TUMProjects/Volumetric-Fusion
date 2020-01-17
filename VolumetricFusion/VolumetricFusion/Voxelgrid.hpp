@@ -18,8 +18,8 @@ namespace vc::fusion {
 	class Voxelgrid {
 	private:
 		GLuint VAO;
-
 		GLuint vbo;;
+		GLuint depthTexture;
 
 		struct Vertex {
 			GLfloat pos[4];
@@ -33,7 +33,7 @@ namespace vc::fusion {
 		int integratedFrames = 0;
 
 		std::map<int, std::vector<int>> integratedFramesPerPipeline;
-
+		float truncationDistance;
 
 	public:
 		float resolution;
@@ -51,7 +51,7 @@ namespace vc::fusion {
 			return z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x;
 		}
 
-		Voxelgrid(const float resolution = 0.05f, const Eigen::Vector3d size = Eigen::Vector3d(2.0, 2.0, 2.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
+		Voxelgrid(const float resolution = 0.01f, const Eigen::Vector3d size = Eigen::Vector3d(2.0, 2.0, 2.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
 			: resolution(resolution), origin(origin), size(size), sizeHalf(size / 2.0f), sizeNormalized((size / resolution) + Eigen::Vector3d(1.0, 1.0, 1.0)), num_gridPoints((sizeNormalized[0] * sizeNormalized[1] * sizeNormalized[2]))
 		{
 			reset();
@@ -70,10 +70,19 @@ namespace vc::fusion {
 
 			glGenVertexArrays(1, &VAO);
 			glGenBuffers(1, &vbo);
+			glGenTextures(1, &depthTexture);
+
+			glBindTexture(GL_TEXTURE_2D, depthTexture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
+				// set the texture wrapping parameters
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			// set texture filtering parameters
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 			//setTSDF();
 
-			compute(INVALID_TSDF_VALUE, true);
+			initializeVoxelgridBuffer();
 		}
 
 		void setComputeShader() {
@@ -89,36 +98,25 @@ namespace vc::fusion {
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, vbo);
 		}
 
-		void compute(float new_tsdf = INVALID_TSDF_VALUE, bool setPosition = false) {
+		void initializeVoxelgridBuffer() {
 			setComputeShader();
 
 			voxelgridComputeShader->use();
 			voxelgridComputeShader->setInt("INVALID_TSDF_VALUE", INVALID_TSDF_VALUE);
 			voxelgridComputeShader->setFloat("resolution", resolution);
-			voxelgridComputeShader->setFloat("new_tsdf", new_tsdf);
 			voxelgridComputeShader->setVec3("sizeHalf", sizeHalf);
 			voxelgridComputeShader->setVec3("sizeNormalized", sizeNormalized);
 			voxelgridComputeShader->setVec3("origin", origin);
-			voxelgridComputeShader->setBool("setPosition", setPosition);
-			//voxelgridComputeShader->setMat4("coordinate_correction", vc::rendering::COORDINATE_CORRECTION);
+			voxelgridComputeShader->setBool("setPosition", true);
 
 			glDispatchCompute(num_gridPoints, 1, 1);
-			//voxelgridComputeShader->checkError();
 
 			glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbo);
 			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Vertex) * num_gridPoints, verts);
-
-			//for (int i = 0; i < 50 && i < num_gridPoints; i++) {
-			//	std::cout << 
-			//		verts[i].pos[0] << ", " << verts[i].pos[1] << ", " << verts[i].pos[2] << ", " << verts[i].pos[3] << " | " <<
-			//		verts[i].tsdf[0] << ", " << verts[i].tsdf[1] << ", " << verts[i].tsdf[2] << ", " << verts[i].tsdf[3] << " | "
-			//		<< std::endl;
-			//}
-			//std::cout << "";
 		}
-
+		
 		void renderGrid(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
 			
 			glBindVertexArray(VAO);
@@ -131,7 +129,7 @@ namespace vc::fusion {
 			gridShader->setMat4("view", view);
 			gridShader->setMat4("projection", projection);
 			gridShader->setMat4("coordinate_correction", vc::rendering::COORDINATE_CORRECTION);
-
+			gridShader->setFloat("truncationDistance", truncationDistance);
 
 			glDrawArrays(GL_POINTS, 0, num_gridPoints);
 			glBindVertexArray(0);
@@ -154,15 +152,59 @@ namespace vc::fusion {
 			integratedFrames = 0;
 		}
 
+		void integrateFrameGPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance) try {
+			glm::mat3 world2CameraProjection = pipeline->depth_camera->world2cam_glm;
+
+			rs2::depth_frame depth_frame = pipeline->data->filteredDepthFrames;
+			int depthWidth = depth_frame.as<rs2::video_frame>().get_width();
+			int	depthHeight = depth_frame.as<rs2::video_frame>().get_height();
+			
+			setComputeShader();
+
+			voxelgridComputeShader->use();
+			voxelgridComputeShader->setInt("INVALID_TSDF_VALUE", INVALID_TSDF_VALUE);
+			voxelgridComputeShader->setBool("setPosition", false);
+
+			voxelgridComputeShader->setMat3("world2CameraProjection", world2CameraProjection);
+			voxelgridComputeShader->setFloat("depthScale", pipeline->depth_camera->depthScale);
+			voxelgridComputeShader->setVec2("depthResolution", depthWidth, depthHeight);
+			voxelgridComputeShader->setFloat("truncationDistance", truncationDistance);
+			this->truncationDistance = truncationDistance;
+
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, depthTexture);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, depthWidth, depthHeight, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, depth_frame.get_data());
+			voxelgridComputeShader->setInt("depthFrame", 0);
+
+			glDispatchCompute(num_gridPoints, 1, 1);
+
+			glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbo);
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Vertex) * num_gridPoints, verts);
+
+			//for (int i = 0; i < num_gridPoints; i++) {
+			//	if (std::abs(verts[i].pos[0]) < resolution * 0.9f && std::abs(verts[i].pos[1]) < resolution * 0.9f)
+			//		//if (verts[i].pos[2] > 0 ) 
+			//	{
+			//		for (int j = 0; j < 4; j++) {
+			//			std::cout <<
+			//				verts[i].pos[j] << " | " << verts[i].tsdf[j] << std::endl;
+			//		}
+			//		std::cout << std::endl;
+			//	}
+			//}
+			//std::cout << "";
+		}
+		catch (rs2::error & e) {
+			return;
+		}
+
 		void integrateFramesCPU(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines, std::vector<Eigen::Matrix4d> relativeTransformations) {
 			for (int i = 0; i < pipelines.size(); i++) {
 				//continue;
 				integrateFrameCPU(pipelines[i], relativeTransformations[i], i, pipelines[i]->data->frameId);
 			}
-		}
-
-		void integrateFrameGPU(float new_tsdf) {
-			compute(new_tsdf);
 		}
 
 		void integrateFrameCPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, const int pipelineId, const int frameId) {

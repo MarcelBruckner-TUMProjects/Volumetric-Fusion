@@ -8,6 +8,8 @@ uniform mat4 view;
 uniform mat4 projection;
 uniform mat4 coordinate_correction;
 
+uniform float truncationDistance;
+
 out VS_OUT {
     vec4 color;
 } vs_out;
@@ -27,11 +29,11 @@ void main()
 
     if(t < 0) {
         // Red: Behind poindcloud
-        vs_out.color = vec4(0.0f, 1.0f + t, 0.0f, 1.0);
+        vs_out.color = vec4(0.0f, (truncationDistance + t) / truncationDistance, 0.0f, 1.0f + t);
     } 
     else
     {
         // Green: Infront of pointcloud
-        vs_out.color = vec4(1.0f - t, 0.0f, 0.0f, 1.0);
+        vs_out.color = vec4((truncationDistance - t) / truncationDistance, 0.0f, 0.0f, 1.0f - t);
     }
 }
