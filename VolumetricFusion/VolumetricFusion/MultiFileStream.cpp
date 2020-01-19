@@ -8,12 +8,11 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
+#include "ImGuiHelpers.hpp"
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "stb_image.h"
-
-#include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
-// Include short list of convenience functions for rendering
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -29,9 +28,6 @@
 #include <atomic>
 #include <filesystem>
 
-
-//#include "imgui.h"
-//#include "imgui_impl_glfw.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -42,7 +38,6 @@ using namespace vc::enums;
 #include "processing.hpp"
 
 #include "Settings.hpp"
-#include "Data.hpp"
 #include "CaptureDevice.hpp"
 #include "Rendering.hpp"
 #if APPLE
@@ -53,27 +48,18 @@ using namespace vc::enums;
 #endif
 #include <signal.h>
 
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 #include "camera.hpp"
 #include "shader.hpp"
 #include <VolumetricFusion\Voxelgrid.hpp>
 //#include <io.h>
-
 #include "MarchingCubes.hpp"
-#include "Optimization.hpp"
+
+#include "optimization/optimizationProblem.hpp"
+#include "optimization/BundleAdjustment.hpp"
+#include "optimization/Procrustes.hpp"
 #include "glog/logging.h"
 
 #pragma endregion
-
-template<typename T, typename V>
-std::vector<T> extractKeys(std::map<T, V> const& input_map);
-
-template<typename T>
-std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b);
-
 void my_function_to_handle_aborts(int signalNumber) {
 	std::cout << "Something aborted" << std::endl;
 }
@@ -84,56 +70,61 @@ void mouse_button_callback(GLFWwindow*, int button, int action, int mods);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
-void setCalibration(bool calibrate);
+void setCalibration();
+void addPipeline(std::shared_ptr<  vc::capture::CaptureDevice> pipeline);
+void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance);
 
 // settings
-const unsigned int SCR_WIDTH = 800 * 2;
-const unsigned int TOP_BAR_HEIGHT = 0;
-const unsigned int SCR_HEIGHT = 600 * 2 ;
+int SCR_WIDTH = 800 * 2;
+int TOP_BAR_HEIGHT = 0;
+int SCR_HEIGHT = 600 * 2 ;
 
 std::vector<int> DEFAULT_COLOR_STREAM = { 640, 480 };
 std::vector<int> DEFAULT_DEPTH_STREAM = { 640, 480 };
 
+//std::vector<int> CALIBRATION_COLOR_STREAM = { 640, 480 };
+//std::vector<int> CALIBRATION_DEPTH_STREAM = { 640, 480 };
 std::vector<int> CALIBRATION_COLOR_STREAM = { 1920, 1080 };
 std::vector<int> CALIBRATION_DEPTH_STREAM = { 1280, 720 };
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
+vc::io::Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
 //Camera camera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.f);
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
+double lastX = SCR_WIDTH / 2.0f;
+double lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
-float MouseSensitivity = 0.1;
-float Yaw = 0;
-float Pitch = 0;
 
 // timing
-float deltaTime = 0.0f;	// time between current frame and last frame
-float lastFrame = 0.0f;
+double deltaTime = 0.0;	// time between current frame and last frame
+double lastFrame = 0.0;
 
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::VOLUMETRIC_FUSION);
+//std::vector<vc::imgui::PipelineGUI> pipelineGuis;
+vc::imgui::AllPipelinesGUI* allPipelinesGui;
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
 
 bool visualizeCharucoResults = true;
+bool overlayCharacteristicPoints = true;
 
-bool renderVoxelgrid = false;
 vc::fusion::Voxelgrid* voxelgrid;
-std::atomic_bool calibrateCameras = true;
-std::atomic_bool fuseFrames = false;
+vc::imgui::VoxelgridGUI* voxelgridGUI = new vc::imgui::VoxelgridGUI(voxelgrid);
+
+vc::rendering::CoordinateSystem* coordinateSystem;
+
+std::atomic_bool calibrateCameras = false;
 std::atomic_bool renderCoordinateSystem = false;
 
-vc::optimization::BAProblem bundleAdjustment = vc::optimization::BAProblem();
+vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment();
+vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState, setCalibration, &calibrateCameras, &camera);
 
-int main(int argc, char* argv[]) try {
-	
-	//vc::fusion::testSingleCellMarchingCubes();
-	vc::fusion::testFourCellMarchingCubes();
-	return 0;
-
-	//vc::optimization::testFunc();
+int main(int argc, char* argv[]) try {	
+	////vc::optimization::MockProcrustes().optimize();
+	//vc::optimization::MockBundleAdjustment().optimize();
+	//return 0;
 
 	google::InitGoogleLogging("Bundle Adjustment");
 	ceres::Solver::Summary summary;
@@ -159,6 +150,7 @@ int main(int argc, char* argv[]) try {
 		return -1;
 	}
 	glfwMakeContextCurrent(window);
+	
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 	glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
@@ -190,7 +182,12 @@ int main(int argc, char* argv[]) try {
 		}
 	});
 
+	ImGuiIO io = vc::imgui::init(window, SCR_WIDTH, SCR_HEIGHT);
+
 	voxelgrid = new vc::fusion::Voxelgrid();
+	coordinateSystem = new vc::rendering::CoordinateSystem();
+	optimizationProblem->setupOpenGL();
+	optimizationProblemGUI = new vc::imgui::OptimizationProblemGUI(optimizationProblem);
 
 	//ImGui_ImplGlfw_Init(window, false);
 	
@@ -213,10 +210,10 @@ int main(int argc, char* argv[]) try {
 		for (auto&& device : ctx.query_devices())
 		{
 			if (state.captureState == CaptureState::RECORDING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM, folderSettings.recordingsFolder));
+				addPipeline(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM, folderSettings.recordingsFolder));
 			}
 			else if (state.captureState == CaptureState::STREAMING) {
-				pipelines.emplace_back(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM));
+				addPipeline(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM));
 			}
 			i++;
 		}
@@ -229,9 +226,11 @@ int main(int argc, char* argv[]) try {
 
 		for (int i = 0; i < filenames.size() && i < 4; i++)
 		{
-			pipelines.emplace_back(std::make_shared < vc::capture::PlayingCaptureDevice>(ctx, filenames[i]));
+			addPipeline(std::make_shared < vc::capture::PlayingCaptureDevice>(ctx, filenames[i]));
 		}
 	}
+
+	allPipelinesGui = new vc::imgui::AllPipelinesGUI(&pipelines);
 
 	if (pipelines.size() <= 0) {
 		throw(rs2::error("No device or file found!"));
@@ -244,11 +243,7 @@ int main(int argc, char* argv[]) try {
 	// to prevent UI thread from blocking due to long computations.
 	std::atomic_bool stopped(false);
 	std::atomic_bool paused(false);
-
-	// Create custom depth processing block and their output queues:
-	/*std::map<int, rs2::frame_queue> depth_processing_queues;
-	std::map<int, std::shared_ptr<rs2::processing_block>> depth_processing_blocks;*/
-	
+		
 	std::thread calibrationThread;
 	std::thread fusionThread;
 
@@ -265,72 +260,43 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Camera Calibration Thread
 
-	setCalibration(calibrateCameras);
+	setCalibration();
 	calibrationThread = std::thread([&stopped, &programState]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
 				continue;
 			}
 
-			if (!bundleAdjustment.optimize(pipelines) || !bundleAdjustment.hasSolution) {
+			if (!optimizationProblem->optimize(pipelines)) {
 				continue;
-			}
-
-			
-
-			//if (programState.allMarkersDetected) 
-			{
-				setCalibration(false);
-				// start fusion thread logic
-				fuseFrames.store(true);
-
 			}
 		}
 	});
 #pragma endregion
 	   
-#pragma region Fusion Thread
-	fusionThread = std::thread([&stopped, &programState]() {
-		const int maxIntegrations = 10;
-		int integrations = 0;
-		while (!stopped) {
-			if (calibrateCameras || !fuseFrames) {
-				continue;
-			}
-			
-			voxelgrid->integrateFramesCPU(pipelines, bundleAdjustment.relativeTransformations);
-
-			integrations++;
-			if (integrations >= maxIntegrations) {
-				std::cout << "Fused " << (integrations * pipelines.size()) << " frames" << std::endl;
-				fuseFrames.store(false);
-				break;
-			}
-		}
-		});
-#pragma endregion
-
 #pragma region Main loop
 
+	float f = 0;
+	char* buf = "";
 	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT - TOP_BAR_HEIGHT);
 	while (!glfwWindowShouldClose(window))
 	{
 		// per-frame time logic
 		// --------------------
-		float currentFrame = glfwGetTime();
+		double currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
-
+		
 		// Retina display (Mac OS) have double the pixel density
 		int w2, h2;
 		glfwGetFramebufferSize(window, &w2, &h2);
 		const bool isRetinaDisplay = w2 == width * 2 && h2 == width * 2;
 
 		const float aspect = 1.0f * width / height;
-
+		
 		// -------------------------------------------------------------------------------
 		processInput(window);
 
@@ -338,39 +304,64 @@ int main(int argc, char* argv[]) try {
 		glm::mat4 view = camera.GetViewMatrix();
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
-		vc::rendering::startFrame(window);
 
+		vc::rendering::startFrame(window);
+		optimizationProblem->calculateTransformations();
+
+		glfwPollEvents();
+
+		vc::imgui::startFrame(&io, SCR_WIDTH, SCR_HEIGHT);
+
+		programGui->render();
+
+		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
+			if (state.renderState == RenderState::VOLUMETRIC_FUSION) {
+				voxelgridGUI->render();
+			}
+			if (calibrateCameras) {
+				optimizationProblemGUI->render();
+			}
+			allPipelinesGui->render();
+		}
+		
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
 			int x = i % 2;
-			int y = floor(i / 2);
+			int y = (int)floor(i / 2);
+
 			if (state.renderState == RenderState::ONLY_COLOR) {
 				pipelines[i]->renderColor(x, y, aspect, width, height);
 			}
 			else if (state.renderState == RenderState::ONLY_DEPTH) {
 				pipelines[i]->renderDepth(x, y, aspect, width, height);
 			}
-			else if (state.renderState == RenderState::MULTI_POINTCLOUD) {
-				pipelines[i]->renderPointcloud(model, view, projection, width, height, x, y, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
-				if (renderVoxelgrid) {
+			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
+				if (state.renderState != RenderState::MULTI_POINTCLOUD) {
+					x = -1;
+					y = -1;
+				}
+				vc::rendering::setViewport(width, height, x, y);
+				if (state.renderState == RenderState::VOLUMETRIC_FUSION && voxelgridGUI->renderVoxelgrid) {
 					voxelgrid->renderGrid(model, view, projection);
 				}
-			}
-			else if (state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-				pipelines[i]->renderAllPointclouds(model, view, projection, width, height, bundleAdjustment.relativeTransformations[i], renderCoordinateSystem);
-			}
-		}
-		if (renderVoxelgrid && state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
-			voxelgrid->renderGrid(model, view, projection);
-		}
+				if (programGui->showCoordinateSystem) {
+					coordinateSystem->render(model, view, projection);
+				}
+				pipelines[i]->renderPointcloud(model, view, projection, optimizationProblem->getBestRelativeTransformation(i, 0), allPipelinesGui->alphas[i]);
+				
+				if (calibrateCameras && optimizationProblemGUI->highlightMarkerCorners) {
+					optimizationProblem->render(model, view, projection, i);
+				}
 
-		/*if (state.renderState == RenderState::VOXELGRID) {
-			voxelgrid->renderField(model, view, projection);
-		}*/
-		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-		// -------------------------------------------------------------------------------
+				if (voxelgridGUI->fuse) {
+					volumetricFusion(pipelines[i], optimizationProblem->getBestRelativeTransformation(i, 0), voxelgridGUI->truncationDistance);
+				}
+			}
+		}
+				
+		vc::imgui::render();
+
 		glfwSwapBuffers(window);
-		glfwPollEvents();
 	}
 #pragma endregion
 
@@ -378,11 +369,14 @@ int main(int argc, char* argv[]) try {
 
 	stopped.store(true);
 	for (int i = 0; i < pipelines.size(); i++) {
-		pipelines[i]->stopPipeline();
+		pipelines[i]->terminate();
 	}
 	calibrationThread.join();
 	fusionThread.join();
 #pragma endregion
+
+	vc::imgui::terminate();
+
 	glfwTerminate();
 	//std::exit(EXIT_SUCCESS);
 	return EXIT_SUCCESS;
@@ -400,34 +394,20 @@ catch (const std::exception & e)
 }
 #pragma endregion
 
-#pragma region Helper functions
+void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance) {
+		//voxelgrid->integrateFramesCPU(pipelines, optimizationProblem->bestTransformations);
+		voxelgrid->integrateFrameGPU(pipeline, relativeTransformation, voxelgridGUI->truncationDistance);
 
-template<typename T, typename V>
-std::vector<T> extractKeys(std::map<T, V> const& input_map) {
-	std::vector<T> retval;
-	for (auto const& element : input_map) {
-		retval.emplace_back(element.first);
-	}
-	return retval;
-}
+		voxelgridGUI->fuse = false;
 
-
-template<typename T>
-std::vector<T> findOverlap(std::vector<T> a, std::vector<T> b) {
-	std::vector<T> c;
-
-	for (T x : a) {
-		if (std::find(b.begin(), b.end(), x) != b.end()) {
-			c.emplace_back(x);
+		if (voxelgridGUI->marchingCubes) {
+			vc::fusion::marchingCubes(voxelgrid);
+			voxelgridGUI->marchingCubes = false;
 		}
-	}
-
-	return c;
 }
 
-void setCalibration(bool calibrate) {
-	fuseFrames.store(!calibrate);
-	calibrateCameras.store(calibrate);
+void setCalibration() {
+	calibrateCameras.store(calibrateCameras);
 	for (int i = 0; i < pipelines.size(); i++) {
 		if (calibrateCameras) {
 			pipelines[i]->setResolutions(CALIBRATION_COLOR_STREAM, CALIBRATION_DEPTH_STREAM);
@@ -439,6 +419,11 @@ void setCalibration(bool calibrate) {
 	}
 }
 
+void addPipeline(std::shared_ptr<vc::capture::CaptureDevice> pipeline)
+{
+	pipelines.emplace_back(pipeline);
+}
+
 bool isKeyPressed(GLFWwindow* window, int key) {
 	return glfwGetKey(window, key) == GLFW_PRESS;
 }
@@ -448,16 +433,16 @@ bool isKeyPressed(GLFWwindow* window, int key) {
 void processInput(GLFWwindow* window)
 {
 	if (isKeyPressed(window, GLFW_KEY_W)) {
-		camera.ProcessKeyboard(FORWARD, deltaTime);
+		camera.ProcessKeyboard(vc::io::Camera_Movement::FORWARD, deltaTime);
 	}
 	if (isKeyPressed(window, GLFW_KEY_S)) {
-		camera.ProcessKeyboard(BACKWARD, deltaTime);
+		camera.ProcessKeyboard(vc::io::Camera_Movement::BACKWARD, deltaTime);
 	}
 	if (isKeyPressed(window, GLFW_KEY_A)) {
-		camera.ProcessKeyboard(LEFT, deltaTime);
+		camera.ProcessKeyboard(vc::io::Camera_Movement::LEFT, deltaTime);
 	}
 	if (isKeyPressed(window, GLFW_KEY_D)) {
-		camera.ProcessKeyboard(RIGHT, deltaTime);
+		camera.ProcessKeyboard(vc::io::Camera_Movement::RIGHT, deltaTime);
 	}
 }
 
@@ -492,10 +477,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			state.renderState = RenderState::CALIBRATED_POINTCLOUD;
 			break;
 		}
-		case GLFW_KEY_5: {
-			//state.renderState = RenderState::VOXELGRID;
-			break;
-		}
 		case GLFW_KEY_V: {
 			visualizeCharucoResults = !visualizeCharucoResults;
 			for (auto pipe : pipelines) {
@@ -503,16 +484,17 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 			}
 			break;
 		}
-		case GLFW_KEY_G: {
-			renderVoxelgrid = !renderVoxelgrid;
-			break;
-		}
 		case GLFW_KEY_C: {
-			setCalibration(!calibrateCameras);
+			calibrateCameras.store(calibrateCameras.load());
+			setCalibration();
 			break;
 		}
 		case GLFW_KEY_L: {
 			renderCoordinateSystem = !renderCoordinateSystem;
+			break;
+		}
+		case GLFW_KEY_O: {
+			overlayCharacteristicPoints = !overlayCharacteristicPoints;
 			break;
 		}
 		}
@@ -528,6 +510,8 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 	// height will be significantly larger than specified on retina displays.
 	glfwMakeContextCurrent(window);
 	glViewport(0, 0, width, height - 50);
+	SCR_HEIGHT = height;
+	SCR_WIDTH = width;
 }
 
 
@@ -543,8 +527,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 			firstMouse = false;
 		}
 
-		float xoffset = lastX - xpos;
-		float yoffset = ypos - lastY; // reversed since y-coordinates go from bottom to top
+		float xoffset = (float)(lastX - xpos);
+		float yoffset = (float)(ypos - lastY); // reversed since y-coordinates go from bottom to top
 		//float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
 
 		lastX = xpos;
@@ -554,26 +538,6 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 		camera.ProcessMouseMovement(xoffset, yoffset);
 	}
 }
-//
-//void processMouse(float xoffset, float yoffset, GLboolean constrainPitch ) {
-//	xoffset *= MouseSensitivity;
-//	yoffset *= MouseSensitivity;
-//
-//	Yaw += xoffset;
-//	Pitch += yoffset;
-//
-//	// Make sure that when pitch is out of bounds, screen doesn't get flipped
-//	if (constrainPitch)
-//	{
-//		if (Pitch > 89.0f)
-//			Pitch = 89.0f;
-//		if (Pitch < -89.0f)
-//			Pitch = -89.0f;
-//	}
-//	model = glm::mat4(1.0f);
-//	model = glm::rotate(model, glm::radians(Pitch), glm::vec3(1.0f, 0.0f, 0.0f));
-//	model = glm::rotate(model, glm::radians(Yaw), glm::vec3(0.0f, 1.0f, 0.0f));
-//}
 
 void mouse_button_callback(GLFWwindow*, int button, int action, int mods)
 {

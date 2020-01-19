@@ -14,9 +14,11 @@
 #include <opencv2/calib3d/calib3d.hpp>
 
 #include "Data.hpp"
+#include "PinholeCamera.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include "Utils.hpp"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -56,7 +58,7 @@ namespace vc::processing {
 				auto res = src.allocate_video_frame(f.get_profile(), f);
 
 				// copy from cv --> frame
-				memcpy((void*)res.get_data(), image.data, w * h * factor);
+				memcpy((void*)res.get_data(), image.data, (size_t)(w) * (size_t)(h) * (size_t)(factor));
 
 				// Send the resulting frame to the output queue
 				src.frame_ready(res);
@@ -104,42 +106,59 @@ namespace vc::processing {
 
 		cv::Vec3d rotation, translation;
 		
-		void startCharucoProcessing(vc::data::Camera camera) {
-			const auto charucoPoseEstimation = [&camera, this](cv::Mat& image, unsigned long long frameId) {
-				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-				cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04, 0.02, dictionary);
+		void startCharucoProcessing(vc::camera::PinholeCamera camera) {
 
-				cv::aruco::detectMarkers(image, dictionary, markerCorners, ids);
+			const auto charucoPoseEstimation = [camera, this](cv::Mat& image, unsigned long long frameId) {
+				try {
+					cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+					cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04f, 0.02f, dictionary);
 
-				/*int i = 0;
-				for (auto corner_list : markerCorners) {
-					std::cout << ids[i++] << std::endl;
-					for (auto corner : corner_list) {
-						std::cout << corner << std::endl;
-					}
-				}*/
+					cv::aruco::detectMarkers(image, dictionary, markerCorners, ids);
 
-				// if at least one marker detected
-				if (ids.size() > 0) {
-					if (visualize) {
-						cv::aruco::drawDetectedMarkers(image, markerCorners, ids);
-					}
-					cv::aruco::interpolateCornersCharuco(markerCorners, ids, image, board, charucoCorners, charucoIds);
-					// if at least one charuco corner detected
-					if (charucoIds.size() > 0) {
-						if (visualize) {
-							cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
+					/*int i = 0;
+					for (auto corner_list : markerCorners) {
+						std::cout << ids[i++] << std::endl;
+						for (auto corner : corner_list) {
+							std::cout << corner << std::endl;
 						}
-						bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.K, camera.distCoeffs, rotation, translation);
-						// if charuco pose is valid
-						if (valid) {
+					}*/
+
+					// if at least one marker detected
+					if (ids.size() > 0) {
+						if (visualize) {
+							cv::aruco::drawDetectedMarkers(image, markerCorners, ids);
+						}
+						cv::aruco::interpolateCornersCharuco(markerCorners, ids, image, board, charucoCorners, charucoIds);
+						// if at least one charuco corner detected
+						if (charucoIds.size() > 0) {
 							if (visualize) {
-								cv::aruco::drawAxis(image, camera.K, camera.distCoeffs, rotation, translation, 0.1);
+								cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
 							}
 
-							hasMarkersDetected = true;
+							if (camera.depthScale < 0) {
+								return;
+							}
+
+							bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.K, camera.distCoeffs, rotation, translation);
+							// if charuco pose is valid
+							if (valid) {
+								if (visualize) {
+									cv::aruco::drawAxis(image, camera.K, camera.distCoeffs, rotation, translation, 0.1f);
+								}
+
+								hasMarkersDetected = true;
+							}
 						}
 					}
+				}
+				catch (const cv::Exception & e) {
+					std::cerr << vc::utils::asHeader("OpenCV - Error in Charuco block") << e.what() << std::endl;
+				}
+				catch (const rs2::error & e) {
+					std::cerr << vc::utils::asHeader("RS2 - Error in Charuco block") << e.what() << std::endl;
+				}
+				catch (const std::exception & e) {
+					std::cerr << vc::utils::asHeader("Error in Charuco block") << e.what() << std::endl;
 				}
 			};
 

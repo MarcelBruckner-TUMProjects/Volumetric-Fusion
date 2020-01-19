@@ -13,3 +13,6 @@
 [submodule "include/gflags"]
 	path = include/gflags
 	url = https://github.com/gflags/gflags
+[submodule "include/dearImgui"]
+	path = include/dearImgui
+	url = git@github.com:ocornut/imgui.git
