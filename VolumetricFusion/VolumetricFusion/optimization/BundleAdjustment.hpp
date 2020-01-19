@@ -18,6 +18,7 @@
 #include "OptimizationProblem.hpp"
 #include "PointCorrespondenceError.hpp"
 #include "ReprojectionError.hpp"
+#include "ICP.hpp"
 #include "../Utils.hpp"
 #include "../CaptureDevice.hpp"
 
@@ -287,6 +288,19 @@ namespace vc::optimization {
             }
         }
 
+		bool solveICP() {
+			
+			int baseId = 0;
+
+			for (int relativeId = 1; relativeId < characteristicPoints.size(); relativeId++) {
+
+				vc::optimization::ICP icp = new ICP();
+				icp.estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], getCurrentRelativeTransformation(relativeId, baseId));
+			}
+			
+			return true;
+		}
+
         void setup() {
             for (int i = 0; i < 4; i++)
             {
@@ -312,7 +326,7 @@ namespace vc::optimization {
                 return false;
             }
 
-            if (!solvePointCorrespondenceError()) {
+            if (!solvePointCorrespondenceError() || !solveICP()) {
                 return false;
             }
 
