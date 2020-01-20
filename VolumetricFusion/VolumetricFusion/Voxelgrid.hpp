@@ -1,3 +1,5 @@
+#pragma once
+
 #ifndef _VOXELGRID_HEADER_
 #define _VOXELGRID_HEADER_
 
@@ -16,15 +18,10 @@ namespace vc::fusion {
 
 	   
 	class Voxelgrid {
-	private:
+	protected:
 		GLuint VAO;
-		GLuint vbo;;
+		GLuint vbo;
 		GLuint depthTexture;
-
-		struct Vertex {
-			GLfloat pos[4];
-			GLfloat tsdf[4];
-		} *verts;
 
 		vc::rendering::Shader* gridShader;
 		vc::rendering::Shader* tsdfComputeShader;
@@ -41,20 +38,23 @@ namespace vc::fusion {
 		Eigen::Vector3d sizeNormalized;
 		Eigen::Vector3d sizeHalf;
 		Eigen::Vector3d origin;
+		
+		vc::fusion::Vertex* verts;
 
-		std::vector<float> tsdf;
-		std::vector<float> weights;
+		//std::vector<float> tsdf;
+		//std::vector<float> weights;
 
 		int num_gridPoints;
 
 		int hashFunc(int x, int y, int z) {
+			std::cout << z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x << std::endl;
 			return z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x;
 		}
 
-		Voxelgrid(const float resolution = 0.01f, const Eigen::Vector3d size = Eigen::Vector3d(2.0, 2.0, 2.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
+		Voxelgrid(const float resolution = 0.025f, const Eigen::Vector3d size = Eigen::Vector3d(2.0, 2.0, 2.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
 			: resolution(resolution), origin(origin), size(size), sizeHalf(size / 2.0f), sizeNormalized((size / resolution) + Eigen::Vector3d(1.0, 1.0, 1.0)), num_gridPoints((sizeNormalized[0] * sizeNormalized[1] * sizeNormalized[2]))
 		{
-			reset();
+			//reset();
 
 			verts = new Vertex[num_gridPoints];
 			
@@ -144,13 +144,13 @@ namespace vc::fusion {
 		}
 
 
-		void reset() {
-			tsdf = std::vector<float>(num_gridPoints);
-			weights = std::vector<float>(num_gridPoints);
-			//points = std::vector<float>(3 * num_gridPoints);
+		//void reset() {
+		//	//tsdf = std::vector<float>(num_gridPoints);
+		//	//weights = std::vector<float>(num_gridPoints);
+		//	//points = std::vector<float>(3 * num_gridPoints);
 
-			integratedFrames = 0;
-		}
+		//	integratedFrames = 0;
+		//}
 
 		void integrateFrameGPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance) try {
 			glm::mat3 world2CameraProjection = pipeline->depth_camera->world2cam_glm;
@@ -249,6 +249,7 @@ namespace vc::fusion {
 					threads.emplace_back(std::thread([&, y, z]() {
 						for (int x = 0; x < sizeNormalized[0]; x++)
 						{
+							GLfloat* tsdf;
 							std::stringstream ss;
 							Eigen::Vector3d voxelPosition = getVoxelPosition(x, y, z);
 
@@ -263,7 +264,7 @@ namespace vc::fusion {
 							float z = projectedVoxelCenter[2];
 
 							if (z <= 0) {
-								tsdf[hash] = INVALID_TSDF_VALUE;
+								tsdf = new GLfloat[4]{ (GLfloat)hash, INVALID_TSDF_VALUE,-3,-3 };
 								ss << vc::utils::asHeader("Invalid because z <= 0");
 							}
 							else {
@@ -277,7 +278,7 @@ namespace vc::fusion {
 
 								if (pixelCoordinate[0] < 0 || pixelCoordinate[1] < 0 ||
 									pixelCoordinate[0] >= depth_width || pixelCoordinate[1] >= depth_height) {
-									tsdf[hash] = INVALID_TSDF_VALUE;
+									tsdf = new GLfloat[4]{ (GLfloat)hash, INVALID_TSDF_VALUE,-2,-2 };
 									ss << vc::utils::asHeader("Invalid because pixel not in image");
 								}
 								else {
@@ -287,7 +288,7 @@ namespace vc::fusion {
 										ss << NAME_AND_VALUE(real_depth);
 
 										if (real_depth <= 0) {
-											tsdf[hash] = INVALID_TSDF_VALUE;
+											tsdf = new GLfloat[4]{ (GLfloat)hash, INVALID_TSDF_VALUE, -1, -1 };
 											ss << vc::utils::asHeader("Invalid because no value in depth image");
 										}
 										else {
@@ -300,7 +301,7 @@ namespace vc::fusion {
 
 											ss << NAME_AND_VALUE(clamped_tsdf_value);
 
-											tsdf[hash] = clamped_tsdf_value;
+											tsdf = new GLfloat[4]{ (GLfloat)hash, clamped_tsdf_value, 0, 0 };
 
 											//float old_tsdf = tsdf[hash];
 											//int old_weight = weights[hash];
@@ -313,9 +314,13 @@ namespace vc::fusion {
 										std::cout << "error in retrieving depth" << std::endl;
 									}
 								}
-							}
-						}
 
+							}
+
+							verts[hash] = Vertex();
+							//verts[hash].pos = new GLfloat[4]{ voxelPosition[0], voxelPosition[1], voxelPosition[2], 1.0f };
+							//verts[hash].tsdf = tsdf;
+						};
 						//if (voxelPosition[0] == 0 && voxelPosition[1] == 0) {
 						//	std::cout << ss.str();
 						//	std::cout << std::endl;
@@ -342,74 +347,32 @@ namespace vc::fusion {
 		}
 
 		bool getGridCell(int x, int y, int z, vc::fusion::GridCell* cell) {
-			cell->corners[0] = getVoxelPosition(x - 1, y - 1, z);
-			cell->corners[1] = getVoxelPosition(x, y - 1, z);
-			cell->corners[2] = getVoxelPosition(x, y - 1, z - 1);
-			cell->corners[3] = getVoxelPosition(x - 1, y - 1, z - 1);
-
-			cell->corners[4] = getVoxelPosition(x - 1, y, z);
-			cell->corners[5] = getVoxelPosition(x, y, z);
-			cell->corners[6] = getVoxelPosition(x, y, z - 1);
-			cell->corners[7] = getVoxelPosition(x - 1, y, z - 1);
-
-			cell->tsdfs[0] = tsdf[hashFunc(x - 1, y - 1, z)];
-			cell->tsdfs[1] = tsdf[hashFunc(x, y - 1, z)];
-			cell->tsdfs[2] = tsdf[hashFunc(x, y - 1, z - 1)];
-			cell->tsdfs[3] = tsdf[hashFunc(x - 1, y - 1, z - 1)];
-
-			cell->tsdfs[4] = tsdf[hashFunc(x - 1, y, z)];
-			cell->tsdfs[5] = tsdf[hashFunc(x, y, z)];
-			cell->tsdfs[6] = tsdf[hashFunc(x, y, z - 1)];
-			cell->tsdfs[7] = tsdf[hashFunc(x - 1, y, z - 1)];
+			cell->verts[0] = verts[hashFunc(x, y, z + 1)];
+			cell->verts[1] = verts[hashFunc(x + 1, y, z + 1)];
+			cell->verts[2] = verts[hashFunc(x + 1, y, z)];
+			cell->verts[3] = verts[hashFunc(x, y, z)];
+								   
+			cell->verts[4] = verts[hashFunc(x, y + 1, z + 1)];
+			cell->verts[5] = verts[hashFunc(x + 1, y + 1, z + 1)];
+			cell->verts[6] = verts[hashFunc(x + 1, y + 1, z)];
+			cell->verts[7] = verts[hashFunc(x, y + 1, z)];
 
 			return true;
-		}
-
-		Eigen::Vector3d* getVoxelCorners(int x, int y, int z) {
-			Eigen::Vector3d* voxelCorners = new Eigen::Vector3d[8];
-
-			for (int zz = 0; zz < 2; zz++)
-			{
-				for (int yy = 0; yy < 2; yy++)
-				{
-					for (int xx = 0; xx < 2; xx++)
-					{
-						voxelCorners[zz * 4 + yy * 2 + xx] = getVoxelPosition(x + xx, y + yy, z + zz);
-					}
-				}
-			}
-			return voxelCorners;
-		}
-
-		float* getTSDFValues(int x, int y, int z) {
-			float* tsdfs = new float[8];
-
-			for (int zz = 0; zz < 2; zz++)
-			{
-				for (int yy = 0; yy < 2; yy++)
-				{
-					for (int xx = 0; xx < 2; xx++)
-					{
-						tsdfs[zz * 4 + yy * 2 + xx] = tsdf[hashFunc(x + xx, y + yy, z + zz)];
-					}
-				}
-			}
-			return tsdfs;
 		}
 	};
 
 	class SingleCellMockVoxelGrid : public Voxelgrid {
 	public:
-		SingleCellMockVoxelGrid() : Voxelgrid(1.0, Eigen::Vector3d(1.0, 1.0, 1.0), Eigen::Vector3d::Identity(), false)
+		SingleCellMockVoxelGrid() : Voxelgrid(1.0, Eigen::Vector3d(1.0, 1.0, 1.0), Eigen::Vector3d::Zero(), false)
 		{
-			tsdf[0] = 1.0f;
-			tsdf[1] = 1.0f;
-			tsdf[2] = 1.0f;
-			tsdf[3] = -1.0f;
-			tsdf[4] = 1.0f;
-			tsdf[5] = 1.0f;
-			tsdf[6] = 1.0f;
-			tsdf[7] = 1.0f;
+			initializeOpenGL();
+
+			for (int i = 0; i < 8; i++)
+			{
+				verts[i].tsdf.y = 1.0f;
+			}
+
+			verts[0].tsdf.y = -1.0f;
 		}
 	};
 
@@ -417,35 +380,24 @@ namespace vc::fusion {
 	public:
 		FourCellMockVoxelGrid() : Voxelgrid(1.0, Eigen::Vector3d(2.0, 2.0, 2.0), Eigen::Vector3d::Identity(), false)
 		{
-			tsdf[0] = 1.0f;
-			tsdf[1] = 1.0f;
-			tsdf[2] = 1.0f;
-			tsdf[3] = 1.0f;
-			tsdf[4] = -1.0f;
-			tsdf[5] = 1.0f;
-			tsdf[6] = 1.0f;
-			tsdf[7] = 1.0f;
-			tsdf[8] = 1.0f;
+			initializeOpenGL();
 
-			tsdf[0 + 9] = 1.0f;
-			tsdf[1 + 9] = -1.0f;
-			tsdf[2 + 9] = 1.0f;
-			tsdf[3 + 9] = -1.0f;
-			tsdf[4 + 9] = 1.0f;
-			tsdf[5 + 9] = -1.0f;
-			tsdf[6 + 9] = 1.0f;
-			tsdf[7 + 9] = -1.0f;
-			tsdf[8 + 9] = 1.0f;
 
-			tsdf[0 + 9 + 9] = 1.0f;
-			tsdf[1 + 9 + 9] = 1.0f;
-			tsdf[2 + 9 + 9] = 1.0f;
-			tsdf[3 + 9 + 9] = 1.0f;
-			tsdf[4 + 9 + 9] = -1.0f;
-			tsdf[5 + 9 + 9] = 1.0f;
-			tsdf[6 + 9 + 9] = 1.0f;
-			tsdf[7 + 9 + 9] = 1.0f;
-			tsdf[8 + 9 + 9] = 1.0f;
+			for (int i = 0; i < 27; i++)
+			{
+				verts[i].tsdf.y = 1.0f;
+			}
+
+			verts[0].tsdf.y = -1.0f;
+
+			verts[4].tsdf.y = -1.0f;
+
+			verts[1 + 9].tsdf.y = -1.0f;
+			verts[3 + 9].tsdf.y = -1.0f;
+			verts[5 + 9].tsdf.y = -1.0f;
+			verts[7 + 9].tsdf.y = -1.0f;
+
+			verts[4 + 9 + 9].tsdf.y = -1.0f;
 		}
 	};
 }

@@ -11,11 +11,13 @@
 #include <chrono>
 #include <thread>
 
+#include "Structs.hpp"
+
 #define NAME_AND_VALUE(name) vc::utils::nameAndValue(#name, (name))
 
 namespace vc::utils {
 
-	const int NUM_THREADS = 32;
+	const int NUM_THREADS = -1000;
 	
 	std::string asHeader(std::string header) {
 		std::stringstream ss;
@@ -141,6 +143,19 @@ namespace vc::utils {
 		return ss.str();
 	}
 
+	std::string toString(std::string header, vc::fusion::Triangle* b) {
+		std::stringstream ss;
+		ss << asHeader(header);
+
+		for (auto& pos : b->pos)
+		{
+			ss << pos[0] << " | " << pos[1] << " | " << pos[2] << " | " << pos[3] << std::endl;
+		}
+		ss << std::endl;
+
+		return ss.str();
+	}
+
 	std::string toString(std::string header, Eigen::Vector4d b) {
 		std::stringstream ss;
 		ss << asHeader(header);
@@ -209,8 +224,8 @@ namespace vc::utils {
 		return asHeader(ss.str());
 	}
 
-	bool isValid(Eigen::Vector3d v) {
-		for (int i = 0; i < 3; i++)
+	bool isValid(glm::vec4 v) {
+		for (int i = 0; i < 4; i++)
 		{
 			if (std::abs(v[i]) > 10e2) {
 				return false;

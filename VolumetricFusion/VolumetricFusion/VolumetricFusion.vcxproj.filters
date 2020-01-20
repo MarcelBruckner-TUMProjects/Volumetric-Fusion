@@ -91,6 +91,7 @@
       <Filter>ImGui</Filter>
     </ClInclude>
     <ClInclude Include="PinholeCamera.hpp" />
+    <ClInclude Include="Structs.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -153,6 +154,12 @@
       <Filter>Shader</Filter>
     </None>
     <None Include="shader\voxelgrid.comp">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\marchingCubes.comp">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\countTriangles.comp">
       <Filter>Shader</Filter>
     </None>
   </ItemGroup>

@@ -1,0 +1,215 @@
+#version 430
+
+uniform isampler1D edgeTable;
+uniform isampler2D triTable;
+	
+uniform vec3 sizeNormalized;
+uniform float isolevel;
+uniform int INVALID_TSDF_VALUE;
+
+layout (local_size_x = 1) in;
+
+struct VtxData {
+   vec4 pos;       // 4N [GOOD] -- Largest base alignment
+   vec4 tsdf;
+};                      // ^^ 8 * sizeof (GLfloat) per-vtx
+
+struct TriData {
+    vec4 pos[3];
+};
+
+layout (std140, binding = 0) buffer VertexBuffer {
+   VtxData verts [];
+};
+
+layout (std140, binding = 1) buffer TriangleBuffer {
+   TriData triangles [];
+};
+
+vec3 unhash(uint hash){
+    int x = int(hash % int(sizeNormalized.x));
+    int y = int(int(hash / sizeNormalized.x) % int(sizeNormalized.y));
+    int z = int(int(hash/ int(sizeNormalized.x * sizeNormalized.y)) % int(sizeNormalized.z));
+
+    vec3 pos = vec3(x, y, z);
+    return pos;
+}
+
+int hashFunc(vec3 pos){
+    return int(pos.x + pos.y * sizeNormalized.x + pos.z * sizeNormalized.x * sizeNormalized.z); 
+}
+
+int[8] getHashes(vec3 pos){
+    return int[]
+    (
+        hashFunc(pos + vec3(0,0,1)),
+        hashFunc(pos + vec3(1,0,1)),
+    
+        hashFunc(pos + vec3(1,0,0)),
+        hashFunc(pos + vec3(0,0,0)),
+    
+        hashFunc(pos + vec3(0,1,1)),
+        hashFunc(pos + vec3(1,1,1)),
+    
+        hashFunc(pos + vec3(1,1,0)),
+        hashFunc(pos + vec3(0,1,0))
+    );
+}
+
+int calculateCubeIndex(int hashes[8]){
+    int cubeindex = 0;
+    if (verts[hashes[0]].tsdf[1] < isolevel) cubeindex |= 1;
+    if (verts[hashes[1]].tsdf[1] < isolevel) cubeindex |= 2;
+    if (verts[hashes[2]].tsdf[1] < isolevel) cubeindex |= 4;
+    if (verts[hashes[3]].tsdf[1] < isolevel) cubeindex |= 8;
+    if (verts[hashes[4]].tsdf[1] < isolevel) cubeindex |= 16;
+    if (verts[hashes[5]].tsdf[1] < isolevel) cubeindex |= 32;
+    if (verts[hashes[6]].tsdf[1] < isolevel) cubeindex |= 64;
+    if (verts[hashes[7]].tsdf[1] < isolevel) cubeindex |= 128;
+    return cubeindex;
+}
+
+void invalidate(uint hash){
+    for(int i = 0; i < 3; i++){
+        triangles[hash].pos[i] = vec4(-1, -1, -1, -1);
+    }
+}
+
+void invalidateAll(uint hash){
+	for(int i = 0; i < 5; i++){
+		invalidate(hash + i);
+	}
+}
+
+vec4 VertexInterp(VtxData _p1, VtxData _p2)
+{
+    vec4 p1 = vec4(_p1.pos[0], _p1.pos[1], _p1.pos[2], 1.0f);
+    vec4 p2 = vec4(_p2.pos[0], _p2.pos[1], _p2.pos[2], 1.0f);
+
+    float mu;
+    vec4 p;
+
+    if (abs(isolevel - _p1.tsdf.y) < 0.00001)
+        return(p1);
+    if (abs(isolevel - _p2.tsdf[1]) < 0.00001)
+        return(p2);
+    if (abs(_p1.tsdf[1] - _p2.tsdf[1]) < 0.00001)
+        return(p1);
+    mu = (isolevel - _p1.tsdf[1]) / (_p2.tsdf[1] - _p1.tsdf[1]);
+    p[0] = p1[0] + mu * (p2[0] - p1[0]);
+    p[1] = p1[1] + mu * (p2[1] - p1[1]);
+    p[2] = p1[2] + mu * (p2[2] - p1[2]);
+
+    return(p);
+}
+
+bool isValid(vec4 v){
+	for (int i = 0; i < 4; i++)
+	{
+		if (abs(v[i]) > 10e2) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void main(){	
+    uint hash = gl_GlobalInvocationID.x;
+    uint triangleHash = hash * 5;
+
+    vec3 pos = unhash(hash);
+
+    if(
+        pos.x >= sizeNormalized.x - 1 || 
+        pos.y >= sizeNormalized.y - 1 || 
+        pos.z >= sizeNormalized.z - 1 
+    )
+    {  
+        invalidateAll(triangleHash);
+        return;
+    }
+    
+    int hashes[8] = getHashes(pos);
+    int cubeindex = calculateCubeIndex(hashes);
+    
+
+    if(texture(edgeTable, cubeindex) == 0){
+		invalidateAll(triangleHash);
+		return;
+	}
+    
+	vec4 vertlist[12] = vec4[](
+		vec4(-1, -1, -1, -1),
+		vec4(-1, -1, -1, -1),
+		vec4(-1, -1, -1, -1),
+		vec4(-1, -1, -1, -1),
+		vec4(-1, -1, -1, -1),
+		vec4(-1, -1, -1, -1),
+		vec4(-1, -1, -1, -1),
+		vec4(-1, -1, -1, -1),
+		vec4(-1, -1, -1, -1),
+		vec4(-1, -1, -1, -1),
+		vec4(-1, -1, -1, -1),
+		vec4(-1, -1, -1, -1)
+	);
+
+    if (bool(texture(edgeTable, cubeindex) & 1) && verts[0].tsdf[1] != INVALID_TSDF_VALUE && verts[1].tsdf[1] != INVALID_TSDF_VALUE)
+        vertlist[0] =
+		VertexInterp(verts[0], verts[1]);
+    if (bool(texture(edgeTable, cubeindex) & 2) && verts[1].tsdf[1] != INVALID_TSDF_VALUE && verts[2].tsdf[1] != INVALID_TSDF_VALUE)
+        vertlist[1] =
+        VertexInterp(verts[1], verts[2]);
+    if (bool(texture(edgeTable, cubeindex) & 4) && verts[2].tsdf[1] != INVALID_TSDF_VALUE && verts[3].tsdf[1] != INVALID_TSDF_VALUE)
+        vertlist[2] =
+        VertexInterp(verts[2], verts[3]);
+    if (bool(texture(edgeTable, cubeindex) & 8) && verts[3].tsdf[1] != INVALID_TSDF_VALUE && verts[0].tsdf[1] != INVALID_TSDF_VALUE)
+        vertlist[3] =
+        VertexInterp(verts[3], verts[0]);
+    if (bool(texture(edgeTable, cubeindex) & 16) && verts[4].tsdf[1] != INVALID_TSDF_VALUE && verts[5].tsdf[1] != INVALID_TSDF_VALUE)
+        vertlist[4] =
+        VertexInterp(verts[4], verts[5]);
+    if (bool(texture(edgeTable, cubeindex) & 32) && verts[5].tsdf[1] != INVALID_TSDF_VALUE && verts[6].tsdf[1] != INVALID_TSDF_VALUE)
+        vertlist[5] =
+        VertexInterp(verts[5], verts[6]);
+    if (bool(texture(edgeTable, cubeindex) & 64) && verts[6].tsdf[1] != INVALID_TSDF_VALUE && verts[7].tsdf[1] != INVALID_TSDF_VALUE)
+        vertlist[6] =
+        VertexInterp(verts[6], verts[7]);
+    if (bool(texture(edgeTable, cubeindex) & 128) && verts[7].tsdf[1] != INVALID_TSDF_VALUE && verts[4].tsdf[1] != INVALID_TSDF_VALUE)
+        vertlist[7] =
+        VertexInterp(verts[7], verts[4]);
+    if (bool(texture(edgeTable, cubeindex) & 256) && verts[0].tsdf[1] != INVALID_TSDF_VALUE && verts[4].tsdf[1] != INVALID_TSDF_VALUE)
+        vertlist[8] =
+        VertexInterp(verts[0], verts[4]);
+    if (bool(texture(edgeTable, cubeindex) & 512) && verts[1].tsdf[1] != INVALID_TSDF_VALUE && verts[5].tsdf[1] != INVALID_TSDF_VALUE)
+        vertlist[9] =
+        VertexInterp(verts[1], verts[5]);
+    if (bool(texture(edgeTable, cubeindex) & 1024) && verts[2].tsdf[1] != INVALID_TSDF_VALUE && verts[6].tsdf[1] != INVALID_TSDF_VALUE)
+        vertlist[10] =
+        VertexInterp(verts[2], verts[6]);
+    if (bool(texture(edgeTable, cubeindex) & 2048) && verts[3].tsdf[1] != INVALID_TSDF_VALUE && verts[7].tsdf[1] != INVALID_TSDF_VALUE)
+        vertlist[11] =
+        VertexInterp(verts[3], verts[7]);
+			
+	int x = 0;
+//	for (int i = 0; texture(triTable, vec2(cubeindex, i)) != -1; i += 3) {
+//		vec4 a = vertlist[int(texture(triTable, vec2(cubeindex, i)))];
+//        vec4 b = vertlist[int(texture(triTable, vec2(cubeindex, i + 1)))];
+//        vec4 c = vertlist[int(texture(triTable, vec2(cubeindex, i + 2)))];
+//
+//		if(isValid(a) && isValid(b) && isValid(c)){
+//			triangles[triangleHash + x].pos[0] = a;
+//			triangles[triangleHash + x].pos[1] = b;
+//			triangles[triangleHash + x].pos[2] = c;
+//		}
+//		else
+//		{
+//			invalidate(triangleHash);
+//		}
+        x++;
+//	}
+
+    triangles[triangleHash + 4].pos[0] = vec4(hash, cubeindex, texture(triTable, vec2(0, 0)).x,x);
+    triangles[triangleHash + 4].pos[1] = vec4(hash, cubeindex, texture(triTable, vec2(cubeindex, 0)).y,x);
+    triangles[triangleHash + 4].pos[2] = vec4(hash, cubeindex, texture(triTable, vec2(cubeindex, 0)).z,x);
+    return;
+}

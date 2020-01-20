@@ -38,6 +38,8 @@
     <None Include="shader\compute_shader.comp" />
     <None Include="shader\coordinate.fs" />
     <None Include="shader\coordinate.vs" />
+    <None Include="shader\countTriangles.comp" />
+    <None Include="shader\marchingCubes.comp" />
     <None Include="shader\pointcloud.frag" />
     <None Include="shader\pointcloud.vs" />
     <None Include="shader\pointcloud_new.vert" />
@@ -89,6 +91,7 @@
     <ClInclude Include="Settings.hpp" />
     <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="Structs.hpp" />
     <ClInclude Include="Tables.hpp" />
     <ClInclude Include="Utils.hpp" />
     <ClInclude Include="Voxelgrid.hpp" />

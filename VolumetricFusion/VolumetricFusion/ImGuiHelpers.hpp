@@ -210,7 +210,7 @@ namespace vc::imgui {
 
 			ImGui::Separator();
 
-			fuse = ImGui::SliderFloat("Truncation distance", &truncationDistance, 0, truncationDistanceRange);
+			fuse |= ImGui::SliderFloat("Truncation distance", &truncationDistance, 0, truncationDistanceRange);
 
 			ImGui::End();
 		}

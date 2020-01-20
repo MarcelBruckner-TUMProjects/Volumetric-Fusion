@@ -9,6 +9,16 @@
 #include "Utils.hpp"
 
 namespace vc::fusion {
+    struct Vertex {
+        glm::vec4 pos;
+        glm::vec4 tsdf;
+    };
+
+    struct Triangle {
+        glm::vec4 pos[3];
+    };
+
+    /*
     class Triangle {
     public:
         std::vector<Eigen::Vector3d> vertices;
@@ -22,12 +32,11 @@ namespace vc::fusion {
         operator bool () {
             return vc::utils::isValid(vertices[0]) && vc::utils::isValid(vertices[1]) && vc::utils::isValid(vertices[2]);
         }
-    };
+    };*/
 
     class GridCell {
     public:
-        Eigen::Vector3d corners[8];
-        float tsdfs[8];
+        Vertex verts[8];
     };
 }
 

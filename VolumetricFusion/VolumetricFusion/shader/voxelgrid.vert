@@ -23,7 +23,7 @@ void main()
 
     // Blue: invalid point
     if(t > 1){
-        vs_out.color = vec4(0.0, 0.0, 1.0, 0.4);
+        vs_out.color = vec4(0.0, 0.0, 1.0, 1.0);
         return;
     }
 
