@@ -2,7 +2,7 @@
 #if APPLE
 #include "Enums.hpp"
 #else
-#include <VolumetricFusion\Enums.hpp>
+#include "Enums.hpp"
 #endif
 
 using namespace vc::enums;

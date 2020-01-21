@@ -1,0 +1,36 @@
+#version 430
+
+uniform ivec3 sizeNormalized;
+uniform float isolevel;
+
+layout (local_size_x = 1) in;
+
+struct VtxData {
+   vec4 vtx_pos;       // 4N [GOOD] -- Largest base alignment
+   vec4 vtx_tsdf;
+};                      // ^^ 8 * sizeof (GLfloat) per-vtx
+
+layout (std140, binding = 0) buffer VertexBuffer {
+   VtxData verts [];
+};
+
+layout(binding = 2) uniform atomic_uint numTriangles;
+
+vec3 unhash(uint hash){
+    int x = int(hash % int(sizeNormalized.x));
+    int y = int(int(hash / sizeNormalized.x) % int(sizeNormalized.y));
+    int z = int(int(hash/ int(sizeNormalized.x * sizeNormalized.y)) % int(sizeNormalized.z));
+
+    vec3 pos = vec3(x, y, z);
+    return pos;
+}
+
+int hash(vec3 pos){
+    return int(pos.x + pos.y * sizeNormalized.x + pos.z * sizeNormalized.x * sizeNormalized.z); 
+}
+
+void main(){	
+    vec3 hash = gl_GlobalInvocationID;
+    
+    atomicCounterIncrement(numTriangles);
+}

@@ -20,26 +20,35 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\src\glad.c" />
+    <ClCompile Include="imgui\imgui.cpp" />
+    <ClCompile Include="imgui\imgui_demo.cpp" />
+    <ClCompile Include="imgui\imgui_draw.cpp" />
+    <ClCompile Include="imgui\imgui_impl_glfw.cpp" />
+    <ClCompile Include="imgui\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="MultiFileStream.cpp" />
-    <ClCompile Include="ReprojectionError.hpp" />
     <ClCompile Include="std_image.cpp" />
-    <ClCompile Include="Structs.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="readme.md" />
+    <None Include="shader\characteristic_points.frag" />
+    <None Include="shader\characteristic_points.geom" />
+    <None Include="shader\characteristic_points.vert" />
     <None Include="shader\compute_shader.comp" />
     <None Include="shader\coordinate.fs" />
     <None Include="shader\coordinate.vs" />
-    <None Include="shader\mesh.fs" />
-    <None Include="shader\mesh.vs" />
-    <None Include="shader\pointcloud.fs" />
+    <None Include="shader\countTriangles.comp" />
+    <None Include="shader\marchingCubes.comp" />
     <None Include="shader\pointcloud.frag" />
     <None Include="shader\pointcloud.vs" />
     <None Include="shader\pointcloud_new.vert" />
     <None Include="shader\texture.fs" />
     <None Include="shader\texture.vs" />
+    <None Include="shader\tsdf.comp" />
+    <None Include="shader\voxelgrid.comp" />
     <None Include="shader\voxelgrid.frag" />
+    <None Include="shader\voxelgrid.geom" />
     <None Include="shader\voxelgrid.vert" />
     <None Include="shader\voxelgrid_cube.fs" />
     <None Include="shader\voxelgrid_cube.vs" />
@@ -52,9 +61,9 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\include\dearImgui\examples\libs\gl3w\GL\glcorearb.h" />
     <ClInclude Include="camera.hpp" />
     <ClInclude Include="CaptureDevice.hpp" />
-    <ClInclude Include="ComputeShader.hpp" />
     <ClInclude Include="Data.hpp" />
     <ClInclude Include="Enums.hpp" />
     <ClInclude Include="FileAccess.hpp" />
@@ -62,16 +71,28 @@
     <ClInclude Include="glad\include\KHR\khrplatform.h" />
     <ClInclude Include="happly.h" />
     <ClInclude Include="ImGuiHelpers.hpp" />
-    <ClInclude Include="MarchingCubes.h" />
-    <ClInclude Include="Mesh.hpp" />
+    <ClInclude Include="imgui\imconfig.h" />
+    <ClInclude Include="imgui\imgui.h" />
+    <ClInclude Include="imgui\imgui_impl_glfw.h" />
+    <ClInclude Include="imgui\imgui_impl_opengl3.h" />
+    <ClInclude Include="imgui\imgui_internal.h" />
+    <ClInclude Include="imgui\imstb_rectpack.h" />
+    <ClInclude Include="imgui\imstb_textedit.h" />
+    <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="MarchingCubes.hpp" />
-    <ClInclude Include="Optimization.hpp" />
-    <ClInclude Include="PointCorrespondenceError.hpp" />
+    <ClInclude Include="optimization\BundleAdjustment.hpp" />
+    <ClInclude Include="optimization\CharacteristicPoints.hpp" />
+    <ClInclude Include="optimization\OptimizationProblem.hpp" />
+    <ClInclude Include="optimization\PointCorrespondenceError.hpp" />
+    <ClInclude Include="optimization\Procrustes.hpp" />
+    <ClInclude Include="optimization\ReprojectionError.hpp" />
+    <ClInclude Include="PinholeCamera.hpp" />
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />
     <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="Structs.hpp" />
     <ClInclude Include="Tables.hpp" />
     <ClInclude Include="Utils.hpp" />
     <ClInclude Include="Voxelgrid.hpp" />
@@ -138,7 +159,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\Program Files\OpenGL\glfw-3.3\include;C:\Program Files\OpenGL\glm-stable;C:\dev\eigen;C:\dev\glfw-3.3\include;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\include;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party\glfw-imgui\include;$(OPENCV_DIR)\..\..\..\include;glad\include;C:\dev\glm-0.9.9.6;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Program Files\OpenGL\glfw-3.3\include;C:\Program Files\OpenGL\glm-stable;C:\dev\eigen;C:\dev\glfw-3.3\include;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\include;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party;$(OPENCV_DIR)\..\..\..\include;glad\include;C:\dev\glm-0.9.9.6;$(IncludePath)</IncludePath>
     <LibraryPath>$(OPENCV_DIR)\lib;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\lib\x64;C:\dev\opencv\build\lib\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

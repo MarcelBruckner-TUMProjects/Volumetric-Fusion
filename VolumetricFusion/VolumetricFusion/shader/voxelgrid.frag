@@ -1,7 +1,7 @@
 #version 330 core
 out vec4 FragColor;
 
-in vec3 aColor;
+in vec4 fColor;
 
 
 void main()
@@ -11,5 +11,5 @@ void main()
 //    if(aColor.z == 1.0f) {
 //        FragColor = vec4(aColor, 0.0f);
 //    }
-    FragColor = vec4(aColor, 1.0f);
+    FragColor = fColor;
 }

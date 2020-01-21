@@ -1,0 +1,91 @@
+#version 430
+
+uniform int INVALID_TSDF_VALUE;
+uniform float resolution;
+uniform float resolutionInv;
+uniform vec3 size;
+uniform vec3 sizeHalf;
+uniform vec3 sizeNormalized;
+uniform vec3 origin;
+uniform mat4 relativeTransformation;
+uniform mat4 coordinate_correction;
+uniform float new_tsdf;
+uniform bool setPosition;
+
+uniform mat3 world2CameraProjection;
+uniform float truncationDistance;
+
+uniform usampler2D depthFrame;
+uniform vec2 depthResolution;
+uniform float depthScale;
+
+layout (local_size_x = 1) in;
+
+struct VtxData {
+   vec4 vtx_pos;       // 4N [GOOD] -- Largest base alignment
+   vec4 vtx_tsdf;
+};                      // ^^ 8 * sizeof (GLfloat) per-vtx
+
+// std140 is pretty important here, it is the only way to guarantee the data
+//   structure is aligned as described above and that the stride between
+//     elements in verts[] is 0.
+layout (std140, binding = 1) buffer VertexBuffer {
+   VtxData verts [];
+};
+
+vec3 unhash(uint hash){
+    int x = int(hash % int(sizeNormalized.x));
+    int y = int(int(hash / sizeNormalized.x) % int(sizeNormalized.y));
+    int z = int(int(hash/ int(sizeNormalized.x * sizeNormalized.y)) % int(sizeNormalized.z));
+
+    vec3 pos = vec3(x, y, z);
+    pos *= resolution;
+    pos -= sizeHalf;
+    pos += origin;
+
+    return pos;
+}
+
+void main(){	
+    uint hash = gl_GlobalInvocationID.x;
+
+    if(setPosition) {
+        vec3 pos = unhash(hash);
+        verts[hash].vtx_pos = vec4(pos, 1);
+        verts[hash].vtx_tsdf = vec4(hash, INVALID_TSDF_VALUE, 0, 0);
+        return;
+    }
+
+    vec3 projectedVoxelCenter = world2CameraProjection * verts[hash].vtx_pos.xyz;
+    float z = projectedVoxelCenter.z;
+
+    if(z <= 0) {
+        verts[hash].vtx_tsdf = vec4(hash, INVALID_TSDF_VALUE,-3,-3);
+        return;
+    }
+
+    vec2 pixelCoordinate = projectedVoxelCenter.xy / z;
+    pixelCoordinate /= 2.0f;
+    
+    if(pixelCoordinate.x < 0 || pixelCoordinate.y < 0 || pixelCoordinate.x >= depthResolution.x || pixelCoordinate.y >= depthResolution.y) {
+        verts[hash].vtx_tsdf = vec4(hash, INVALID_TSDF_VALUE, -2, -2);
+        return;
+    }
+
+    float realDepth = texture(depthFrame, pixelCoordinate / depthResolution).x * depthScale;
+//    verts[hash].vtx_tsdf = vec4(realDepth, depthResolution, depthScale);
+    
+//    return;
+
+    if(realDepth <= 0) {
+        verts[hash].vtx_tsdf = vec4(hash, INVALID_TSDF_VALUE, -1, -1);
+        return;
+    }
+
+    float tsdf = realDepth - z;
+    tsdf *= -1;
+
+    tsdf = clamp(tsdf, -truncationDistance, truncationDistance);
+    
+    verts[hash].vtx_tsdf = vec4(hash, tsdf, 1, 0);
+}
