@@ -39,7 +39,7 @@ namespace vc::fusion {
 		Eigen::Vector3d sizeHalf;
 		Eigen::Vector3d origin;
 		
-		vc::fusion::Vertex* verts;
+		std::vector<Vertex> verts;
 
 		//std::vector<float> tsdf;
 		//std::vector<float> weights;
@@ -56,7 +56,7 @@ namespace vc::fusion {
 		{
 			//reset();
 
-			verts = new Vertex[num_gridPoints];
+			verts = std::vector<Vertex>(num_gridPoints);
 			
 			if (initializeShader) {
 				initializeOpenGL();
@@ -88,7 +88,7 @@ namespace vc::fusion {
 		void setComputeShader() {
 			glBindVertexArray(VAO);
 			glBindBuffer(GL_ARRAY_BUFFER, vbo);
-			glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * num_gridPoints, verts, GL_DYNAMIC_COPY);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * num_gridPoints, verts.data(), GL_DYNAMIC_COPY);
 
 			glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0); // Vertex Attrib. 0
 			glEnableVertexAttribArray(0);
@@ -114,7 +114,7 @@ namespace vc::fusion {
 			glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbo);
-			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Vertex) * num_gridPoints, verts);
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Vertex) * num_gridPoints, verts.data());
 		}
 		
 		void renderGrid(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
@@ -181,7 +181,7 @@ namespace vc::fusion {
 			glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbo);
-			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Vertex) * num_gridPoints, verts);
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Vertex) * num_gridPoints, verts.data());
 
 			//for (int i = 0; i < num_gridPoints; i++) {
 			//	if (std::abs(verts[i].pos[0]) < resolution * 0.9f && std::abs(verts[i].pos[1]) < resolution * 0.9f)

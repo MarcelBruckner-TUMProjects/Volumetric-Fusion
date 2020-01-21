@@ -143,6 +143,25 @@ namespace vc::utils {
 		return ss.str();
 	}
 
+	std::string toString(glm::vec4 pos) {
+		std::stringstream ss;
+
+			ss << pos[0] << " | " << pos[1] << " | " << pos[2] << " | " << pos[3] << std::endl;
+
+		return ss.str();
+	}
+
+	std::string toString(vc::fusion::Triangle* b) {
+		std::stringstream ss;
+
+		for (auto& pos : b->pos)
+		{
+			ss << pos[0] << " | " << pos[1] << " | " << pos[2] << " | " << pos[3] << std::endl;
+		}
+
+		return ss.str();
+	}
+
 	std::string toString(std::string header, vc::fusion::Triangle* b) {
 		std::stringstream ss;
 		ss << asHeader(header);
@@ -222,6 +241,13 @@ namespace vc::utils {
 		std::stringstream ss;
 		ss << header << std::endl << value;
 		return asHeader(ss.str());
+	}
+
+	bool isValid(vc::fusion::Triangle* triangle) {
+		return !(
+			triangle->pos[0].x == 0 && triangle->pos[0].w == 0 && triangle->pos[0].z == 0 && triangle->pos[0].y == 0 &&
+			triangle->pos[1].x == 0 && triangle->pos[1].w == 0 && triangle->pos[1].z == 0 && triangle->pos[1].y == 0 &&
+			triangle->pos[2].x == 0 && triangle->pos[2].w == 0 && triangle->pos[2].z == 0 && triangle->pos[2].y == 0);
 	}
 
 	bool isValid(glm::vec4 v) {

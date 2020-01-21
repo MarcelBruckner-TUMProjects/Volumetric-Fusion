@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) try {
 	GLFWwindow* window = setupWindow();
 
 	//voxelgrid = new vc::fusion::Voxelgrid();
-	voxelgrid = new vc::fusion::SingleCellMockVoxelGrid();
+	voxelgrid = new vc::fusion::FourCellMockVoxelGrid();
 	marchingCubes = new vc::fusion::MarchingCubes();
 	vc::fusion::marchingCubes(voxelgrid);
 	marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);

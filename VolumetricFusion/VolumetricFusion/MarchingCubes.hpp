@@ -21,14 +21,14 @@ namespace vc::fusion {
     class Voxelgrid;
 
     void exportToPly(std::vector<vc::fusion::Triangle*> triangles);
-    glm::vec4 VertexInterp(int isolevel, vc::fusion::Vertex _p1, vc::fusion::Vertex _p2);
+    glm::vec4 VertexInterp(double isolevel, vc::fusion::Vertex _p1, vc::fusion::Vertex _p2);
     std::vector< vc::fusion::Triangle*> Polygonise(vc::fusion::GridCell grid, double isolevel);
 
     class MarchingCubes {
     private:
         GLuint vbos[3];
         vc::fusion::Vertex* verts;
-        vc::fusion::Triangle* triangles;
+        std::vector<vc::fusion::Triangle> triangles;
         GLuint triangleCount;
 
         GLuint edgeTable;
@@ -43,24 +43,8 @@ namespace vc::fusion {
             countTrianglesComputeShader = new vc::rendering::ComputeShader("shader/countTriangles.comp");
 
             glGenBuffers(3, vbos);
-            glGenTextures(1, &edgeTable);
-            glGenTextures(1, &triTable);
-
-            glBindTexture(GL_TEXTURE_1D, edgeTable); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
-            // set the texture wrapping parameters
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            // set texture filtering parameters
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-            glBindTexture(GL_TEXTURE_2D, triTable); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
-            // set the texture wrapping parameters
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            // set texture filtering parameters
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glGenBuffers(1, &edgeTable);
+            glGenBuffers(1, &triTable);
         }
 
         void countTriangles(Eigen::Vector3d size, vc::fusion::Vertex* verts) {
@@ -79,13 +63,13 @@ namespace vc::fusion {
 
             glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, vbos[2]);
             glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), NULL, GL_DYNAMIC_DRAW);
-            //glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), tmp_numTriangles);
-            //glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 2, vbos[2]);
+            glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), tmp_numTriangles);
+            glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 2, vbos[2]);
             glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
 
-            glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, vbos[2]);
-            glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint) * 1, tmp_numTriangles);
-            glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
+            //glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, vbos[2]);
+            //glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint) * 1, tmp_numTriangles);
+            //glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
 
             glDispatchCompute(num_verts, 1, 1);
             glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -99,7 +83,7 @@ namespace vc::fusion {
             //triangleCount = *tmp_numTriangles;
         }
 
-        void compute(Eigen::Vector3d size, vc::fusion::Vertex* verts) {
+        void compute(Eigen::Vector3d size, std::vector<vc::fusion::Vertex> verts) {
 
             //countTriangles(size, verts);
 
@@ -110,44 +94,49 @@ namespace vc::fusion {
             int num_verts = snx * sny * snz;
             int num_triangles = num_verts * 5;
 
-            triangles = new vc::fusion::Triangle[num_triangles];
+            triangles = std::vector<vc::fusion::Triangle>(num_triangles);
 
             marchingCubesComputeShader->use();
             marchingCubesComputeShader->setVec3("sizeNormalized", size);
             marchingCubesComputeShader->setFloat("isolevel", 0.0f);
+            marchingCubesComputeShader->setInt("INVALID_TSDF_VALUE", vc::fusion::INVALID_TSDF_VALUE);
 
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbos[0]);
-            glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Vertex) * num_verts, verts, GL_DYNAMIC_COPY);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Vertex) * num_verts, verts.data(), GL_DYNAMIC_COPY);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, vbos[0]);
 
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbos[1]);
-            glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Triangle) * num_triangles, triangles, GL_DYNAMIC_COPY);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Triangle) * num_triangles, triangles.data(), GL_DYNAMIC_COPY);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, vbos[1]);
 
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, edgeTable);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vc::fusion::edgeTable), vc::fusion::edgeTable, GL_DYNAMIC_COPY);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, edgeTable);
 
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_1D, edgeTable);
-            glTexImage1D(GL_TEXTURE_1D, 0, GL_RED, 256, 0, GL_RED, GL_INT, vc::fusion::edgeTable);
-            marchingCubesComputeShader->setInt("edgeTable", 0);
-
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, triTable);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 16, 256, 0, GL_RED, GL_INT, vc::fusion::triTable);
-            marchingCubesComputeShader->setInt("triTable", 1);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, triTable);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vc::fusion::triTable), vc::fusion::triTable, GL_DYNAMIC_COPY);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, triTable);
 
             glDispatchCompute(num_verts, 1, 1);
 
             glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbos[1]);
-            glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Triangle) * num_triangles, triangles);
+            glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Triangle) * num_triangles, triangles.data());
 
-            for (int i = 4; i < num_triangles; i += 5) {
-                //for (int i = 0; i < 2 && i < num_triangles; i++) {
-                std::cout << vc::utils::toString(std::to_string(i), &triangles[i]);
+            for (int i = 0; i < 4 && i < num_triangles; i++) {
+                std::cout << vc::utils::toString(&triangles[i]);
             }
-
+            std::vector<vc::fusion::Triangle*> finalTriangles(0);
+            for (auto& triangle : triangles)
+            {
+                if (vc::utils::isValid(&triangle)) {
+                    finalTriangles.push_back(&triangle);
+                }
+            }
             std::cout << std::endl;
+            exportToPly(finalTriangles);
+
         }
     };
 
@@ -275,6 +264,11 @@ namespace vc::fusion {
                 vertlist[11] =
                 VertexInterp(isolevel, grid.verts[3], grid.verts[7]);
 
+            for (int i = 0; i < 12; i++)
+            {
+                std::cout << vc::utils::toString(vertlist[i]);
+            }
+
             /* Create the triangle */
             for (i = 0; triTable[cubeindex][i] != -1; i += 3) {
                 auto a = vertlist[triTable[cubeindex][i]];
@@ -300,7 +294,7 @@ namespace vc::fusion {
            Linearly interpolate the position where an isosurface cuts
            an edge between two vertices, each with their own scalar value
         */
-        glm::vec4 VertexInterp(int isolevel, vc::fusion::Vertex _p1, vc::fusion::Vertex _p2)
+        glm::vec4 VertexInterp(double isolevel, vc::fusion::Vertex _p1, vc::fusion::Vertex _p2)
         {
             glm::vec4 p1 = glm::vec4(_p1.pos[0], _p1.pos[1], _p1.pos[2], 1.0f);
             glm::vec4 p2 = glm::vec4(_p2.pos[0], _p2.pos[1], _p2.pos[2], 1.0f);
@@ -318,6 +312,7 @@ namespace vc::fusion {
             p[0] = p1[0] + mu * (p2[0] - p1[0]);
             p[1] = p1[1] + mu * (p2[1] - p1[1]);
             p[2] = p1[2] + mu * (p2[2] - p1[2]);
+            p[3] = 1.0f;
 
             return(p);
         }
