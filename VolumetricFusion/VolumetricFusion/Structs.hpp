@@ -36,7 +36,7 @@ namespace vc::fusion {
 
     class GridCell {
     public:
-        Vertex verts[8];
+        vc::fusion::Vertex verts[8];
     };
 }
 

@@ -3,7 +3,6 @@
   <ItemGroup>
     <ClCompile Include="glad\src\glad.c" />
     <ClCompile Include="MultiFileStream.cpp" />
-    <ClCompile Include="ReprojectionError.hpp" />
     <ClCompile Include="std_image.cpp" />
     <ClCompile Include="imgui\imgui.cpp">
       <Filter>ImGui</Filter>
@@ -34,11 +33,7 @@
     <ClInclude Include="glad\include\KHR\khrplatform.h" />
     <ClInclude Include="happly.h" />
     <ClInclude Include="ImGuiHelpers.hpp" />
-    <ClInclude Include="MarchingCubes.h" />
-    <ClInclude Include="Mesh.hpp" />
     <ClInclude Include="MarchingCubes.hpp" />
-    <ClInclude Include="Optimization.hpp" />
-    <ClInclude Include="PointCorrespondenceError.hpp" />
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />

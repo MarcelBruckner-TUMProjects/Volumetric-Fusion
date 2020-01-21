@@ -44,11 +44,6 @@ using namespace vc::enums;
 
 #include "camera.hpp"
 #include "shader.hpp"
-#include <VolumetricFusion\Voxelgrid.hpp>
-#include <VolumetricFusion\MarchingCubes.h>
-#include <VolumetricFusion\Mesh.hpp>
-//#include <VolumetricFusion\happly.h>
-//#include <io.h>
 #include "MarchingCubes.hpp"
 
 #include "optimization/optimizationProblem.hpp"
@@ -127,12 +122,12 @@ int main(int argc, char* argv[]) try {
 	
 	GLFWwindow* window = setupWindow();
 
-	//voxelgrid = new vc::fusion::Voxelgrid();
-	voxelgrid = new vc::fusion::FourCellMockVoxelGrid();
-	marchingCubes = new vc::fusion::MarchingCubes();
-	vc::fusion::marchingCubes(voxelgrid);
-	marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
-	return 0;
+	voxelgrid = new vc::fusion::Voxelgrid();
+	//voxelgrid = new vc::fusion::FourCellMockVoxelGrid();
+	//marchingCubes = new vc::fusion::MarchingCubes();
+	//vc::fusion::marchingCubes(voxelgrid);
+	//marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
+	//return 0;
 
 	coordinateSystem = new vc::rendering::CoordinateSystem();
 	optimizationProblem->setupOpenGL();
