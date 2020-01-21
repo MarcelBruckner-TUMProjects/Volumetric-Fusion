@@ -164,6 +164,12 @@
     <None Include="shader\countTriangles.comp">
       <Filter>Shader</Filter>
     </None>
+    <None Include="shader\mesh.frag">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\mesh.vert">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Shader">

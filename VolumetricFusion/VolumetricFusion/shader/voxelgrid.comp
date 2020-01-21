@@ -13,7 +13,11 @@ uniform float new_tsdf;
 uniform bool setPosition;
 
 uniform mat3 world2CameraProjection;
+uniform mat3 colorWorld2CameraProjection;
 uniform float truncationDistance;
+
+uniform sampler2D colorFrame;
+uniform vec2 colorResolution;
 
 uniform usampler2D depthFrame;
 uniform vec2 depthResolution;
@@ -24,6 +28,7 @@ layout (local_size_x = 1) in;
 struct VtxData {
    vec4 vtx_pos;       // 4N [GOOD] -- Largest base alignment
    vec4 vtx_tsdf;
+   vec4 vtx_color;
 };                      // ^^ 8 * sizeof (GLfloat) per-vtx
 
 // std140 is pretty important here, it is the only way to guarantee the data
@@ -88,4 +93,12 @@ void main(){
     tsdf = clamp(tsdf, -truncationDistance, truncationDistance);
     
     verts[hash].vtx_tsdf = vec4(hash, tsdf, 1, 0);
+
+//    projectedVoxelCenter = colorWorld2CameraProjection * verts[hash].vtx_pos.xyz;
+//    z = projectedVoxelCenter.z;
+//    
+//    pixelCoordinate = projectedVoxelCenter.xy / z;
+//    pixelCoordinate /= 2.0f;
+
+    verts[hash].vtx_color = texture(colorFrame, pixelCoordinate / depthResolution);
 }

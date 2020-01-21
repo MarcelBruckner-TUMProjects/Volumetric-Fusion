@@ -269,7 +269,7 @@ namespace vc::rendering {
         }
     };
     
-    void startFrame(GLFWwindow* window) {
+    void startFrame(GLFWwindow* window, int width, int height) {
         glfwMakeContextCurrent(window);
         // render
         // ------
@@ -281,6 +281,8 @@ namespace vc::rendering {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         //glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glViewport(0, 0, width, height);
     }
 
     void setViewport(const int viewport_width, const int viewport_height, const int pos_x, const int pos_y) {

@@ -22,6 +22,7 @@ namespace vc::fusion {
 		GLuint VAO;
 		GLuint vbo;
 		GLuint depthTexture;
+		GLuint colorTexture;
 
 		vc::rendering::Shader* gridShader;
 		vc::rendering::Shader* tsdfComputeShader;
@@ -47,7 +48,7 @@ namespace vc::fusion {
 		int num_gridPoints;
 
 		int hashFunc(int x, int y, int z) {
-			std::cout << z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x << std::endl;
+			//std::cout << z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x << std::endl;
 			return z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x;
 		}
 
@@ -71,8 +72,17 @@ namespace vc::fusion {
 			glGenVertexArrays(1, &VAO);
 			glGenBuffers(1, &vbo);
 			glGenTextures(1, &depthTexture);
+			glGenTextures(1, &colorTexture);
 
 			glBindTexture(GL_TEXTURE_2D, depthTexture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
+				// set the texture wrapping parameters
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			// set texture filtering parameters
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+			glBindTexture(GL_TEXTURE_2D, colorTexture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
 				// set the texture wrapping parameters
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -154,11 +164,16 @@ namespace vc::fusion {
 
 		void integrateFrameGPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance) try {
 			glm::mat3 world2CameraProjection = pipeline->depth_camera->world2cam_glm;
+			glm::mat3 colorWorld2CameraProjection = pipeline->rgb_camera->world2cam_glm;
 
 			rs2::depth_frame depth_frame = pipeline->data->filteredDepthFrames;
 			int depthWidth = depth_frame.as<rs2::video_frame>().get_width();
 			int	depthHeight = depth_frame.as<rs2::video_frame>().get_height();
-			
+
+			rs2::frame color_frame = pipeline->data->filteredColorFrames;
+			int colorWidth = color_frame.as<rs2::video_frame>().get_width();
+			int	colorHeight = color_frame.as<rs2::video_frame>().get_height();
+
 			setComputeShader();
 
 			voxelgridComputeShader->use();
@@ -166,8 +181,10 @@ namespace vc::fusion {
 			voxelgridComputeShader->setBool("setPosition", false);
 
 			voxelgridComputeShader->setMat3("world2CameraProjection", world2CameraProjection);
+			voxelgridComputeShader->setMat3("colorWorld2CameraProjection", colorWorld2CameraProjection);
 			voxelgridComputeShader->setFloat("depthScale", pipeline->depth_camera->depthScale);
 			voxelgridComputeShader->setVec2("depthResolution", depthWidth, depthHeight);
+			voxelgridComputeShader->setVec2("colorResolution", colorWidth, colorHeight);
 			voxelgridComputeShader->setFloat("truncationDistance", truncationDistance);
 			this->truncationDistance = truncationDistance;
 
@@ -175,6 +192,11 @@ namespace vc::fusion {
 			glBindTexture(GL_TEXTURE_2D, depthTexture);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, depthWidth, depthHeight, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, depth_frame.get_data());
 			voxelgridComputeShader->setInt("depthFrame", 0);
+
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, colorTexture);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, colorWidth, colorHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, color_frame.get_data());
+			voxelgridComputeShader->setInt("colorFrame", 1);
 
 			glDispatchCompute(num_gridPoints, 1, 1);
 

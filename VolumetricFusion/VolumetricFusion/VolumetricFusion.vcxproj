@@ -40,6 +40,8 @@
     <None Include="shader\coordinate.vs" />
     <None Include="shader\countTriangles.comp" />
     <None Include="shader\marchingCubes.comp" />
+    <None Include="shader\mesh.frag" />
+    <None Include="shader\mesh.vert" />
     <None Include="shader\pointcloud.frag" />
     <None Include="shader\pointcloud.vs" />
     <None Include="shader\pointcloud_new.vert" />

@@ -20,94 +20,67 @@
 namespace vc::fusion {
     class Voxelgrid;
 
-    void exportToPly(std::vector<vc::fusion::Triangle*> triangles);
+    void exportToPly(std::vector<vc::fusion::Triangle> triangles);
     glm::vec4 VertexInterp(double isolevel, vc::fusion::Vertex _p1, vc::fusion::Vertex _p2);
-    std::vector< vc::fusion::Triangle*> Polygonise(vc::fusion::GridCell grid, double isolevel);
+    std::vector< vc::fusion::Triangle> Polygonise(vc::fusion::GridCell grid, double isolevel);
 
     class MarchingCubes {
     private:
-        GLuint vbos[3];
-        vc::fusion::Vertex* verts;
+        GLuint vertexBuffer;
+        GLuint triangleBuffer;
+        GLuint triangleVertexArray;
+
+        //vc::fusion::Vertex* verts;
         std::vector<vc::fusion::Triangle> triangles;
-        GLuint triangleCount;
+        GLuint triangleCount = 0;
 
         GLuint edgeTable;
         GLuint triTable;
+        GLuint atomicCounter;
 
         vc::rendering::ComputeShader* marchingCubesComputeShader;
         vc::rendering::ComputeShader* countTrianglesComputeShader;
+        vc::rendering::VertexFragmentShader* triangleShader;
 
     public:
         MarchingCubes() {
             marchingCubesComputeShader = new vc::rendering::ComputeShader("shader/marchingCubes.comp");
             countTrianglesComputeShader = new vc::rendering::ComputeShader("shader/countTriangles.comp");
+            triangleShader = new vc::rendering::VertexFragmentShader("shader/mesh.vert", "shader/mesh.frag");
 
-            glGenBuffers(3, vbos);
+            glGenVertexArrays(1, &triangleVertexArray);
+            glGenBuffers(1, &vertexBuffer);
+            glGenBuffers(1, &triangleBuffer);
             glGenBuffers(1, &edgeTable);
             glGenBuffers(1, &triTable);
+            glGenBuffers(1, &atomicCounter);
         }
 
-        void countTriangles(Eigen::Vector3d size, vc::fusion::Vertex* verts) {
-            int num_verts = size[0] * size[1] * size[2];
-            
-            countTrianglesComputeShader->use();
-            countTrianglesComputeShader->setVec3("sizeNormalized", size);
-            countTrianglesComputeShader->setFloat("isolevel", 0.0f);
-
-            glBindBuffer(GL_ARRAY_BUFFER, vbos[0]);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * num_verts, verts, GL_DYNAMIC_COPY);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, vbos[0]);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-
+        void zeroTriangleCounter() {
             GLuint tmp_numTriangles[1] = { 0 };
-
-            glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, vbos[2]);
+            glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, atomicCounter);
             glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), NULL, GL_DYNAMIC_DRAW);
             glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), tmp_numTriangles);
-            glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 2, vbos[2]);
+            glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 4, atomicCounter);
             glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
-
-            //glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, vbos[2]);
-            //glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint) * 1, tmp_numTriangles);
-            //glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
-
-            glDispatchCompute(num_verts, 1, 1);
-            glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-            GLuint userCounters[1];
-            glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, vbos[2]);
-            glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint) * 1, userCounters);
-            glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
-            triangleCount = userCounters[0];
-
-            //triangleCount = *tmp_numTriangles;
         }
 
         void compute(Eigen::Vector3d size, std::vector<vc::fusion::Vertex> verts) {
-
-            //countTriangles(size, verts);
-
             int snx = size[0];
             int sny = size[1];
             int snz = size[2];
 
             int num_verts = snx * sny * snz;
-            int num_triangles = num_verts * 5;
-
-            triangles = std::vector<vc::fusion::Triangle>(num_triangles);
 
             marchingCubesComputeShader->use();
             marchingCubesComputeShader->setVec3("sizeNormalized", size);
             marchingCubesComputeShader->setFloat("isolevel", 0.0f);
             marchingCubesComputeShader->setInt("INVALID_TSDF_VALUE", vc::fusion::INVALID_TSDF_VALUE);
+            marchingCubesComputeShader->setBool("onlyCount", true);
 
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbos[0]);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, vertexBuffer);
             glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Vertex) * num_verts, verts.data(), GL_DYNAMIC_COPY);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, vbos[0]);
-
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbos[1]);
-            glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Triangle) * num_triangles, triangles.data(), GL_DYNAMIC_COPY);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, vbos[1]);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, vertexBuffer);
 
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, edgeTable);
             glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vc::fusion::edgeTable), vc::fusion::edgeTable, GL_DYNAMIC_COPY);
@@ -117,26 +90,54 @@ namespace vc::fusion {
             glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(vc::fusion::triTable), vc::fusion::triTable, GL_DYNAMIC_COPY);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, triTable);
 
-            glDispatchCompute(num_verts, 1, 1);
+            zeroTriangleCounter();
 
+            glDispatchCompute(num_verts, 1, 1);
             glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, vbos[1]);
-            glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Triangle) * num_triangles, triangles.data());
+            GLuint userCounters[1];
+            glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, atomicCounter);
+            glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), userCounters);
+            glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
+            GLuint numTriangles = userCounters[0];
 
-            for (int i = 0; i < 4 && i < num_triangles; i++) {
-                std::cout << vc::utils::toString(&triangles[i]);
-            }
-            std::vector<vc::fusion::Triangle*> finalTriangles(0);
-            for (auto& triangle : triangles)
-            {
-                if (vc::utils::isValid(&triangle)) {
-                    finalTriangles.push_back(&triangle);
-                }
-            }
-            std::cout << std::endl;
-            exportToPly(finalTriangles);
+            std::cout << vc::utils::toString("Calculated numTriangles", numTriangles);
 
+            marchingCubesComputeShader->setBool("onlyCount", false);
+            triangles = std::vector<vc::fusion::Triangle>(numTriangles);
+            zeroTriangleCounter();
+
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleBuffer);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Triangle) * numTriangles, triangles.data(), GL_DYNAMIC_COPY);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, triangleBuffer);
+
+            glDispatchCompute(num_verts, 1, 1);
+            glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleBuffer);
+            glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Triangle) * numTriangles, triangles.data());
+        }
+
+        void exportToPly() {
+            vc::fusion::exportToPly(triangles);
+        }
+
+        void render(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
+            glBindVertexArray(triangleVertexArray);
+            glBindBuffer(GL_ARRAY_BUFFER, triangleBuffer);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(Triangle) * triangles.size(), triangles.data(), GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(4 * sizeof(float)));
+            glEnableVertexAttribArray(1);
+
+            triangleShader->use();
+            triangleShader->setMat4("model", model);
+            triangleShader->setMat4("view", view);
+            triangleShader->setMat4("projection", projection);
+            triangleShader->setMat4("coordinate_correction", vc::rendering::COORDINATE_CORRECTION);
+            glDrawArrays(GL_TRIANGLES, 0, triangles.size());
+            glBindVertexArray(0);
         }
     };
 
@@ -145,7 +146,7 @@ namespace vc::fusion {
             int sny = voxelgrid->sizeNormalized[1];
             int snz = voxelgrid->sizeNormalized[2];
 
-            std::vector<vc::fusion::Triangle*> triangles(snx * sny * snz * 5);
+            std::vector<vc::fusion::Triangle> triangles(snx * sny * snz * 5);
 
             std::vector<std::thread> threads;
             int i = 0;
@@ -164,14 +165,12 @@ namespace vc::fusion {
                                 continue;
                             }
 
-                            std::cout << x + y * snx + z * snx * sny << ":: ";
-                            std::vector<vc::fusion::Triangle*> new_triangles = Polygonise(cell, 0.0);
+                            //std::cout << x + y * snx + z * snx * sny << ":: ";
+                            std::vector<vc::fusion::Triangle> new_triangles = Polygonise(cell, 0.0);
 
                             for (auto& triangle : new_triangles)
                             {
-                                if (triangle) {
                                     triangles[i++] = triangle;
-                                }
                             }
                         }
                     }));
@@ -192,14 +191,14 @@ namespace vc::fusion {
                 thread.join();
             }
 
-            std::vector<vc::fusion::Triangle*> finalTriangles(0);
+            std::vector<vc::fusion::Triangle> finalTriangles(0);
             finalTriangles.insert(finalTriangles.end(), triangles.begin(), triangles.begin() + i);
             exportToPly(finalTriangles);
         }
 
 
-        std::vector< vc::fusion::Triangle*> Polygonise(vc::fusion::GridCell grid, double isolevel) {
-            std::vector<vc::fusion::Triangle*> triangles;
+        std::vector< vc::fusion::Triangle> Polygonise(vc::fusion::GridCell grid, double isolevel) {
+            std::vector<vc::fusion::Triangle> triangles;
 
             int i, ntriang;
             int cubeindex;
@@ -219,7 +218,7 @@ namespace vc::fusion {
             if (grid.verts[6].tsdf[1] < isolevel) cubeindex |= 64;
             if (grid.verts[7].tsdf[1] < isolevel) cubeindex |= 128;
 
-            std::cout << cubeindex << std::endl;
+            //std::cout << cubeindex << std::endl;
 
             /* Cube is entirely in/out of the surface */
             if (edgeTable[cubeindex] == 0) {
@@ -264,10 +263,10 @@ namespace vc::fusion {
                 vertlist[11] =
                 VertexInterp(isolevel, grid.verts[3], grid.verts[7]);
 
-            for (int i = 0; i < 12; i++)
-            {
-                std::cout << vc::utils::toString(vertlist[i]);
-            }
+            //for (int i = 0; i < 12; i++)
+            //{
+            //    std::cout << vc::utils::toString(vertlist[i]);
+            //}
 
             /* Create the triangle */
             for (i = 0; triTable[cubeindex][i] != -1; i += 3) {
@@ -277,13 +276,11 @@ namespace vc::fusion {
                 auto triangle = new vc::fusion::Triangle();
 
                 if (vc::utils::isValid(a) && vc::utils::isValid(b) && vc::utils::isValid(c)) {
-                    auto triangle = new vc::fusion::Triangle();
-                    triangle->pos[0] = a;
-                    triangle->pos[1] = b;
-                    triangle->pos[2] = c;
-                    if (triangle) {
-                        triangles.emplace_back(triangle);
-                    }
+                    auto triangle = vc::fusion::Triangle();
+                    triangle.pos0 = a;
+                    triangle.pos1 = b;
+                    triangle.pos2 = c;
+                    triangles.emplace_back(triangle);
                 }
             }
 
@@ -317,15 +314,7 @@ namespace vc::fusion {
             return(p);
         }
 
-        void testSingleCellMarchingCubes() {
-            marchingCubes(new vc::fusion::SingleCellMockVoxelGrid());
-        }
-
-        void testFourCellMarchingCubes() {
-            marchingCubes(new vc::fusion::FourCellMockVoxelGrid());
-        }
-
-        void exportToPly(std::vector<vc::fusion::Triangle*> triangles) {
+        void exportToPly(std::vector<vc::fusion::Triangle> triangles) {
             std::ofstream ply_file;
             ply_file.open("plys/marching_cube.ply");
 
@@ -346,18 +335,26 @@ namespace vc::fusion {
 
             int i = 0;
             for (auto triangle : triangles) {
-                for (auto vertex : triangle->pos) {
-                    if (vc::utils::isValid(vertex)) {
+                    if (vc::utils::isValid(triangle.pos0)&& vc::utils::isValid(triangle.pos1)&& vc::utils::isValid(triangle.pos2)) {
                         for (int i = 0; i < 3; i++)
                         {
-                            ply_file << vertex[i] << " ";
+                            ply_file << triangle.pos0[i] << " ";
+                        }
+                        ply_file << "\n";
+                        for (int i = 0; i < 3; i++)
+                        {
+                            ply_file << triangle.pos1[i] << " ";
+                        }
+                        ply_file << "\n";
+                        for (int i = 0; i < 3; i++)
+                        {
+                            ply_file << triangle.pos2[i] << " ";
                         }
                         ply_file << "\n";
                     }
                     else {
                         std::cout << "error with triangle " << i << std::endl;
                     }
-                }
                 i++;
 
             }

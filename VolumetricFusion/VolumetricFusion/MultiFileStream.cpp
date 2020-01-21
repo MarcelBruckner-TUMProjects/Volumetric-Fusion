@@ -69,7 +69,6 @@ GLFWwindow* setupWindow();
 
 // settings
 int SCR_WIDTH = 800 * 2;
-int TOP_BAR_HEIGHT = 0;
 int SCR_HEIGHT = 600 * 2 ;
 
 std::vector<int> DEFAULT_COLOR_STREAM = { 640, 480 };
@@ -123,9 +122,10 @@ int main(int argc, char* argv[]) try {
 	GLFWwindow* window = setupWindow();
 
 	voxelgrid = new vc::fusion::Voxelgrid();
+	marchingCubes = new vc::fusion::MarchingCubes();
+
 	//voxelgrid = new vc::fusion::FourCellMockVoxelGrid();
-	//marchingCubes = new vc::fusion::MarchingCubes();
-	//vc::fusion::marchingCubes(voxelgrid);
+	////vc::fusion::marchingCubes(voxelgrid);
 	//marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
 	//return 0;
 
@@ -222,7 +222,6 @@ int main(int argc, char* argv[]) try {
 
 	float f = 0;
 	char* buf = "";
-	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT - TOP_BAR_HEIGHT);
 	while (!glfwWindowShouldClose(window))
 	{
 		// per-frame time logic
@@ -249,8 +248,8 @@ int main(int argc, char* argv[]) try {
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
 
-		vc::rendering::startFrame(window);
-		optimizationProblem->calculateTransformations();
+		vc::rendering::startFrame(window, SCR_WIDTH, SCR_HEIGHT);
+		//optimizationProblem->calculateTransformations();
 
 		glfwPollEvents();
 
@@ -258,10 +257,25 @@ int main(int argc, char* argv[]) try {
 
 		programGui->render();
 
-		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
-			if (state.renderState == RenderState::VOLUMETRIC_FUSION) {
-				voxelgridGUI->render();
+		if (state.renderState == RenderState::VOLUMETRIC_FUSION) {
+			voxelgridGUI->render();
+
+			if (voxelgridGUI->renderVoxelgrid) {
+				voxelgrid->renderGrid(model, view, projection);
 			}
+
+			//if (voxelgridGUI->fuse) {
+			//for (int i = 0; i < pipelines.size() && i < 4; i++)
+			int i = 0;
+			{
+				volumetricFusion(pipelines[i], optimizationProblem->getBestRelativeTransformation(i, 0), voxelgridGUI->truncationDistance);
+			}
+
+			marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
+			marchingCubes->render(model, view, projection);
+		}
+
+		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 			if (calibrateCameras) {
 				optimizationProblemGUI->render();
 			}
@@ -279,15 +293,13 @@ int main(int argc, char* argv[]) try {
 			else if (state.renderState == RenderState::ONLY_DEPTH) {
 				pipelines[i]->renderDepth(x, y, aspect, width, height);
 			}
-			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
+			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 				if (state.renderState != RenderState::MULTI_POINTCLOUD) {
 					x = -1;
 					y = -1;
 				}
 				vc::rendering::setViewport(width, height, x, y);
-				if (state.renderState == RenderState::VOLUMETRIC_FUSION && voxelgridGUI->renderVoxelgrid) {
-					voxelgrid->renderGrid(model, view, projection);
-				}
+				
 				if (programGui->showCoordinateSystem) {
 					coordinateSystem->render(model, view, projection);
 				}
@@ -295,10 +307,6 @@ int main(int argc, char* argv[]) try {
 				
 				if (calibrateCameras && optimizationProblemGUI->highlightMarkerCorners) {
 					optimizationProblem->render(model, view, projection, i);
-				}
-
-				if (voxelgridGUI->fuse) {
-					volumetricFusion(pipelines[i], optimizationProblem->getBestRelativeTransformation(i, 0), voxelgridGUI->truncationDistance);
 				}
 			}
 		}
@@ -345,7 +353,7 @@ void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline
 		voxelgridGUI->fuse = false;
 
 		if (voxelgridGUI->marchingCubes) {
-			//vc::fusion::marchingCubes(voxelgrid);
+			marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
 			voxelgridGUI->marchingCubes = false;
 		}
 }
@@ -419,6 +427,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_4: {
 			state.renderState = RenderState::CALIBRATED_POINTCLOUD;
+			break;
+		}
+		case GLFW_KEY_5: {
+			state.renderState = RenderState::VOLUMETRIC_FUSION;
 			break;
 		}
 		case GLFW_KEY_V: {
