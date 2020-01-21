@@ -57,6 +57,7 @@ using namespace vc::enums;
 #include "optimization/optimizationProblem.hpp"
 #include "optimization/BundleAdjustment.hpp"
 #include "optimization/Procrustes.hpp"
+#include "optimization/ICP.hpp"
 #include "glog/logging.h"
 
 #pragma endregion

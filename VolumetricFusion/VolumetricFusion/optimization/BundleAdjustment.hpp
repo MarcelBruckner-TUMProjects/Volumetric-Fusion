@@ -189,16 +189,19 @@ namespace vc::optimization {
             ceres::Solve(options, problem, &summary);
             calculateTransformations();
 
-            if (verbose) {
+            //if (verbose) {
                 std::cout << summary.FullReport() << "\n";
                 std::cout << vc::utils::toString("Initial", initialTransformations);
                 std::cout << vc::utils::toString("Final", bestTransformations);
 
                 std::cout << std::endl;
-            }
+            //}
         }
 
         bool solvePointCorrespondenceError() {
+
+			std::cout << "Bundle Adjustment" << std::endl;
+
             // Create residuals for each observation in the bundle adjustment problem. The
             // parameters for cameras and points are added automatically.
             ceres::Problem problem;
@@ -290,14 +293,21 @@ namespace vc::optimization {
 
 		bool solveICP() {
 			
+			std::vector<Eigen::Matrix4d> initialTransformations = bestTransformations;
+
 			int baseId = 0;
 
 			for (int relativeId = 1; relativeId < characteristicPoints.size(); relativeId++) {
-
-				vc::optimization::ICP icp = new ICP();
-				icp.estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], getCurrentRelativeTransformation(relativeId, baseId));
+				//getCurrentRelativeTransformation
+				ICP icp = vc::optimization::ICP();
+				bestTransformations[relativeId] = getBestRelativeTransformation(baseId, relativeId) * icp.estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], getBestRelativeTransformation(relativeId, baseId));
 			}
-			
+
+			std::cout << vc::utils::toString("Initial", initialTransformations);
+			std::cout << vc::utils::toString("Final", bestTransformations);
+
+			std::cout << std::endl;
+
 			return true;
 		}
 
@@ -326,7 +336,7 @@ namespace vc::optimization {
                 return false;
             }
 
-            if (!solvePointCorrespondenceError() || !solveICP()) {
+            if (!solvePointCorrespondenceError() /*|| !solveICP()*/) {
                 return false;
             }
 

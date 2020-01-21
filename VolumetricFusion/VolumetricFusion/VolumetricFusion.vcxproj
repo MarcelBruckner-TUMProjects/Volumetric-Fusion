@@ -79,6 +79,7 @@
     <ClInclude Include="MarchingCubes.hpp" />
     <ClInclude Include="optimization\BundleAdjustment.hpp" />
     <ClInclude Include="optimization\CharacteristicPoints.hpp" />
+    <ClInclude Include="optimization\ICP.hpp" />
     <ClInclude Include="optimization\OptimizationProblem.hpp" />
     <ClInclude Include="optimization\PointCorrespondenceError.hpp" />
     <ClInclude Include="optimization\Procrustes.hpp" />
