@@ -192,6 +192,7 @@ namespace vc::imgui {
 		const float truncationDistanceRange = 1.0f;
 	public:
 		bool renderVoxelgrid = true;
+		bool fuse = true;
 		float truncationDistance = truncationDistanceRange / 2.0f;
 
 		VoxelgridGUI(vc::fusion::Voxelgrid* voxelgrid) : voxelgrid(voxelgrid){}
@@ -201,11 +202,19 @@ namespace vc::imgui {
 			ImGui::Text("Editable settings of the voxelgrid.");
 
 			ImGui::Checkbox("Render voxelgrid", &renderVoxelgrid);
-			
+
+			ImGui::Checkbox("Fuse", &fuse);
+
 			ImGui::Separator();
 
 			if (ImGui::SliderFloat("Truncation distance", &truncationDistance, 0, truncationDistanceRange)) {
 				voxelgrid->setTruncationDistance(truncationDistance);
+			}
+
+			ImGui::Separator();
+
+			if (ImGui::Button("Clear")) {
+				voxelgrid->resetVoxelgridBuffer();
 			}
 
 			ImGui::End();

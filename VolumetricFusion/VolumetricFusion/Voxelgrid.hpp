@@ -195,6 +195,7 @@ namespace vc::fusion {
 			voxelgridComputeShader->setBool("setPosition", false);
 
 			voxelgridComputeShader->setMat3("world2CameraProjection", world2CameraProjection);
+			voxelgridComputeShader->setMat4("relativeTransformation", relativeTransformation);
 			voxelgridComputeShader->setMat3("colorWorld2CameraProjection", colorWorld2CameraProjection);
 			voxelgridComputeShader->setFloat("depthScale", pipeline->depth_camera->depthScale);
 			voxelgridComputeShader->setVec2("depthResolution", depthWidth, depthHeight);

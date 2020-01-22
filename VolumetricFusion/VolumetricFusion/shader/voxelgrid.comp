@@ -57,15 +57,15 @@ void main(){
     if(setPosition) {
         vec3 pos = unhash(hash);
         verts[hash].vtx_pos = vec4(pos, 1);
-        verts[hash].vtx_tsdf = vec4(hash, INVALID_TSDF_VALUE, 0, 0);
+        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);
         return;
     }
 
-    vec3 projectedVoxelCenter = world2CameraProjection * verts[hash].vtx_pos.xyz;
+    vec3 projectedVoxelCenter = world2CameraProjection * (relativeTransformation * verts[hash].vtx_pos).xyz;
     float z = projectedVoxelCenter.z;
 
     if(z <= 0) {
-        verts[hash].vtx_tsdf = vec4(hash, INVALID_TSDF_VALUE,-3,-3);
+//        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);
         return;
     }
 
@@ -73,7 +73,7 @@ void main(){
     pixelCoordinate /= 2.0f;
     
     if(pixelCoordinate.x < 0 || pixelCoordinate.y < 0 || pixelCoordinate.x >= depthResolution.x || pixelCoordinate.y >= depthResolution.y) {
-        verts[hash].vtx_tsdf = vec4(hash, INVALID_TSDF_VALUE, -2, -2);
+//        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);
         return;
     }
 
@@ -84,7 +84,7 @@ void main(){
 //    return;
 
     if(realDepth <= 0) {
-        verts[hash].vtx_tsdf = vec4(hash, INVALID_TSDF_VALUE, -1, -1);
+//        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);
         return;
     }
 
@@ -93,13 +93,16 @@ void main(){
 
     tsdf = clamp(tsdf, -truncationDistance, truncationDistance);
     
-    verts[hash].vtx_tsdf = vec4(hash, tsdf, 1, 0);
+    float oldWeight = verts[hash].vtx_tsdf.z;
+    float oldTsdf = verts[hash].vtx_tsdf.y;
+    float newWeight = oldWeight + 1;
 
-//    projectedVoxelCenter = colorWorld2CameraProjection * verts[hash].vtx_pos.xyz;
-//    z = projectedVoxelCenter.z;
-//    
-//    pixelCoordinate = projectedVoxelCenter.xy / z;
-//    pixelCoordinate /= 2.0f;
+    tsdf = (oldTsdf * oldWeight + tsdf) / newWeight;
 
-    verts[hash].vtx_color = texture(colorFrame, uv);
+    verts[hash].vtx_tsdf = vec4(hash, tsdf, newWeight, 0);
+
+    vec4 oldColor = verts[hash].vtx_color;
+    vec4 newColor = texture(colorFrame, uv);
+
+    verts[hash].vtx_color = (oldColor * oldWeight + newColor) / newWeight;
 }

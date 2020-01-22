@@ -64,7 +64,6 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 void setCalibration();
 void addPipeline(std::shared_ptr<  vc::capture::CaptureDevice> pipeline);
-void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation);
 GLFWwindow* setupWindow();
 GLFWwindow* setupComputeWindow();
 
@@ -118,11 +117,13 @@ vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState
 vc::settings::FolderSettings folderSettings;
 ImGuiIO io;
 
+bool blockInput = false;
+
 int main(int argc, char* argv[]) try {	
 	
 	GLFWwindow* window = setupWindow();
-	GLFWwindow* hiddenComputeWindow = setupComputeWindow();
-	glfwMakeContextCurrent(window);
+	//GLFWwindow* hiddenComputeWindow = setupComputeWindow();
+	//glfwMakeContextCurrent(window);
 
 	//voxelgrid = new vc::fusion::FourCellMockVoxelGrid();
 	voxelgrid = new vc::fusion::Voxelgrid();
@@ -233,8 +234,7 @@ int main(int argc, char* argv[]) try {
 
 #pragma region Main loop
 
-	float f = 0;
-	char* buf = "";
+	int frameNumberForVoxelgrid = 0;
 	while (!glfwWindowShouldClose(window))
 	{
 		// per-frame time logic
@@ -273,19 +273,21 @@ int main(int argc, char* argv[]) try {
 		if (state.renderState == RenderState::VOLUMETRIC_FUSION) {
 			voxelgridGUI->render();
 
+			if (voxelgridGUI->fuse && frameNumberForVoxelgrid++ > 10) {
+				blockInput = true;
+				for (int i = 0; i < pipelines.size() && i < 4; i++)
+				{
+					voxelgrid->integrateFrameGPU(pipelines[i], optimizationProblem->getBestRelativeTransformation(0, i));
+				}
+
+				marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
+				frameNumberForVoxelgrid = 0;
+				blockInput = false;
+			}
 			if (voxelgridGUI->renderVoxelgrid) {
 				voxelgrid->renderGrid(model, view, projection);
 			}
-
-			//if (voxelgridGUI->fuse) {
-			//for (int i = 0; i < pipelines.size() && i < 4; i++)
-			int i = 0;
-			{
-				volumetricFusion(pipelines[i], optimizationProblem->getBestRelativeTransformation(i, 0));
-			}
-
-			//marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
-			//marchingCubes->render(model, view, projection);
+			marchingCubes->render(model, view, projection);
 		}
 
 		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
@@ -359,11 +361,6 @@ catch (const std::exception & e)
 }
 #pragma endregion
 
-void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation) {
-		//voxelgrid->integrateFramesCPU(pipelines, optimizationProblem->bestTransformations);
-		voxelgrid->integrateFrameGPU(pipeline, relativeTransformation);
-}
-
 void setCalibration() {
 	calibrateCameras.store(calibrateCameras);
 	for (int i = 0; i < pipelines.size(); i++) {
@@ -390,6 +387,9 @@ bool isKeyPressed(GLFWwindow* window, int key) {
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow* window)
 {
+	if (blockInput) {
+		return;
+	}
 	if (isKeyPressed(window, GLFW_KEY_W)) {
 		camera.ProcessKeyboard(vc::io::Camera_Movement::FORWARD, deltaTime);
 	}
@@ -405,6 +405,9 @@ void processInput(GLFWwindow* window)
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	if (blockInput) {
+		return;
+	}
 	if (action == GLFW_PRESS || action == GLFW_REPEAT) {
 		switch (key) {
 		case GLFW_KEY_ESCAPE: {
@@ -481,6 +484,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 // -------------------------------------------------------
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
+	if (blockInput) {
+		return;
+	}
 	if (mouseButtonDown[GLFW_MOUSE_BUTTON_1]) {
 		if (firstMouse)
 		{
@@ -503,6 +509,9 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 
 void mouse_button_callback(GLFWwindow*, int button, int action, int mods)
 {
+	if (blockInput) {
+		return;
+	}
 	if (action == GLFW_PRESS) {
 		firstMouse = true;
 	}
@@ -513,6 +522,9 @@ void mouse_button_callback(GLFWwindow*, int button, int action, int mods)
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
+	if (blockInput) {
+		return;
+	}
 	camera.ProcessMouseScroll(yoffset);
 }
 

@@ -98,7 +98,7 @@ int calculateCubeIndex(int hashes[8]){
 
 InterpolationResult VertexInterp(VtxData p1, VtxData p2)
 {
-    if(p1.tsdf.y == INVALID_TSDF_VALUE || p2.tsdf.y == INVALID_TSDF_VALUE){
+    if(p1.tsdf.w == INVALID_TSDF_VALUE || p2.tsdf.w == INVALID_TSDF_VALUE){
         return InterpolationResult(vec4(-1000), vec4(-1000));
     }
 
