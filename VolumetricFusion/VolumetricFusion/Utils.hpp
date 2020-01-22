@@ -151,29 +151,26 @@ namespace vc::utils {
 		return ss.str();
 	}
 
-	//std::string toString(vc::fusion::Triangle* b) {
-	//	std::stringstream ss;
+	std::string toString(vc::fusion::Triangle* b) {
+		std::stringstream ss;
 
-	//	for (auto& pos : b->pos)
-	//	{
-	//		ss << pos0 << " | " << pos1 << " | " << pos2 << " | " << pos[3] << std::endl;
-	//	}
+		ss << b->pos0[0] << " | " << b->pos0[1] << " | " << b->pos0[2] << " | " << b->pos0[3] << " --- " << b->color0[0] << " | " << b->color0[1] << " | " << b->color0[2] << " | " << b->color0[3] << std::endl;
+		ss << b->pos1[0] << " | " << b->pos1[1] << " | " << b->pos1[2] << " | " << b->pos1[3] << " --- " << b->color1[0] << " | " << b->color1[1] << " | " << b->color1[2] << " | " << b->color1[3] << std::endl;
+		ss << b->pos2[0] << " | " << b->pos2[1] << " | " << b->pos2[2] << " | " << b->pos2[3] << " --- " << b->color2[0] << " | " << b->color2[1] << " | " << b->color2[2] << " | " << b->color1[3] << std::endl;
 
-	//	return ss.str();
-	//}
+		ss << std::endl;
 
-	//std::string toString(std::string header, vc::fusion::Triangle* b) {
-	//	std::stringstream ss;
-	//	ss << asHeader(header);
+		return ss.str();
+	}
 
-	//	for (auto& pos : b->pos)
-	//	{
-	//		ss << pos0 << " | " << pos1 << " | " << pos2 << " | " << pos[3] << std::endl;
-	//	}
-	//	ss << std::endl;
+	std::string toString(std::string header, vc::fusion::Triangle* b) {
+		std::stringstream ss;
+		ss << asHeader(header);
 
-	//	return ss.str();
-	//}
+		ss << toString(b);
+
+		return ss.str();
+	}
 
 	std::string toString(std::string header, Eigen::Vector4d b) {
 		std::stringstream ss;
@@ -258,6 +255,21 @@ namespace vc::utils {
 			}
 		}
 		return true;
+	}
+
+	bool areEqual(glm::vec4 a, glm::vec4 b) {
+		return
+			a[0] == b[0] &&
+			a[1] == b[1] &&
+			a[2] == b[2] &&
+			a[3] == b[3];
+	}
+
+	bool areEqual(vc::fusion::Triangle* a, vc::fusion::Triangle* b) {
+		return
+			areEqual(a->pos0, b->pos0) &&
+			areEqual(a->pos1, b->pos1) &&
+			areEqual(a->pos2, b->pos2);
 	}
 
 }

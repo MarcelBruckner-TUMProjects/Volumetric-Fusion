@@ -64,7 +64,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 void setCalibration();
 void addPipeline(std::shared_ptr<  vc::capture::CaptureDevice> pipeline);
-void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance);
+void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation);
 GLFWwindow* setupWindow();
 
 // settings
@@ -102,7 +102,7 @@ bool visualizeCharucoResults = true;
 bool overlayCharacteristicPoints = true;
 
 vc::fusion::Voxelgrid* voxelgrid;
-vc::imgui::VoxelgridGUI* voxelgridGUI = new vc::imgui::VoxelgridGUI(voxelgrid);
+vc::imgui::VoxelgridGUI* voxelgridGUI;
 vc::fusion::MarchingCubes* marchingCubes;
 
 vc::rendering::CoordinateSystem* coordinateSystem;
@@ -121,6 +121,7 @@ int main(int argc, char* argv[]) try {
 	
 	GLFWwindow* window = setupWindow();
 
+	//voxelgrid = new vc::fusion::FourCellMockVoxelGrid();
 	voxelgrid = new vc::fusion::Voxelgrid();
 	marchingCubes = new vc::fusion::MarchingCubes();
 
@@ -132,7 +133,7 @@ int main(int argc, char* argv[]) try {
 	coordinateSystem = new vc::rendering::CoordinateSystem();
 	optimizationProblem->setupOpenGL();
 	optimizationProblemGUI = new vc::imgui::OptimizationProblemGUI(optimizationProblem);
-
+	voxelgridGUI = new vc::imgui::VoxelgridGUI(voxelgrid);
 	//ImGui_ImplGlfw_Init(window, false);
 	
 	//vc::rendering::Rendering rendering(app, viewOrientation);
@@ -268,7 +269,7 @@ int main(int argc, char* argv[]) try {
 			//for (int i = 0; i < pipelines.size() && i < 4; i++)
 			int i = 0;
 			{
-				volumetricFusion(pipelines[i], optimizationProblem->getBestRelativeTransformation(i, 0), voxelgridGUI->truncationDistance);
+				volumetricFusion(pipelines[i], optimizationProblem->getBestRelativeTransformation(i, 0));
 			}
 
 			marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
@@ -346,16 +347,9 @@ catch (const std::exception & e)
 }
 #pragma endregion
 
-void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance) {
+void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation) {
 		//voxelgrid->integrateFramesCPU(pipelines, optimizationProblem->bestTransformations);
-		voxelgrid->integrateFrameGPU(pipeline, relativeTransformation, voxelgridGUI->truncationDistance);
-
-		voxelgridGUI->fuse = false;
-
-		if (voxelgridGUI->marchingCubes) {
-			marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
-			voxelgridGUI->marchingCubes = false;
-		}
+		voxelgrid->integrateFrameGPU(pipeline, relativeTransformation);
 }
 
 void setCalibration() {

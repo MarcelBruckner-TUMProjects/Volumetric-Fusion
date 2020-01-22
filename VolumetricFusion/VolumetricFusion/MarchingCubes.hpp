@@ -65,7 +65,7 @@ namespace vc::fusion {
             glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
         }
 
-        void compute(Eigen::Vector3d size, std::vector<vc::fusion::Vertex> verts) {
+        void compute(Eigen::Vector3i size, std::vector<vc::fusion::Vertex> verts) {
             int snx = size[0];
             int sny = size[1];
             int snz = size[2];
@@ -73,7 +73,7 @@ namespace vc::fusion {
             int num_verts = snx * sny * snz;
 
             marchingCubesComputeShader->use();
-            marchingCubesComputeShader->setVec3("sizeNormalized", size);
+            marchingCubesComputeShader->setVec3i("sizeNormalized", size);
             marchingCubesComputeShader->setFloat("isolevel", 0.0f);
             marchingCubesComputeShader->setInt("INVALID_TSDF_VALUE", vc::fusion::INVALID_TSDF_VALUE);
             marchingCubesComputeShader->setBool("onlyCount", true);
@@ -116,6 +116,23 @@ namespace vc::fusion {
 
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleBuffer);
             glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Triangle) * numTriangles, triangles.data());
+
+            //for (int i = 0; i < 100 && i < numTriangles; i++)
+            //{
+            //    std::cout << vc::utils::toString(std::to_string(i), &triangles[i]);
+            //    for (int j = 0; j < 100 && j < numTriangles; j++)
+            //    {
+            //        if (i != j && vc::utils::areEqual(&triangles[i], &triangles[j])) {
+            //            std::cout << vc::utils::asHeader("Overlap detected");
+            //            std::cout << vc::utils::toString(std::to_string(i), &triangles[i]);
+            //            std::cout << vc::utils::toString(std::to_string(j), &triangles[j]);
+            //        }
+            //    }
+            //}
+
+            std::cout << std::endl;
+
+            //exportToPly();
         }
 
         void exportToPly() {
@@ -136,7 +153,7 @@ namespace vc::fusion {
             triangleShader->setMat4("view", view);
             triangleShader->setMat4("projection", projection);
             triangleShader->setMat4("coordinate_correction", vc::rendering::COORDINATE_CORRECTION);
-            glDrawArrays(GL_TRIANGLES, 0, triangles.size());
+            glDrawArrays(GL_TRIANGLES, 0, triangles.size() * 3);
             glBindVertexArray(0);
         }
     };
@@ -328,6 +345,10 @@ namespace vc::fusion {
             ply_file << "property float y\n";
             ply_file << "property float z\n";
 
+            ply_file << "property uchar red\n";
+            ply_file << "property uchar green\n";
+            ply_file << "property uchar blue\n";
+
 
             ply_file << "element face " << triangles.size() << "\n";
             ply_file << "property list uchar int vertex_indices\n";
@@ -340,15 +361,27 @@ namespace vc::fusion {
                         {
                             ply_file << triangle.pos0[i] << " ";
                         }
+                        for (int i = 0; i < 3; i++)
+                        {
+                            ply_file << int(triangle.color0[i] * 255) << " ";
+                        }
                         ply_file << "\n";
                         for (int i = 0; i < 3; i++)
                         {
                             ply_file << triangle.pos1[i] << " ";
                         }
+                        for (int i = 0; i < 3; i++)
+                        {
+                            ply_file << int(triangle.color1[i] * 255) << " ";
+                        }
                         ply_file << "\n";
                         for (int i = 0; i < 3; i++)
                         {
                             ply_file << triangle.pos2[i] << " ";
+                        }
+                        for (int i = 0; i < 3; i++)
+                        {
+                            ply_file << int(triangle.color2[i] * 255) << " ";
                         }
                         ply_file << "\n";
                     }

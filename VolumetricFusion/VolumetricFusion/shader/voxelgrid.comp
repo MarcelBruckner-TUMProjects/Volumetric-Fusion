@@ -5,7 +5,7 @@ uniform float resolution;
 uniform float resolutionInv;
 uniform vec3 size;
 uniform vec3 sizeHalf;
-uniform vec3 sizeNormalized;
+uniform ivec3 sizeNormalized;
 uniform vec3 origin;
 uniform mat4 relativeTransformation;
 uniform mat4 coordinate_correction;
@@ -77,7 +77,8 @@ void main(){
         return;
     }
 
-    float realDepth = texture(depthFrame, pixelCoordinate / depthResolution).x * depthScale;
+    vec2 uv = pixelCoordinate / depthResolution;
+    float realDepth = texture(depthFrame, uv).x * depthScale;
 //    verts[hash].vtx_tsdf = vec4(realDepth, depthResolution, depthScale);
     
 //    return;
@@ -100,5 +101,5 @@ void main(){
 //    pixelCoordinate = projectedVoxelCenter.xy / z;
 //    pixelCoordinate /= 2.0f;
 
-    verts[hash].vtx_color = texture(colorFrame, pixelCoordinate / depthResolution);
+    verts[hash].vtx_color = texture(colorFrame, uv);
 }

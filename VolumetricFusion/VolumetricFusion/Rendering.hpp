@@ -242,6 +242,8 @@ namespace vc::rendering {
 
             const int width = color_image.as<rs2::video_frame>().get_width();
             const int height = color_image.as<rs2::video_frame>().get_height();
+
+            glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, textures[0]);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, color_image.get_data());
 
@@ -260,12 +262,14 @@ namespace vc::rendering {
 
             TEXTURE_shader->use();
             TEXTURE_shader->setVec2("aspect", x_aspect, y_aspect );
-            glBindVertexArray(VAOs[0]);
+            TEXTURE_shader->setInt("onlyColorTexture", 0);
+
+            initializeTextureBuffer();
+
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
             glBindVertexArray(0);
 
-           /* glBindBuffer(GL_ARRAY_BUFFER, COLOR_VBO);
-            glBufferData(GL_ARRAY_BUFFER, vertices.size(), vertices.data(), GL_STREAM_DRAW);*/
+          
         }
     };
     

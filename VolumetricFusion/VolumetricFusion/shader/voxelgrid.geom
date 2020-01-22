@@ -13,6 +13,11 @@ out vec4 fColor;
 void assemble_cube(vec4 position)
 {   
     fColor = gs_in[0].color;
+
+    if(gs_in[0].color.a <= 0){
+        EndPrimitive();
+    }
+
 //    fColor = vec3(1.0f, 0.0f, 0.0f);
 
     gl_Position = position + vec4(cube_radius, cube_radius, cube_radius, 0.0);    

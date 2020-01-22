@@ -164,6 +164,11 @@ namespace vc::capture {
 		}
 
 		void captureThreadFunction() {
+			std::vector<rs2::filter*> filters;
+			filters.emplace_back(new rs2::hole_filling_filter(1)); // Try 0, 1, 2
+			filters.emplace_back(new rs2::threshold_filter(0.2, 1.2)); // Try 0, 1, 2
+			//filters.emplace_back(new rs2::spatial_filter()); // Try 0, 1, 2
+			//filters.emplace_back(new rs2::temporal_filter());
 
 			while (!stopped->load()) //While application is running
 			{
@@ -200,15 +205,15 @@ namespace vc::capture {
 					data->filteredColorFrames = colorFrame;
 
 					// Apply filters.
-					/*for (auto&& filter : data->filters) {
+					for (auto&& filter : filters) {
 						filteredDepthFrame = filter->process(filteredDepthFrame);
-					}*/
+					}
 
 					// Push filtered & original data to their respective queues
 					data->filteredDepthFrames = filteredDepthFrame;
 
 					rs2::colorizer colorizer;
-					data->colorizedDepthFrames = colorizer.process(depthFrame);		// Colorize the depth frame with a color map
+					data->colorizedDepthFrames = colorizer.process(filteredDepthFrame);		// Colorize the depth frame with a color map
 
 					//data->points = data->pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
 					//data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud

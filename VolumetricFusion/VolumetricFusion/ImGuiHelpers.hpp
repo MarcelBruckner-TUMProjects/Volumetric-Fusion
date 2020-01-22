@@ -192,8 +192,6 @@ namespace vc::imgui {
 		const float truncationDistanceRange = 1.0f;
 	public:
 		bool renderVoxelgrid = true;
-		bool fuse = false;
-		bool marchingCubes = false;
 		float truncationDistance = truncationDistanceRange / 2.0f;
 
 		VoxelgridGUI(vc::fusion::Voxelgrid* voxelgrid) : voxelgrid(voxelgrid){}
@@ -203,14 +201,12 @@ namespace vc::imgui {
 			ImGui::Text("Editable settings of the voxelgrid.");
 
 			ImGui::Checkbox("Render voxelgrid", &renderVoxelgrid);
-
-			ImGui::Checkbox("Fuse", &fuse);
-
-			ImGui::Checkbox("Marching cubes after frame", &marchingCubes);			
-
+			
 			ImGui::Separator();
 
-			fuse |= ImGui::SliderFloat("Truncation distance", &truncationDistance, 0, truncationDistanceRange);
+			if (ImGui::SliderFloat("Truncation distance", &truncationDistance, 0, truncationDistanceRange)) {
+				voxelgrid->setTruncationDistance(truncationDistance);
+			}
 
 			ImGui::End();
 		}
