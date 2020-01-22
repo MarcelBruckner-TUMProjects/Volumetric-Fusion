@@ -119,7 +119,7 @@ std::atomic_bool calibrateCameras = false;
 std::atomic_bool renderCoordinateSystem = false;
 
 vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
-vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment();
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::ICP();
 vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState, setCalibration, &calibrateCameras, &camera);
 
 int main(int argc, char* argv[]) try {	

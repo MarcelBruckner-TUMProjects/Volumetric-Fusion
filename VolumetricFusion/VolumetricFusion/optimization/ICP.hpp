@@ -21,7 +21,7 @@
 #include "OptimizationProblem.hpp"
 //#include "PointCorrespondenceError.hpp"
 //#include "ReprojectionError.hpp"
-//#include "BundleAdjustment.hpp"
+#include "BundleAdjustment.hpp"
 #include <VolumetricFusion\CaptureDevice.hpp>
 
 namespace vc::optimization {
@@ -170,20 +170,38 @@ namespace vc::optimization {
 
 		bool vc::optimization::OptimizationProblem::specific_optimize() {
 			
-			////vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment();
-			////optimizationProblem->specific_optimize();
+			if (!solveErrorFunction()) {
+				return false;
+			}
 
-			//std::cout << characteristicPoints[0].markerCorners.size() << " " << characteristicPoints[0].charucoCorners.size() << std::endl;
+			return true;
+
+		}
+
+		void initializeWith() {
+			vc::optimization::BundleAdjustment ba = new vc::optimization::BundleAdjustment();
+			ba.specific_optimize();
+		}
+
+		bool solveErrorFunction() {
+
+			initializeWith();
+
+			//std::vector<Eigen::Matrix4d> initialTransformations = bestTransformations;
 
 			//int baseId = 0;
 
 			//for (int relativeId = 1; relativeId < characteristicPoints.size(); relativeId++) {
-			//	//getCurrentRelativeTransformation(relativeId, baseId)
-			//	bestTransformations[relativeId] = estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], Eigen::Matrix4d::Identity());
+			//	//getCurrentRelativeTransformation
+			//	bestTransformations[relativeId] = getBestRelativeTransformation(baseId, relativeId) * estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], getBestRelativeTransformation(relativeId, baseId));
 			//}
 
-			return false;
+			//std::cout << vc::utils::toString("Initial", initialTransformations);
+			//std::cout << vc::utils::toString("Final", bestTransformations);
 
+			//std::cout << std::endl;
+
+			return true;
 		}
 
 		Eigen::Matrix4d estimatePose(ACharacteristicPoints& source, ACharacteristicPoints& target, Eigen::Matrix4d initialPose) {
@@ -311,6 +329,7 @@ namespace vc::optimization {
 				problem.AddResidualBlock(cf, nullptr, poseIncrement.getData());
 			}
 		}
+
 	};
 
 	class MockICP : public ICP, public MockOptimizationProblem {
