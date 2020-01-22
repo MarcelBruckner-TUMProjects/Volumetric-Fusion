@@ -98,6 +98,10 @@ int calculateCubeIndex(int hashes[8]){
 
 InterpolationResult VertexInterp(VtxData p1, VtxData p2)
 {
+    if(p1.tsdf.y == INVALID_TSDF_VALUE || p2.tsdf.y == INVALID_TSDF_VALUE){
+        return InterpolationResult(vec4(-1000), vec4(-1000));
+    }
+
     if (abs(isolevel - p1.tsdf[1]) < 0.00001)
         return InterpolationResult(p1.pos, p1.color);
     if (abs(isolevel - p2.tsdf[1]) < 0.00001)
@@ -146,57 +150,32 @@ void main(){
 		return;
 	}
     
-	InterpolationResult vertlist[12] = InterpolationResult[](
-		InterpolationResult(vec4(-1000), vec4(-1000)),
-		InterpolationResult(vec4(-1000), vec4(-1000)),
-		InterpolationResult(vec4(-1000), vec4(-1000)),
-		InterpolationResult(vec4(-1000), vec4(-1000)),
-		InterpolationResult(vec4(-1000), vec4(-1000)),
-		InterpolationResult(vec4(-1000), vec4(-1000)),
-		InterpolationResult(vec4(-1000), vec4(-1000)),
-		InterpolationResult(vec4(-1000), vec4(-1000)),
-		InterpolationResult(vec4(-1000), vec4(-1000)),
-		InterpolationResult(vec4(-1000), vec4(-1000)),
-		InterpolationResult(vec4(-1000), vec4(-1000)),
-		InterpolationResult(vec4(-1000), vec4(-1000))
-	);
-                
-    if (bool(edgeTable[cubeindex].value & 1) && verts[hashes[0]].tsdf[1] != INVALID_TSDF_VALUE && verts[hashes[1]].tsdf[1] != INVALID_TSDF_VALUE)
-        vertlist[0] =
-		VertexInterp(verts[hashes[0]], verts[hashes[1]]);
-    if (bool(edgeTable[cubeindex].value & 2) && verts[hashes[1]].tsdf[1] != INVALID_TSDF_VALUE && verts[hashes[2]].tsdf[1] != INVALID_TSDF_VALUE)
-        vertlist[1] =
-        VertexInterp(verts[hashes[1]], verts[hashes[2]]);
-    if (bool(edgeTable[cubeindex].value & 4) && verts[hashes[2]].tsdf[1] != INVALID_TSDF_VALUE && verts[hashes[3]].tsdf[1] != INVALID_TSDF_VALUE)
-        vertlist[2] = 
-        VertexInterp(verts[hashes[2]], verts[hashes[3]]);
-    if (bool(edgeTable[cubeindex].value & 8) && verts[hashes[3]].tsdf[1] != INVALID_TSDF_VALUE && verts[hashes[0]].tsdf[1] != INVALID_TSDF_VALUE)
-        vertlist[3] = 
-        VertexInterp(verts[hashes[3]], verts[hashes[0]]);
-    if (bool(edgeTable[cubeindex].value & 16) && verts[hashes[4]].tsdf[1] != INVALID_TSDF_VALUE && verts[hashes[5]].tsdf[1] != INVALID_TSDF_VALUE)
-        vertlist[4] =
-        VertexInterp(verts[hashes[4]], verts[hashes[5]]);
-    if (bool(edgeTable[cubeindex].value & 32) && verts[hashes[5]].tsdf[1] != INVALID_TSDF_VALUE && verts[hashes[6]].tsdf[1] != INVALID_TSDF_VALUE)
-        vertlist[5] =
-        VertexInterp(verts[hashes[5]], verts[hashes[6]]);
-    if (bool(edgeTable[cubeindex].value & 64) && verts[hashes[6]].tsdf[1] != INVALID_TSDF_VALUE && verts[hashes[7]].tsdf[1] != INVALID_TSDF_VALUE)
-        vertlist[6] =
-        VertexInterp(verts[hashes[6]], verts[hashes[7]]);
-    if (bool(edgeTable[cubeindex].value & 128) && verts[hashes[7]].tsdf[1] != INVALID_TSDF_VALUE && verts[hashes[4]].tsdf[1] != INVALID_TSDF_VALUE)
-        vertlist[7] =
-        VertexInterp(verts[hashes[7]], verts[hashes[4]]);
-    if (bool(edgeTable[cubeindex].value & 256) && verts[hashes[0]].tsdf[1] != INVALID_TSDF_VALUE && verts[hashes[4]].tsdf[1] != INVALID_TSDF_VALUE)
-        vertlist[8] =
-        VertexInterp(verts[hashes[0]], verts[hashes[4]]);
-    if (bool(edgeTable[cubeindex].value & 512) && verts[hashes[1]].tsdf[1] != INVALID_TSDF_VALUE && verts[hashes[5]].tsdf[1] != INVALID_TSDF_VALUE)
-        vertlist[9] =
-        VertexInterp(verts[hashes[1]], verts[hashes[5]]);
-    if (bool(edgeTable[cubeindex].value & 1024) && verts[hashes[2]].tsdf[1] != INVALID_TSDF_VALUE && verts[hashes[6]].tsdf[1] != INVALID_TSDF_VALUE)
-        vertlist[10] =
-        VertexInterp(verts[hashes[2]], verts[hashes[6]]);
-    if (bool(edgeTable[cubeindex].value & 2048) && verts[hashes[3]].tsdf[1] != INVALID_TSDF_VALUE && verts[hashes[7]].tsdf[1] != INVALID_TSDF_VALUE)
-        vertlist[11] =
-        VertexInterp(verts[hashes[3]], verts[hashes[7]]);
+	InterpolationResult vertlist[12];
+    
+    if (bool(edgeTable[cubeindex].value & 1))
+        vertlist[0] = VertexInterp(verts[hashes[0]], verts[hashes[1]]);
+    if (bool(edgeTable[cubeindex].value & 2))
+        vertlist[1] = VertexInterp(verts[hashes[1]], verts[hashes[2]]);
+    if (bool(edgeTable[cubeindex].value & 4))
+        vertlist[2] = VertexInterp(verts[hashes[2]], verts[hashes[3]]);
+    if (bool(edgeTable[cubeindex].value & 8))
+        vertlist[3] = VertexInterp(verts[hashes[3]], verts[hashes[0]]);
+    if (bool(edgeTable[cubeindex].value & 16))
+        vertlist[4] = VertexInterp(verts[hashes[4]], verts[hashes[5]]);
+    if (bool(edgeTable[cubeindex].value & 32))
+        vertlist[5] = VertexInterp(verts[hashes[5]], verts[hashes[6]]);
+    if (bool(edgeTable[cubeindex].value & 64))
+        vertlist[6] = VertexInterp(verts[hashes[6]], verts[hashes[7]]);
+    if (bool(edgeTable[cubeindex].value & 128))
+        vertlist[7] = VertexInterp(verts[hashes[7]], verts[hashes[4]]);
+    if (bool(edgeTable[cubeindex].value & 256))
+        vertlist[8] = VertexInterp(verts[hashes[0]], verts[hashes[4]]);
+    if (bool(edgeTable[cubeindex].value & 512))
+        vertlist[9] = VertexInterp(verts[hashes[1]], verts[hashes[5]]);
+    if (bool(edgeTable[cubeindex].value & 1024))
+        vertlist[10] = VertexInterp(verts[hashes[2]], verts[hashes[6]]);
+    if (bool(edgeTable[cubeindex].value & 2048))
+        vertlist[11] = VertexInterp(verts[hashes[3]], verts[hashes[7]]);
 			
 //    for(int i = 0; i < 12; i++){
 //        triangles[i / 3].pos[i % 3] = vertlist[i];        
@@ -205,11 +184,12 @@ void main(){
 
 	for (int i = 0; triTable[cubeindex * 16 + i].value != -1; i += 3) {
 		InterpolationResult a = vertlist[triTable[cubeindex * 16 + i + 0].value];
+        if(!isValid(a)) continue;
         InterpolationResult b = vertlist[triTable[cubeindex * 16 + i + 1].value];
+        if(!isValid(b)) continue;
         InterpolationResult c = vertlist[triTable[cubeindex * 16 + i + 2].value];
+        if(!isValid(c)) continue;
 
-		if(isValid(a) && isValid(b) && isValid(c))
-        {            
             uint t = atomicCounterIncrement(numTriangles);
             if(!onlyCount){
 //                triangles[t].pos0 = vec4(hashes[0],hashes[1],hashes[2],hashes[3]);
@@ -224,7 +204,6 @@ void main(){
 //			    triangles[t].color1 = vec4(0, 1, 0, 1);
 //			    triangles[t].color2 = vec4(0, 0, 1, 1);
             }
-		}		
 	}
 }
  

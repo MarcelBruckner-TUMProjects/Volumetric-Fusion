@@ -52,7 +52,7 @@ namespace vc::fusion {
 			return z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x;
 		}
 
-		Voxelgrid(const float resolution = 0.01f, const Eigen::Vector3d size = Eigen::Vector3d(1.0, 1.0, 1.1), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
+		Voxelgrid(const float resolution = 0.01f, const Eigen::Vector3d size = Eigen::Vector3d(1.1, 1.1, 1.1), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
 			: resolution(resolution), origin(origin), size(size), 
 			sizeHalf(size / 2.0f), 
 			sizeNormalized(Eigen::Vector3i((size / resolution).cast<int>()) + Eigen::Vector3i(1, 1, 1)), 

@@ -66,6 +66,7 @@ void setCalibration();
 void addPipeline(std::shared_ptr<  vc::capture::CaptureDevice> pipeline);
 void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation);
 GLFWwindow* setupWindow();
+GLFWwindow* setupComputeWindow();
 
 // settings
 int SCR_WIDTH = 800 * 2;
@@ -120,6 +121,8 @@ ImGuiIO io;
 int main(int argc, char* argv[]) try {	
 	
 	GLFWwindow* window = setupWindow();
+	GLFWwindow* hiddenComputeWindow = setupComputeWindow();
+	glfwMakeContextCurrent(window);
 
 	//voxelgrid = new vc::fusion::FourCellMockVoxelGrid();
 	voxelgrid = new vc::fusion::Voxelgrid();
@@ -219,6 +222,15 @@ int main(int argc, char* argv[]) try {
 	});
 #pragma endregion
 	   
+	//fusionThread = std::thread([&stopped, &hiddenComputeWindow]() {
+	//	while (!stopped) {
+	//		if (state.renderState == RenderState::VOLUMETRIC_FUSION) {
+	//			glfwMakeContextCurrent(hiddenComputeWindow);
+	//			vc::utils::sleepFor("Sleeping in compute", 50);
+	//		}
+	//	}
+	//});
+
 #pragma region Main loop
 
 	float f = 0;
@@ -272,8 +284,8 @@ int main(int argc, char* argv[]) try {
 				volumetricFusion(pipelines[i], optimizationProblem->getBestRelativeTransformation(i, 0));
 			}
 
-			marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
-			marchingCubes->render(model, view, projection);
+			//marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
+			//marchingCubes->render(model, view, projection);
 		}
 
 		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
@@ -504,6 +516,20 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 	camera.ProcessMouseScroll(yoffset);
 }
 
+void gladErrorCallback(const char* name, void* funcptr, int len_args, ...) {
+	GLenum error_code;
+
+	(void)funcptr;
+	(void)len_args;
+
+	error_code = glad_glGetError();
+
+	if (error_code != GL_NO_ERROR) {
+		// shut this up for a while
+		fprintf(stderr, "ERROR %d in %s\n", error_code, name);
+	}
+}
+
 GLFWwindow* setupWindow() {
 	google::InitGoogleLogging("Bundle Adjustment");
 	ceres::Solver::Summary summary;
@@ -545,22 +571,47 @@ GLFWwindow* setupWindow() {
 		throw new std::exception("Failed to initialize GLAD");
 	}
 
-	glad_set_post_callback([](const char* name, void* funcptr, int len_args, ...) {
-		GLenum error_code;
-
-		(void)funcptr;
-		(void)len_args;
-
-		error_code = glad_glGetError();
-
-		if (error_code != GL_NO_ERROR) {
-			// shut this up for a while
-			fprintf(stderr, "ERROR %d in %s\n", error_code, name);
-		}
-	});
+	glad_set_post_callback(gladErrorCallback);
 
 	io = vc::imgui::init(window, SCR_WIDTH, SCR_HEIGHT);
 
+	return window;
+}
+
+GLFWwindow* setupComputeWindow() {
+	// glfw: initialize and configure
+	// ------------------------------
+	//glfwInit();
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_VISIBLE, false);
+
+	// glfw window creation
+	// --------------------
+	GLFWwindow* window = glfwCreateWindow(100, 100, "Volumetric Capture - Compute", NULL, NULL);
+	if (window == NULL)
+	{
+		std::cout << "Failed to create GLFW window" << std::endl;
+		glfwTerminate();
+		throw new std::exception("Failed to create GLFW window");
+	}
+	glfwMakeContextCurrent(window);
+
+	// tell GLFW to capture our mouse
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+	// glad: load all OpenGL function pointers
+	// ---------------------------------------
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	{
+		std::cout << "Failed to initialize GLAD" << std::endl;
+		throw new std::exception("Failed to initialize GLAD");
+	}
+
+	glad_set_post_callback(gladErrorCallback);
+	
 	return window;
 }
 #pragma endregion
