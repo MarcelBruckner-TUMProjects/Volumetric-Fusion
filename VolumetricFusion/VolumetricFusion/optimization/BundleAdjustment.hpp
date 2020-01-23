@@ -78,7 +78,7 @@ namespace vc::optimization {
         //}
         
         void solveProblem(ceres::Problem* problem) {
-            std::vector<Eigen::Matrix4d> initialTransformations = bestTransformations;
+            std::vector<Eigen::Matrix4d> initialTransformations(bestTransformations);
             
             ceres::Solver::Options options;
             options.num_threads = 8;

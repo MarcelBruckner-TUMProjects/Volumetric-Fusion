@@ -44,7 +44,8 @@ namespace vc::optimization {
 			T source[3];
 			T output[3];
 
-			//std::cout << "Point: " <<  m_sourcePoint << " " << m_targetPoint << std::endl << std::endl;
+			//std::cout << "Point source: " << T(m_sourcePoint(0)) << " " << T(m_sourcePoint(1)) << " " << T(m_sourcePoint(2)) << std::endl;
+			//std::cout << "Point target: " << T(m_targetPoint(0)) << " " << T(m_targetPoint(1)) << " " << T(m_targetPoint(2)) << std::endl << std::endl;
 
 			source[0] = T(m_sourcePoint(0));
 			source[1] = T(m_sourcePoint(1));
@@ -145,10 +146,42 @@ namespace vc::optimization {
 		T* m_array;
 	};
 
-	class ICP: virtual public OptimizationProblem {
+	class ICP: public BundleAdjustment {
+
+	protected:
+
+		bool init(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+			if (!OptimizationProblem::init(pipelines)) {
+				return false;
+			}
+
+			//for (int i = 0; i < pipelines.size(); i++) {
+			//    std::vector<double> translation;
+			//    for (int j = 0; j < num_translation_parameters; j++)
+			//    {
+			//        translation.emplace_back(pipelines[i]->chArUco->translation[j]);
+			//    }
+
+			//    std::vector<double> rotation;
+			//    for (int j = 0; j < num_rotation_parameters; j++)
+			//    {
+			//        rotation.emplace_back(pipelines[i]->chArUco->rotation[j]);
+			//    }
+
+			//    translations[i] = (translation);
+			//    rotations[i] = (rotation);
+			//    scales[i] = std::vector<double>{ 1.0, 1.0, 1.0 };
+			//}
+
+			needsRecalculation = true;
+
+			//calculateRelativeTransformations();
+			return true;
+		}
+
 	public:
 		ICP(bool verbose = false, long sleepDuration = -1l) :
-			OptimizationProblem(verbose, sleepDuration),
+			//OptimizationProblem(verbose, sleepDuration),
 			m_nIterations{ 50 }
 		{ }
 
@@ -170,6 +203,8 @@ namespace vc::optimization {
 
 		bool vc::optimization::OptimizationProblem::specific_optimize() {
 			
+			
+
 			if (!solveErrorFunction()) {
 				return false;
 			}
@@ -179,22 +214,34 @@ namespace vc::optimization {
 		}
 
 		void initializeWith() {
-			vc::optimization::BundleAdjustment ba = new vc::optimization::BundleAdjustment();
-			ba.specific_optimize();
+			//vc::optimization::OptimizationProblem* ba = new vc::optimization::BundleAdjustment();
+			//ba->specific_optimize();
+
+			BundleAdjustment::solveErrorFunction();
 		}
 
-		bool solveErrorFunction() {
+		bool vc::optimization::OptimizationProblem::solveErrorFunction() {
 
 			initializeWith();
 
-			//std::vector<Eigen::Matrix4d> initialTransformations = bestTransformations;
+			std::vector<Eigen::Matrix4d> initialTransformations = bestTransformations;
 
-			//int baseId = 0;
+			int baseId = 0;
 
-			//for (int relativeId = 1; relativeId < characteristicPoints.size(); relativeId++) {
-			//	//getCurrentRelativeTransformation
-			//	bestTransformations[relativeId] = getBestRelativeTransformation(baseId, relativeId) * estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], getBestRelativeTransformation(relativeId, baseId));
-			//}
+			for (int relativeId = 1; relativeId < characteristicPoints.size(); relativeId++) {
+				//getCurrentRelativeTransformation
+				
+				//bestTransformations[relativeId] = getBestRelativeTransformation(baseId, relativeId) * estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], getBestRelativeTransformation(relativeId, baseId));
+				
+				//std::cout << "Best:" << bestTransformations[relativeId] << std::endl;
+				//std::cout << "Best2:" << getCurrentTransformation(relativeId) << std::endl;
+				//bestTransformations[relativeId] = getCurrentTransformation(relativeId)* getCurrentTransformation(baseId).inverse() * estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], getCurrentTransformation(baseId) * getCurrentTransformation(relativeId).inverse());
+				
+				bestTransformations[relativeId] = getBestRelativeTransformation *  estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], Eigen::Matrix4d::Identity());
+
+				
+				//std::cout << "Best3:" << bestTransformations[relativeId] << std::endl;
+			}
 
 			//std::cout << vc::utils::toString("Initial", initialTransformations);
 			//std::cout << vc::utils::toString("Final", bestTransformations);
@@ -324,6 +371,9 @@ namespace vc::optimization {
 				if (!valid) {
 					continue;
 				}
+
+				//std::cout << "Point source: " << relativePoint(0) << " " << relativePoint(1) << " " << relativePoint(2) << std::endl;
+				//std::cout << "Point target: " << basePoint(0) << " " << basePoint(1) << " " << basePoint(2) << std::endl << std::endl;
 
 				ceres::CostFunction* cf = vc::optimization::PointToPointConstraint::create(relativePoint, basePoint, 0.5f);
 				problem.AddResidualBlock(cf, nullptr, poseIncrement.getData());
