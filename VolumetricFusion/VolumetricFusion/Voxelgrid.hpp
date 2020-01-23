@@ -31,7 +31,6 @@ namespace vc::fusion {
 		int integratedFrames = 0;
 
 		std::map<int, std::vector<int>> integratedFramesPerPipeline;
-		float truncationDistance = 0.5f;
 
 	public:
 		float resolution;
@@ -41,6 +40,7 @@ namespace vc::fusion {
 		Eigen::Vector3d origin;
 		
 		std::vector<Vertex> verts;
+		float truncationDistance = 0.15f;
 
 		//std::vector<float> tsdf;
 		//std::vector<float> weights;
@@ -52,19 +52,22 @@ namespace vc::fusion {
 			return z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x;
 		}
 
-		Voxelgrid(const float resolution = 0.01f, const Eigen::Vector3d size = Eigen::Vector3d(1.1, 1.1, 1.1), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
-			: resolution(resolution), origin(origin), size(size), 
-			sizeHalf(size / 2.0f), 
-			sizeNormalized(Eigen::Vector3i((size / resolution).cast<int>()) + Eigen::Vector3i(1, 1, 1)), 
-			num_gridPoints((sizeNormalized[0] * sizeNormalized[1] * sizeNormalized[2]))
+		Voxelgrid(const float resolution = 0.05f, const Eigen::Vector3d size = Eigen::Vector3d(1.1, 1.1, 1.1), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
 		{
-			//reset();
-
-			verts = std::vector<Vertex>(num_gridPoints);
-			
 			if (initializeShader) {
 				initializeOpenGL();
 			}
+			reset(resolution, size, origin);
+		}
+
+		void reset(const float resolution, const Eigen::Vector3d size, const Eigen::Vector3d origin) {
+			this->resolution = resolution;
+			this->origin = origin;
+			this->size = size;
+			this->sizeHalf = size / 2.0f;
+			this->sizeNormalized = Eigen::Vector3i((size / resolution).cast<int>()) + Eigen::Vector3i(1, 1, 1);
+			this->num_gridPoints = sizeNormalized[0] * sizeNormalized[1] * sizeNormalized[2];
+			resetVoxelgridBuffer();
 		}
 
 		void initializeOpenGL() {
@@ -95,7 +98,6 @@ namespace vc::fusion {
 
 			//setTSDF();
 
-			resetVoxelgridBuffer();
 		}
 
 		void setComputeShader() {
@@ -112,6 +114,8 @@ namespace vc::fusion {
 		}
 
 		void resetVoxelgridBuffer() {
+			verts = std::vector<Vertex>(num_gridPoints);
+			
 			setComputeShader();
 
 			voxelgridComputeShader->use();
@@ -176,7 +180,7 @@ namespace vc::fusion {
 			this->truncationDistance = truncationDistance;
 		}
 
-		virtual void integrateFrameGPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, bool clearAsFristFrame = false) try {
+		virtual void integrateFrameGPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, bool clearAsFirstFrame = false) try {
 			glm::mat3 world2CameraProjection = pipeline->depth_camera->world2cam_glm;
 			glm::mat3 colorWorld2CameraProjection = pipeline->rgb_camera->world2cam_glm;
 
@@ -201,7 +205,7 @@ namespace vc::fusion {
 			voxelgridComputeShader->use();
 			voxelgridComputeShader->setInt("INVALID_TSDF_VALUE", INVALID_TSDF_VALUE);
 			voxelgridComputeShader->setBool("setPosition", false);
-			voxelgridComputeShader->setBool("clearAsFristFrame", clearAsFristFrame);
+			voxelgridComputeShader->setBool("clearAsFirstFrame", clearAsFirstFrame);
 
 			voxelgridComputeShader->setMat3("world2CameraProjection", world2CameraProjection);
 			voxelgridComputeShader->setMat4("relativeTransformation", relativeTransformation);

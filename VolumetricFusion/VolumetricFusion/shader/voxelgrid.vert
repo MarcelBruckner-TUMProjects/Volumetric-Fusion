@@ -22,9 +22,9 @@ void main()
 
     // Blue: invalid point
     if(tsdf.w > 0){
-//        vs_out.color = vec4(0.0, 0.0, 0.0, -1.0);
-//        gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
-        vs_out.color = vec4(0.0, 0.0, 1, .5);
+        vs_out.color = vec4(0.0, 0.0, 0.0, -1.0);
+        gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
+//        vs_out.color = vec4(0.0, 0.0, 1, .5);
         return;
     }
     

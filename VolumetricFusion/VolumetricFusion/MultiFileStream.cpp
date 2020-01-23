@@ -275,7 +275,7 @@ int main(int argc, char* argv[]) try {
 
 			//if (vc::imgui::getFrameRate() > 20) 
 			{
-				blockInput = true;
+				//blockInput = true;
 				if (fusionGUI->fuse) {
 					for (int i = 0; i < pipelines.size() && i < 4; i++)
 					{
@@ -287,7 +287,7 @@ int main(int argc, char* argv[]) try {
 					marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
 				}
 				frameNumberForVoxelgrid = 0;
-				blockInput = false;
+				//blockInput = false;
 			}
 
 			if (fusionGUI->renderVoxelgrid) {

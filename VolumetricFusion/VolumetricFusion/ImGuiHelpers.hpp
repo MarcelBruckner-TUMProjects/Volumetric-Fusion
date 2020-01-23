@@ -193,19 +193,45 @@ namespace vc::imgui {
 	public:
 		bool renderVoxelgrid = true;
 		bool fuse = true;
+		float resolution = 0.05;
+		float* size;
+		float* origin;
 
 		bool renderMesh = false;
 		bool marchingCubes = false;
-		float truncationDistance = truncationDistanceRange / 2.0f;
+		float truncationDistance;
 
-		FusionGUI(vc::fusion::Voxelgrid* voxelgrid) : voxelgrid(voxelgrid){}
+		FusionGUI(vc::fusion::Voxelgrid* voxelgrid) :
+			voxelgrid(voxelgrid),
+			resolution(voxelgrid->resolution),
+			size(new float[3]{ (float)voxelgrid->size[0], (float)voxelgrid->size[1], (float)voxelgrid->size[2] }),
+			origin(new float[3]{ (float)voxelgrid->origin[0], (float)voxelgrid->origin[1], (float)voxelgrid->origin[2] }),
+			truncationDistance(voxelgrid->truncationDistance)
+		{}
+
+		void resetVoxelgrid() {
+			voxelgrid->reset(resolution, Eigen::Vector3f(size[0], size[1], size[2]).cast<double>(), Eigen::Vector3f(origin[0], -origin[1], origin[2]).cast<double>());
+		}
 
 		void render() {
 			ImGui::Begin("Volumetric Fusion", nullptr, WINDOW_FLAGS);
 			ImGui::Text("Editable settings of the fusion stage.");
 
-			ImGui::Checkbox("Render voxelgrid", &renderVoxelgrid);
+			if (ImGui::SliderFloat("Resolution", &resolution, 0.005, 0.1)) {
+				resetVoxelgrid();
+			}
 
+			if (ImGui::InputFloat3("Size", size, 2)) {
+				resetVoxelgrid();
+			}
+
+			if (ImGui::InputFloat3("Origin", origin, 2)) {
+				resetVoxelgrid();
+			}
+
+			ImGui::Separator();
+
+			ImGui::Checkbox("Render voxelgrid", &renderVoxelgrid);
 			ImGui::Checkbox("Fuse", &fuse);
 
 			if (ImGui::SliderFloat("Truncation distance", &truncationDistance, 0, truncationDistanceRange)) {
