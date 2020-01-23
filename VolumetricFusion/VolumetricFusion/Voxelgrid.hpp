@@ -176,13 +176,21 @@ namespace vc::fusion {
 			this->truncationDistance = truncationDistance;
 		}
 
-		virtual void integrateFrameGPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation) try {
+		virtual void integrateFrameGPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, bool clearAsFristFrame = false) try {
 			glm::mat3 world2CameraProjection = pipeline->depth_camera->world2cam_glm;
 			glm::mat3 colorWorld2CameraProjection = pipeline->rgb_camera->world2cam_glm;
 
 			rs2::depth_frame depth_frame = pipeline->data->filteredDepthFrames;
 			int depthWidth = depth_frame.as<rs2::video_frame>().get_width();
 			int	depthHeight = depth_frame.as<rs2::video_frame>().get_height();
+
+			//for (int i = 0; i < depthWidth; i++)
+			//{
+			//	for (int j = 0; j < depthHeight; j++)
+			//	{
+			//		std::cout << i << "," << j << ": " << depth_frame.get_distance(i, j) << std::endl;
+			//	}
+			//}
 
 			rs2::frame color_frame = pipeline->data->filteredColorFrames;
 			int colorWidth = color_frame.as<rs2::video_frame>().get_width();
@@ -193,6 +201,7 @@ namespace vc::fusion {
 			voxelgridComputeShader->use();
 			voxelgridComputeShader->setInt("INVALID_TSDF_VALUE", INVALID_TSDF_VALUE);
 			voxelgridComputeShader->setBool("setPosition", false);
+			voxelgridComputeShader->setBool("clearAsFristFrame", clearAsFristFrame);
 
 			voxelgridComputeShader->setMat3("world2CameraProjection", world2CameraProjection);
 			voxelgridComputeShader->setMat4("relativeTransformation", relativeTransformation);

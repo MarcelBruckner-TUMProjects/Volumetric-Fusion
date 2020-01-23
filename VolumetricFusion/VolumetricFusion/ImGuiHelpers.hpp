@@ -186,36 +186,41 @@ namespace vc::imgui {
 		}
 	};
 
-	class VoxelgridGUI {
+	class FusionGUI {
 	private:
 		vc::fusion::Voxelgrid* voxelgrid;
 		const float truncationDistanceRange = 1.0f;
 	public:
 		bool renderVoxelgrid = true;
 		bool fuse = true;
+
+		bool renderMesh = false;
+		bool marchingCubes = false;
 		float truncationDistance = truncationDistanceRange / 2.0f;
 
-		VoxelgridGUI(vc::fusion::Voxelgrid* voxelgrid) : voxelgrid(voxelgrid){}
+		FusionGUI(vc::fusion::Voxelgrid* voxelgrid) : voxelgrid(voxelgrid){}
 
 		void render() {
-			ImGui::Begin("Voxelgrid", nullptr, WINDOW_FLAGS);
-			ImGui::Text("Editable settings of the voxelgrid.");
+			ImGui::Begin("Volumetric Fusion", nullptr, WINDOW_FLAGS);
+			ImGui::Text("Editable settings of the fusion stage.");
 
 			ImGui::Checkbox("Render voxelgrid", &renderVoxelgrid);
 
 			ImGui::Checkbox("Fuse", &fuse);
 
-			ImGui::Separator();
-
 			if (ImGui::SliderFloat("Truncation distance", &truncationDistance, 0, truncationDistanceRange)) {
 				voxelgrid->setTruncationDistance(truncationDistance);
 			}
 
-			ImGui::Separator();
-
 			if (ImGui::Button("Clear")) {
 				voxelgrid->resetVoxelgridBuffer();
 			}
+
+			ImGui::Separator();
+
+			ImGui::Checkbox("Render mesh", &renderMesh);
+
+			ImGui::Checkbox("Marching cubes", &marchingCubes);
 
 			ImGui::End();
 		}
@@ -237,6 +242,10 @@ namespace vc::imgui {
 			ImGui::StyleColorsLight();
 			isInitialized = true;
 			return io;
+	}
+
+	float getFrameRate() {
+		return ImGui::GetIO().Framerate;
 	}
 
 	void startFrame(ImGuiIO* io, int window_width, int window_height) {

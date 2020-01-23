@@ -93,7 +93,7 @@ double lastFrame = 0.0;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::VOLUMETRIC_FUSION);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
 //std::vector<vc::imgui::PipelineGUI> pipelineGuis;
 vc::imgui::AllPipelinesGUI* allPipelinesGui;
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
@@ -102,7 +102,7 @@ bool visualizeCharucoResults = true;
 bool overlayCharacteristicPoints = true;
 
 vc::fusion::Voxelgrid* voxelgrid;
-vc::imgui::VoxelgridGUI* voxelgridGUI;
+vc::imgui::FusionGUI* fusionGUI;
 vc::fusion::MarchingCubes* marchingCubes;
 
 vc::rendering::CoordinateSystem* coordinateSystem;
@@ -137,7 +137,7 @@ int main(int argc, char* argv[]) try {
 	coordinateSystem = new vc::rendering::CoordinateSystem();
 	optimizationProblem->setupOpenGL();
 	optimizationProblemGUI = new vc::imgui::OptimizationProblemGUI(optimizationProblem);
-	voxelgridGUI = new vc::imgui::VoxelgridGUI(voxelgrid);
+	fusionGUI = new vc::imgui::FusionGUI(voxelgrid);
 	//ImGui_ImplGlfw_Init(window, false);
 	
 	//vc::rendering::Rendering rendering(app, viewOrientation);
@@ -271,23 +271,31 @@ int main(int argc, char* argv[]) try {
 		programGui->render();
 
 		if (state.renderState == RenderState::VOLUMETRIC_FUSION) {
-			voxelgridGUI->render();
+			fusionGUI->render();
 
-			if (voxelgridGUI->fuse && frameNumberForVoxelgrid++ > 10) {
+			//if (vc::imgui::getFrameRate() > 20) 
+			{
 				blockInput = true;
-				for (int i = 0; i < pipelines.size() && i < 4; i++)
-				{
-					voxelgrid->integrateFrameGPU(pipelines[i], optimizationProblem->getBestRelativeTransformation(0, i));
+				if (fusionGUI->fuse) {
+					for (int i = 0; i < pipelines.size() && i < 4; i++)
+					{
+						voxelgrid->integrateFrameGPU(pipelines[i], optimizationProblem->getBestRelativeTransformation(0, i), i == 0);
+					}
 				}
 
-				marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
+				if (fusionGUI->marchingCubes) {
+					marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
+				}
 				frameNumberForVoxelgrid = 0;
 				blockInput = false;
 			}
-			if (voxelgridGUI->renderVoxelgrid) {
+
+			if (fusionGUI->renderVoxelgrid) {
 				voxelgrid->renderGrid(model, view, projection);
 			}
-			marchingCubes->render(model, view, projection);
+			if (fusionGUI->renderMesh) {
+				marchingCubes->render(model, view, projection);
+			}
 		}
 
 		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
