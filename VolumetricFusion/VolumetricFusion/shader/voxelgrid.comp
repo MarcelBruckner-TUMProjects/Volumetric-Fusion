@@ -5,15 +5,20 @@ uniform float resolution;
 uniform float resolutionInv;
 uniform vec3 size;
 uniform vec3 sizeHalf;
-uniform vec3 sizeNormalized;
+uniform ivec3 sizeNormalized;
 uniform vec3 origin;
 uniform mat4 relativeTransformation;
 uniform mat4 coordinate_correction;
 uniform float new_tsdf;
 uniform bool setPosition;
+uniform bool clearAsFirstFrame;
 
 uniform mat3 world2CameraProjection;
+uniform mat3 colorWorld2CameraProjection;
 uniform float truncationDistance;
+
+uniform sampler2D colorFrame;
+uniform vec2 colorResolution;
 
 uniform usampler2D depthFrame;
 uniform vec2 depthResolution;
@@ -24,6 +29,7 @@ layout (local_size_x = 1) in;
 struct VtxData {
    vec4 vtx_pos;       // 4N [GOOD] -- Largest base alignment
    vec4 vtx_tsdf;
+   vec4 vtx_color;
 };                      // ^^ 8 * sizeof (GLfloat) per-vtx
 
 // std140 is pretty important here, it is the only way to guarantee the data
@@ -52,40 +58,50 @@ void main(){
     if(setPosition) {
         vec3 pos = unhash(hash);
         verts[hash].vtx_pos = vec4(pos, 1);
-        verts[hash].vtx_tsdf = vec4(hash, INVALID_TSDF_VALUE, 0, 0);
+        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);
         return;
     }
 
-    vec3 projectedVoxelCenter = world2CameraProjection * verts[hash].vtx_pos.xyz;
-    float z = projectedVoxelCenter.z;
+    if(clearAsFirstFrame){
+        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);
+        verts[hash].vtx_color = vec4(0, 0, 0, 0);
+    }
 
-    if(z <= 0) {
-        verts[hash].vtx_tsdf = vec4(hash, INVALID_TSDF_VALUE,-3,-3);
+    vec3 projectedVoxelCenter = world2CameraProjection * (relativeTransformation * verts[hash].vtx_pos).xyz;
+    
+    if(projectedVoxelCenter.z <= 0.1) {
+//        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);
         return;
     }
 
-    vec2 pixelCoordinate = projectedVoxelCenter.xy / z;
+    vec2 pixelCoordinate = projectedVoxelCenter.xy / projectedVoxelCenter.z;
     pixelCoordinate /= 2.0f;
     
     if(pixelCoordinate.x < 0 || pixelCoordinate.y < 0 || pixelCoordinate.x >= depthResolution.x || pixelCoordinate.y >= depthResolution.y) {
-        verts[hash].vtx_tsdf = vec4(hash, INVALID_TSDF_VALUE, -2, -2);
+//        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);
         return;
     }
 
-    float realDepth = texture(depthFrame, pixelCoordinate / depthResolution).x * depthScale;
+    pixelCoordinate /= depthResolution;
+    float realDepth = texture(depthFrame, pixelCoordinate).x * depthScale;
 //    verts[hash].vtx_tsdf = vec4(realDepth, depthResolution, depthScale);
     
 //    return;
 
     if(realDepth <= 0) {
-        verts[hash].vtx_tsdf = vec4(hash, INVALID_TSDF_VALUE, -1, -1);
+//        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);
         return;
     }
-
-    float tsdf = realDepth - z;
-    tsdf *= -1;
-
-    tsdf = clamp(tsdf, -truncationDistance, truncationDistance);
     
-    verts[hash].vtx_tsdf = vec4(hash, tsdf, 1, 0);
+    float tsdf = clamp(projectedVoxelCenter.z - realDepth, -truncationDistance, truncationDistance);
+    
+//    float oldWeight = ;
+//    float oldTsdf = ;
+//    float newWeight = ;
+
+    tsdf = (verts[hash].vtx_tsdf.y * verts[hash].vtx_tsdf.z + tsdf) / (verts[hash].vtx_tsdf.z + 1);
+    
+    verts[hash].vtx_tsdf = vec4(hash, tsdf, (verts[hash].vtx_tsdf.z + 1), 0);
+    
+    verts[hash].vtx_color = (verts[hash].vtx_color * verts[hash].vtx_tsdf.z + texture(colorFrame, pixelCoordinate)) / (verts[hash].vtx_tsdf.z + 1);
 }

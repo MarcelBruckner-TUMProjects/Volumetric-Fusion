@@ -22,6 +22,7 @@ namespace vc::fusion {
 		GLuint VAO;
 		GLuint vbo;
 		GLuint depthTexture;
+		GLuint colorTexture;
 
 		vc::rendering::Shader* gridShader;
 		vc::rendering::Shader* tsdfComputeShader;
@@ -30,16 +31,16 @@ namespace vc::fusion {
 		int integratedFrames = 0;
 
 		std::map<int, std::vector<int>> integratedFramesPerPipeline;
-		float truncationDistance;
 
 	public:
 		float resolution;
 		Eigen::Vector3d size;
-		Eigen::Vector3d sizeNormalized;
+		Eigen::Vector3i sizeNormalized;
 		Eigen::Vector3d sizeHalf;
 		Eigen::Vector3d origin;
 		
 		std::vector<Vertex> verts;
+		float truncationDistance = 0.15f;
 
 		//std::vector<float> tsdf;
 		//std::vector<float> weights;
@@ -47,20 +48,26 @@ namespace vc::fusion {
 		int num_gridPoints;
 
 		int hashFunc(int x, int y, int z) {
-			std::cout << z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x << std::endl;
+			//std::cout << z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x << std::endl;
 			return z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x;
 		}
 
-		Voxelgrid(const float resolution = 0.025f, const Eigen::Vector3d size = Eigen::Vector3d(2.0, 2.0, 2.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
-			: resolution(resolution), origin(origin), size(size), sizeHalf(size / 2.0f), sizeNormalized((size / resolution) + Eigen::Vector3d(1.0, 1.0, 1.0)), num_gridPoints((sizeNormalized[0] * sizeNormalized[1] * sizeNormalized[2]))
+		Voxelgrid(const float resolution = 0.05f, const Eigen::Vector3d size = Eigen::Vector3d(1.1, 1.1, 1.1), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.0), bool initializeShader = true)
 		{
-			//reset();
-
-			verts = std::vector<Vertex>(num_gridPoints);
-			
 			if (initializeShader) {
 				initializeOpenGL();
 			}
+			reset(resolution, size, origin);
+		}
+
+		void reset(const float resolution, const Eigen::Vector3d size, const Eigen::Vector3d origin) {
+			this->resolution = resolution;
+			this->origin = origin;
+			this->size = size;
+			this->sizeHalf = size / 2.0f;
+			this->sizeNormalized = Eigen::Vector3i((size / resolution).cast<int>()) + Eigen::Vector3i(1, 1, 1);
+			this->num_gridPoints = sizeNormalized[0] * sizeNormalized[1] * sizeNormalized[2];
+			resetVoxelgridBuffer();
 		}
 
 		void initializeOpenGL() {
@@ -71,6 +78,7 @@ namespace vc::fusion {
 			glGenVertexArrays(1, &VAO);
 			glGenBuffers(1, &vbo);
 			glGenTextures(1, &depthTexture);
+			glGenTextures(1, &colorTexture);
 
 			glBindTexture(GL_TEXTURE_2D, depthTexture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
 				// set the texture wrapping parameters
@@ -80,9 +88,16 @@ namespace vc::fusion {
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+			glBindTexture(GL_TEXTURE_2D, colorTexture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
+				// set the texture wrapping parameters
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			// set texture filtering parameters
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
 			//setTSDF();
 
-			initializeVoxelgridBuffer();
 		}
 
 		void setComputeShader() {
@@ -98,14 +113,16 @@ namespace vc::fusion {
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, vbo);
 		}
 
-		void initializeVoxelgridBuffer() {
+		void resetVoxelgridBuffer() {
+			verts = std::vector<Vertex>(num_gridPoints);
+			
 			setComputeShader();
 
 			voxelgridComputeShader->use();
 			voxelgridComputeShader->setInt("INVALID_TSDF_VALUE", INVALID_TSDF_VALUE);
 			voxelgridComputeShader->setFloat("resolution", resolution);
 			voxelgridComputeShader->setVec3("sizeHalf", sizeHalf);
-			voxelgridComputeShader->setVec3("sizeNormalized", sizeNormalized);
+			voxelgridComputeShader->setVec3i("sizeNormalized", sizeNormalized);
 			voxelgridComputeShader->setVec3("origin", origin);
 			voxelgridComputeShader->setBool("setPosition", true);
 
@@ -118,8 +135,6 @@ namespace vc::fusion {
 		}
 		
 		void renderGrid(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
-			
-			glBindVertexArray(VAO);
 
 			gridShader->use();
 
@@ -130,6 +145,15 @@ namespace vc::fusion {
 			gridShader->setMat4("projection", projection);
 			gridShader->setMat4("coordinate_correction", vc::rendering::COORDINATE_CORRECTION);
 			gridShader->setFloat("truncationDistance", truncationDistance);
+
+			glBindVertexArray(VAO);
+			glBindBuffer(GL_ARRAY_BUFFER, vbo);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * num_gridPoints, verts.data(), GL_DYNAMIC_DRAW);
+
+			glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0); // Vertex Attrib. 0
+			glEnableVertexAttribArray(0);
+			glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)16); // Vertex Attrib. 1
+			glEnableVertexAttribArray(1);
 
 			glDrawArrays(GL_POINTS, 0, num_gridPoints);
 			glBindVertexArray(0);
@@ -152,29 +176,54 @@ namespace vc::fusion {
 		//	integratedFrames = 0;
 		//}
 
-		void integrateFrameGPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance) try {
+		void setTruncationDistance(float truncationDistance) {
+			this->truncationDistance = truncationDistance;
+		}
+
+		virtual void integrateFrameGPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, bool clearAsFirstFrame = false) try {
 			glm::mat3 world2CameraProjection = pipeline->depth_camera->world2cam_glm;
+			glm::mat3 colorWorld2CameraProjection = pipeline->rgb_camera->world2cam_glm;
 
 			rs2::depth_frame depth_frame = pipeline->data->filteredDepthFrames;
 			int depthWidth = depth_frame.as<rs2::video_frame>().get_width();
 			int	depthHeight = depth_frame.as<rs2::video_frame>().get_height();
-			
+
+			//for (int i = 0; i < depthWidth; i++)
+			//{
+			//	for (int j = 0; j < depthHeight; j++)
+			//	{
+			//		std::cout << i << "," << j << ": " << depth_frame.get_distance(i, j) << std::endl;
+			//	}
+			//}
+
+			rs2::frame color_frame = pipeline->data->filteredColorFrames;
+			int colorWidth = color_frame.as<rs2::video_frame>().get_width();
+			int	colorHeight = color_frame.as<rs2::video_frame>().get_height();
+
 			setComputeShader();
 
 			voxelgridComputeShader->use();
 			voxelgridComputeShader->setInt("INVALID_TSDF_VALUE", INVALID_TSDF_VALUE);
 			voxelgridComputeShader->setBool("setPosition", false);
+			voxelgridComputeShader->setBool("clearAsFirstFrame", clearAsFirstFrame);
 
 			voxelgridComputeShader->setMat3("world2CameraProjection", world2CameraProjection);
+			voxelgridComputeShader->setMat4("relativeTransformation", relativeTransformation);
+			voxelgridComputeShader->setMat3("colorWorld2CameraProjection", colorWorld2CameraProjection);
 			voxelgridComputeShader->setFloat("depthScale", pipeline->depth_camera->depthScale);
 			voxelgridComputeShader->setVec2("depthResolution", depthWidth, depthHeight);
+			voxelgridComputeShader->setVec2("colorResolution", colorWidth, colorHeight);
 			voxelgridComputeShader->setFloat("truncationDistance", truncationDistance);
-			this->truncationDistance = truncationDistance;
 
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, depthTexture);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, depthWidth, depthHeight, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, depth_frame.get_data());
 			voxelgridComputeShader->setInt("depthFrame", 0);
+
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, colorTexture);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, colorWidth, colorHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, color_frame.get_data());
+			voxelgridComputeShader->setInt("colorFrame", 1);
 
 			glDispatchCompute(num_gridPoints, 1, 1);
 
@@ -374,6 +423,14 @@ namespace vc::fusion {
 
 			verts[0].tsdf.y = -1.0f;
 		}
+		
+		void integrateFrameGPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance) try {
+
+		}
+		catch (rs2::error & e) {
+			return;
+		}
+
 	};
 
 	class FourCellMockVoxelGrid : public Voxelgrid {
@@ -385,19 +442,27 @@ namespace vc::fusion {
 
 			for (int i = 0; i < 27; i++)
 			{
-				verts[i].tsdf.y = 1.0f;
+				verts[i].tsdf.y = 0.5f;
+				verts[i].color = glm::vec4(i % 3 == 0, (i + 1) % 3 == 0, (i + 2) % 3 == 0, 1);
 			}
 
-			verts[0].tsdf.y = -1.0f;
+			//verts[0].tsdf.y = -0.5f;
 
-			verts[4].tsdf.y = -1.0f;
+			verts[4].tsdf.y = -0.5f;
 
-			verts[1 + 9].tsdf.y = -1.0f;
-			verts[3 + 9].tsdf.y = -1.0f;
-			verts[5 + 9].tsdf.y = -1.0f;
-			verts[7 + 9].tsdf.y = -1.0f;
+			verts[1 + 9].tsdf.y = -0.5f;
+			verts[3 + 9].tsdf.y = -0.5f;
+			verts[5 + 9].tsdf.y = -0.5f;
+			verts[7 + 9].tsdf.y = -0.5f;
 
-			verts[4 + 9 + 9].tsdf.y = -1.0f;
+			verts[4 + 9 + 9].tsdf.y = -0.5f;
+			//verts[8 + 9 + 9].tsdf.y = -0.5f;
+		}
+		
+		void integrateFrameGPU(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation) try {
+		}
+		catch (rs2::error & e) {
+			return;
 		}
 	};
 }

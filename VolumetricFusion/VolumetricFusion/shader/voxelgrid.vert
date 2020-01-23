@@ -2,7 +2,6 @@
 layout (location = 0) in vec4 aPos;
 layout (location = 1) in vec4 tsdf;
 
-uniform vec3 size;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
@@ -15,18 +14,20 @@ out VS_OUT {
 } vs_out;
 
 void main()
-{
+{    
     gl_Position = projection * view * model * aPos;
     gl_Position *= coordinate_correction;
     
     float t = tsdf.y;
 
     // Blue: invalid point
-    if(t > 1){
-        vs_out.color = vec4(0.0, 0.0, 1.0, 1.0);
+    if(tsdf.w > 0){
+        vs_out.color = vec4(0.0, 0.0, 0.0, -1.0);
+        gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
+//        vs_out.color = vec4(0.0, 0.0, 1, .5);
         return;
     }
-
+    
     if(t < 0) {
         // Red: Behind poindcloud
         vs_out.color = vec4(0.0f, (truncationDistance + t) / truncationDistance, 0.0f, 1.0f + t);

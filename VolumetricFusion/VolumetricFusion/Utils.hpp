@@ -154,10 +154,11 @@ namespace vc::utils {
 	std::string toString(vc::fusion::Triangle* b) {
 		std::stringstream ss;
 
-		for (auto& pos : b->pos)
-		{
-			ss << pos[0] << " | " << pos[1] << " | " << pos[2] << " | " << pos[3] << std::endl;
-		}
+		ss << b->pos0[0] << " | " << b->pos0[1] << " | " << b->pos0[2] << " | " << b->pos0[3] << " --- " << b->color0[0] << " | " << b->color0[1] << " | " << b->color0[2] << " | " << b->color0[3] << std::endl;
+		ss << b->pos1[0] << " | " << b->pos1[1] << " | " << b->pos1[2] << " | " << b->pos1[3] << " --- " << b->color1[0] << " | " << b->color1[1] << " | " << b->color1[2] << " | " << b->color1[3] << std::endl;
+		ss << b->pos2[0] << " | " << b->pos2[1] << " | " << b->pos2[2] << " | " << b->pos2[3] << " --- " << b->color2[0] << " | " << b->color2[1] << " | " << b->color2[2] << " | " << b->color1[3] << std::endl;
+
+		ss << std::endl;
 
 		return ss.str();
 	}
@@ -166,11 +167,7 @@ namespace vc::utils {
 		std::stringstream ss;
 		ss << asHeader(header);
 
-		for (auto& pos : b->pos)
-		{
-			ss << pos[0] << " | " << pos[1] << " | " << pos[2] << " | " << pos[3] << std::endl;
-		}
-		ss << std::endl;
+		ss << toString(b);
 
 		return ss.str();
 	}
@@ -245,9 +242,9 @@ namespace vc::utils {
 
 	bool isValid(vc::fusion::Triangle* triangle) {
 		return !(
-			triangle->pos[0].x == 0 && triangle->pos[0].w == 0 && triangle->pos[0].z == 0 && triangle->pos[0].y == 0 &&
-			triangle->pos[1].x == 0 && triangle->pos[1].w == 0 && triangle->pos[1].z == 0 && triangle->pos[1].y == 0 &&
-			triangle->pos[2].x == 0 && triangle->pos[2].w == 0 && triangle->pos[2].z == 0 && triangle->pos[2].y == 0);
+			triangle->pos0.x == 0 && triangle->pos0.w == 0 && triangle->pos0.z == 0 && triangle->pos0.y == 0 &&
+			triangle->pos1.x == 0 && triangle->pos1.w == 0 && triangle->pos1.z == 0 && triangle->pos1.y == 0 &&
+			triangle->pos2.x == 0 && triangle->pos2.w == 0 && triangle->pos2.z == 0 && triangle->pos2.y == 0);
 	}
 
 	bool isValid(glm::vec4 v) {
@@ -258,6 +255,21 @@ namespace vc::utils {
 			}
 		}
 		return true;
+	}
+
+	bool areEqual(glm::vec4 a, glm::vec4 b) {
+		return
+			a[0] == b[0] &&
+			a[1] == b[1] &&
+			a[2] == b[2] &&
+			a[3] == b[3];
+	}
+
+	bool areEqual(vc::fusion::Triangle* a, vc::fusion::Triangle* b) {
+		return
+			areEqual(a->pos0, b->pos0) &&
+			areEqual(a->pos1, b->pos1) &&
+			areEqual(a->pos2, b->pos2);
 	}
 
 }

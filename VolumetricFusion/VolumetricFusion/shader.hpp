@@ -65,6 +65,17 @@ namespace vc::rendering {
 		{
 			glUniform3f(glGetUniformLocation(ID, name.c_str()), x, y, z);
 		}
+
+		// ------------------------------------------------------------------------
+		void setVec3i(const std::string& name, const Eigen::Vector3i vec) const
+		{
+			setVec3i(name, vec[0], vec[1], vec[2]);
+		}
+		// ------------------------------------------------------------------------
+		void setVec3i(const std::string& name, const int x, const int y, const int z) const
+		{
+			glUniform3i(glGetUniformLocation(ID, name.c_str()), x, y, z);
+		}
 		// ------------------------------------------------------------------------
 		void setColor(const std::string& name, float r, float g, float b, float a) const
 		{
