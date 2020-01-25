@@ -77,22 +77,6 @@ namespace vc::optimization {
             CharacteristicPoints()
         };
 
-		bool hasProcrustesInitialization = false;
-		bool needsRecalculation = true;
-
-		const int num_translation_parameters = 3;
-		const int num_rotation_parameters = 3;
-		const int num_scale_parameters = 3;
-		const int num_intrinsic_parameters = 4;
-		const int num_distCoeff_parameters = 4;
-
-		std::vector<std::vector<double>> translations;
-		std::vector<std::vector<double>> rotations;
-		std::vector<std::vector<double>> scales;
-
-		std::vector<std::vector<double>> intrinsics;
-		std::vector<std::vector<double>> distCoeffs;
-
         std::vector<Eigen::Matrix4d> currentTranslations;
         std::vector<Eigen::Matrix4d> currentRotations;
         std::vector<Eigen::Matrix4d> currentScales;
@@ -137,66 +121,6 @@ namespace vc::optimization {
             reset();
             clear();
         }
-
-		Eigen::Matrix4d getRotationMatrix(int camera_index) {
-			try {
-				Eigen::Vector3d rotationVector(
-					rotations.at(camera_index).at(0),
-					rotations.at(camera_index).at(1),
-					rotations.at(camera_index).at(2)
-				);
-				return generateTransformationMatrix(0.0, 0.0, 0.0, rotationVector.norm(), rotationVector.normalized());
-			}
-			catch (std::out_of_range&) {
-				return Eigen::Matrix4d::Identity();
-			}
-			catch (std::exception&) {
-				return Eigen::Matrix4d::Identity();
-			}
-		}
-
-		Eigen::Matrix4d getTranslationMatrix(int camera_index) {
-			try {
-				return generateTransformationMatrix(
-					translations.at(camera_index).at(0),
-					translations.at(camera_index).at(1),
-					translations.at(camera_index).at(2),
-					0.0, Eigen::Vector3d::Identity()
-				);
-			}
-			catch (std::out_of_range&) {
-				return Eigen::Matrix4d::Identity();
-			}
-			catch (std::exception&) {
-				return Eigen::Matrix4d::Identity();
-			}
-		}
-
-		Eigen::Matrix4d getScaleMatrix(int camera_index) {
-			try {
-				return generateScaleMatrix(
-					scales.at(camera_index).at(0),
-					scales.at(camera_index).at(1),
-					scales.at(camera_index).at(2)
-				);
-			}
-			catch (std::out_of_range&) {
-				return Eigen::Matrix4d::Identity();
-			}
-			catch (std::exception&) {
-				return Eigen::Matrix4d::Identity();
-			}
-		}
-
-		void calculateTransformations() {
-			for (int i = 0; i < translations.size(); i++) {
-				currentTranslations[i] = getTranslationMatrix(i);
-				currentRotations[i] = getRotationMatrix(i);
-				currentScales[i] = getScaleMatrix(i);
-			}
-
-			needsRecalculation = false;
-		}
 
         Eigen::Matrix4d generateScaleMatrix(double x, double y, double z) {
             Eigen::Matrix4d scale = Eigen::Matrix4d::Identity();
@@ -257,9 +181,9 @@ namespace vc::optimization {
             return true;
         }
 
-        //virtual void calculateTransformations() {
-        //    // STUB for testing
-        //}
+        virtual void calculateTransformations() {
+            // STUB for testing
+        }
 
 
         virtual bool init(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
@@ -335,13 +259,6 @@ namespace vc::optimization {
             return success;
         }
 
-		Eigen::Matrix4d getTransformation(int camera_index) {
-			if (needsRecalculation) {
-				calculateTransformations();
-			}
-			return getCurrentTransformation(camera_index);
-		}
-
         bool optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines = std::vector<std::shared_ptr<vc::capture::CaptureDevice>>()) {
             if (!init(pipelines)) {
                 return false;
@@ -365,30 +282,8 @@ namespace vc::optimization {
         }
 
         virtual bool specific_optimize() = 0;
-		virtual bool solveErrorFunction() = 0;
+		
 
-		virtual void initializeWith() {
-			return;
-		}
-
-		void setup() {
-			for (int i = 0; i < 4; i++)
-			{
-				Eigen::Vector3d translation = currentTranslations[i].block<3, 1>(0, 3);
-				double angle = Eigen::AngleAxisd(currentRotations[i].block<3, 3>(0, 0)).angle();
-				Eigen::Vector3d rotation = Eigen::AngleAxisd(currentRotations[i].block<3, 3>(0, 0)).axis().normalized();
-				rotation *= angle;
-				Eigen::Vector3d scale = currentScales[i].diagonal().block<3, 1>(0, 0);
-
-				for (int j = 0; j < 3; j++)
-				{
-					translations[i][j] = translation[j];
-					rotations[i][j] = rotation[j];
-					scales[i][j] = scale[j];
-				}
-			}
-			calculateTransformations();
-		}
 
         void render(glm::mat4 model, glm::mat4 view, glm::mat4 projection, int i) {
             //std::cout << characteristicPointsRenderers.size() << std::endl;

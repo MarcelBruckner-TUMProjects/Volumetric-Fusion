@@ -78,6 +78,7 @@
     <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="MarchingCubes.hpp" />
     <ClInclude Include="optimization\BundleAdjustment.hpp" />
+    <ClInclude Include="optimization\CeresOptimizationProblem.hpp" />
     <ClInclude Include="optimization\CharacteristicPoints.hpp" />
     <ClInclude Include="optimization\ICP.hpp" />
     <ClInclude Include="optimization\OptimizationProblem.hpp" />

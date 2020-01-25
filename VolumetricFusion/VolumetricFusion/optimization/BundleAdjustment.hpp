@@ -15,6 +15,7 @@
 
 #include "Procrustes.hpp"
 #include "CharacteristicPoints.hpp"
+#include "CeresOptimizationProblem.hpp"
 #include "OptimizationProblem.hpp"
 #include "PointCorrespondenceError.hpp"
 #include "ReprojectionError.hpp"
@@ -22,11 +23,27 @@
 #include "../CaptureDevice.hpp"
 
 namespace vc::optimization {
-    class BundleAdjustment : virtual public OptimizationProblem {
-    protected:
+    class BundleAdjustment : public virtual CeresOptimizationProblem {
+    
+	protected:
 
+		bool hasInitialization = false;
+		bool needsRecalculation = true;
         int iterationsSinceImprovement = 0;
         int maxIterationsSinceImprovement = 5;
+
+		const int num_translation_parameters = 3;
+		const int num_rotation_parameters = 3;
+		const int num_scale_parameters = 3;
+		const int num_intrinsic_parameters = 4;
+		const int num_distCoeff_parameters = 4;
+
+		std::vector<std::vector<double>> translations;
+		std::vector<std::vector<double>> rotations;
+		std::vector<std::vector<double>> scales;
+
+		std::vector<std::vector<double>> intrinsics;
+		std::vector<std::vector<double>> distCoeffs;
 
         bool init(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
             if (!OptimizationProblem::init(pipelines)) {
@@ -60,7 +77,7 @@ namespace vc::optimization {
 
     public:
 
-        BundleAdjustment(bool verbose = false, bool withSleep = false) : OptimizationProblem(verbose, withSleep) {
+        BundleAdjustment(bool verbose = false, bool withSleep = false) : CeresOptimizationProblem(verbose, withSleep) {
             for (int i = 0; i < 4; i++)
             {
                 translations.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
@@ -72,13 +89,99 @@ namespace vc::optimization {
             }
         }
 
-        //void clear() {
-        //    OptimizationProblem::clear();
-        //    needsRecalculation = true;
-        //}
+		void setup() {
+			for (int i = 0; i < 4; i++)
+			{
+				Eigen::Vector3d translation = currentTranslations[i].block<3, 1>(0, 3);
+				double angle = Eigen::AngleAxisd(currentRotations[i].block<3, 3>(0, 0)).angle();
+				Eigen::Vector3d rotation = Eigen::AngleAxisd(currentRotations[i].block<3, 3>(0, 0)).axis().normalized();
+				rotation *= angle;
+				Eigen::Vector3d scale = currentScales[i].diagonal().block<3, 1>(0, 0);
+
+				for (int j = 0; j < 3; j++)
+				{
+					translations[i][j] = translation[j];
+					rotations[i][j] = rotation[j];
+					scales[i][j] = scale[j];
+				}
+			}
+			calculateTransformations();
+		}
+
+        void clear() {
+            OptimizationProblem::clear();
+            needsRecalculation = true;
+        }
+
+		void calculateTransformations() {
+			for (int i = 0; i < translations.size(); i++) {
+				currentTranslations[i] = getTranslationMatrix(i);
+				currentRotations[i] = getRotationMatrix(i);
+				currentScales[i] = getScaleMatrix(i);
+			}
+
+			needsRecalculation = false;
+		}
+
+		Eigen::Matrix4d getTransformation(int camera_index) {
+			if (needsRecalculation) {
+				calculateTransformations();
+			}
+			return getCurrentTransformation(camera_index);
+		}
+
+		Eigen::Matrix4d getRotationMatrix(int camera_index) {
+			try {
+				Eigen::Vector3d rotationVector(
+					rotations.at(camera_index).at(0),
+					rotations.at(camera_index).at(1),
+					rotations.at(camera_index).at(2)
+				);
+				return generateTransformationMatrix(0.0, 0.0, 0.0, rotationVector.norm(), rotationVector.normalized());
+			}
+			catch (std::out_of_range&) {
+				return Eigen::Matrix4d::Identity();
+			}
+			catch (std::exception&) {
+				return Eigen::Matrix4d::Identity();
+			}
+		}
+
+		Eigen::Matrix4d getTranslationMatrix(int camera_index) {
+			try {
+				return generateTransformationMatrix(
+					translations.at(camera_index).at(0),
+					translations.at(camera_index).at(1),
+					translations.at(camera_index).at(2),
+					0.0, Eigen::Vector3d::Identity()
+				);
+			}
+			catch (std::out_of_range&) {
+				return Eigen::Matrix4d::Identity();
+			}
+			catch (std::exception&) {
+				return Eigen::Matrix4d::Identity();
+			}
+		}
+
+		Eigen::Matrix4d getScaleMatrix(int camera_index) {
+			try {
+				return generateScaleMatrix(
+					scales.at(camera_index).at(0),
+					scales.at(camera_index).at(1),
+					scales.at(camera_index).at(2)
+				);
+			}
+			catch (std::out_of_range&) {
+				return Eigen::Matrix4d::Identity();
+			}
+			catch (std::exception&) {
+				return Eigen::Matrix4d::Identity();
+			}
+		}
         
         void solveProblem(ceres::Problem* problem) {
-            std::vector<Eigen::Matrix4d> initialTransformations(bestTransformations);
+            std::vector<Eigen::Matrix4d> initialTransformations(OptimizationProblem::bestTransformations);
             
             ceres::Solver::Options options;
             options.num_threads = 8;
@@ -92,10 +195,10 @@ namespace vc::optimization {
             calculateTransformations();
 
             //if (verbose) {
-                std::cout << summary.FullReport() << "\n";
+                //std::cout << summary.FullReport() << "\n";
+				std::cout << "Bundle Adjustment" << std::endl;
                 std::cout << vc::utils::toString("Initial", initialTransformations);
                 std::cout << vc::utils::toString("Final", bestTransformations);
-
                 std::cout << std::endl;
             //}
         }
@@ -103,7 +206,7 @@ namespace vc::optimization {
 		//solvePointCorrespondenceError
         bool solveErrorFunction() {
 
-			std::cout << "Bundle Adjustment" << std::endl;
+			
 
             // Create residuals for each observation in the bundle adjustment problem. The
             // parameters for cameras and points are added automatically.
@@ -178,7 +281,7 @@ namespace vc::optimization {
             return true;
         }
 
-        void initializeWith() {
+        void initialize() {
             vc::optimization::Procrustes procrustes = vc::optimization::Procrustes(verbose);
             procrustes.characteristicPoints = characteristicPoints;
             if (procrustes.optimizeOnPoints()) {
@@ -186,19 +289,18 @@ namespace vc::optimization {
                 currentRotations = procrustes.currentRotations;
                 currentTranslations = procrustes.currentTranslations;
                 currentScales = procrustes.currentScales;
-                hasProcrustesInitialization = true;
+                hasInitialization = true;
                 setup();
             }
             else {
-                hasProcrustesInitialization = false;
+				hasInitialization = false;
             }
         }
 
         bool vc::optimization::OptimizationProblem::specific_optimize() {
-            //if (!hasProcrustesInitialization) {
-            //    initializeWith();
-            //    //return false;
-            //}
+            if (!hasInitialization) {
+                initialize();
+            }
 
             if (!solveErrorFunction()) {
                 return false;

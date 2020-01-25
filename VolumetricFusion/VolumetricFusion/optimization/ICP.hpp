@@ -16,11 +16,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-//#include "Procrustes.hpp"
 #include "CharacteristicPoints.hpp"
 #include "OptimizationProblem.hpp"
-//#include "PointCorrespondenceError.hpp"
-//#include "ReprojectionError.hpp"
+#include "CeresOptimizationProblem.hpp"
+#include "PointCorrespondenceError.hpp"
+#include "ReprojectionError.hpp"
 #include "BundleAdjustment.hpp"
 #include <VolumetricFusion\CaptureDevice.hpp>
 
@@ -37,8 +37,7 @@ namespace vc::optimization {
 		template <typename T>
 		bool operator()(const T* const pose, T* residuals) const {
 
-
-			const T* rotation = pose;
+			const T* rotation = pose; 
 			const T* translation = pose + 3;
 
 			T source[3];
@@ -51,20 +50,17 @@ namespace vc::optimization {
 			source[1] = T(m_sourcePoint(1));
 			source[2] = T(m_sourcePoint(2));
 
-			//PoseIncrement<double> pi((PoseIncrement<double> &) pose);
+			T point[3];
 
-			//Map<Vector3f>(source, 3, 1) = m_sourcePoint;
+			ceres::AngleAxisRotatePoint(rotation, source, point);
 
-			T temp[3];
-			ceres::AngleAxisRotatePoint(rotation, source, temp);
+			point[0] = point[0] + translation[0];
+			point[1] = point[1] + translation[1];
+			point[2] = point[2] + translation[2];
 
-			output[0] = temp[0] + translation[0];
-			output[1] = temp[1] + translation[1];
-			output[2] = temp[2] + translation[2];
-
-			T res1 = output[0] - T(m_targetPoint(0));
-			T res2 = output[1] - T(m_targetPoint(1));
-			T res3 = output[2] - T(m_targetPoint(2));
+			T res1 = point[0] - T(m_targetPoint(0));
+			T res2 = point[1] - T(m_targetPoint(1));
+			T res3 = point[2] - T(m_targetPoint(2));
 
 			residuals[0] = T(sqrt(LAMBDA)) * T(sqrt(m_weight)) * res1;
 			residuals[1] = T(sqrt(LAMBDA)) * T(sqrt(m_weight)) * res2;
@@ -106,10 +102,11 @@ namespace vc::optimization {
 		void apply(T* inputPoint, T* outputPoint) const {
 			// pose[0,1,2] is angle-axis rotation.
 			// pose[3,4,5] is translation.
-			const T* rotation = m_array;
+			const T* rotation = m_array + 0;
 			const T* translation = m_array + 3;
 
 			T temp[3];
+
 			ceres::AngleAxisRotatePoint(rotation, inputPoint, temp);
 
 			outputPoint[0] = temp[0] + translation[0];
@@ -146,7 +143,23 @@ namespace vc::optimization {
 		T* m_array;
 	};
 
-	class ICP: public BundleAdjustment {
+	class ICP: public virtual CeresOptimizationProblem {
+
+		bool hasInitialization = false;
+		bool needsRecalculation = true;
+
+		const int num_translation_parameters = 3;
+		const int num_rotation_parameters = 3;
+		const int num_scale_parameters = 3;
+		const int num_intrinsic_parameters = 4;
+		const int num_distCoeff_parameters = 4;
+
+		std::vector<std::vector<double>> translations;
+		std::vector<std::vector<double>> rotations;
+		std::vector<std::vector<double>> scales;
+
+		std::vector<std::vector<double>> intrinsics;
+		std::vector<std::vector<double>> distCoeffs;
 
 	protected:
 
@@ -180,10 +193,20 @@ namespace vc::optimization {
 		}
 
 	public:
-		ICP(bool verbose = false, long sleepDuration = -1l) :
-			//OptimizationProblem(verbose, sleepDuration),
-			m_nIterations{ 50 }
-		{ }
+		ICP(bool verbose = false, long sleepDuration = -1l) 
+			:CeresOptimizationProblem(verbose, sleepDuration),
+			m_nIterations{ 20 }
+		{
+			for (int i = 0; i < 4; i++)
+			{
+				translations.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
+				rotations.push_back(std::vector<double> { 0.0, 2 * M_PI, 0.0 });
+				scales.push_back(std::vector<double> {1.0, 1.0, 1.0  });
+
+				intrinsics.push_back(std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
+				distCoeffs.push_back(std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
+			}
+		}
 
 		void setNbOfIterations(unsigned nIterations) {
 			m_nIterations = nIterations;
@@ -201,9 +224,12 @@ namespace vc::optimization {
 			return transformedPoints;
 		}
 
-		bool vc::optimization::OptimizationProblem::specific_optimize() {
+		bool specific_optimize() {
 			
-			
+			if (!hasInitialization) {
+				initialize();
+				//return false;
+			}
 
 			if (!solveErrorFunction()) {
 				return false;
@@ -213,40 +239,148 @@ namespace vc::optimization {
 
 		}
 
-		void initializeWith() {
-			//vc::optimization::OptimizationProblem* ba = new vc::optimization::BundleAdjustment();
-			//ba->specific_optimize();
+		void calculateTransformations() {
+			for (int i = 0; i < translations.size(); i++) {
+				currentTranslations[i] = getTranslationMatrix(i);
+				currentRotations[i] = getRotationMatrix(i);
+				currentScales[i] = getScaleMatrix(i);
+			}
 
-			BundleAdjustment::solveErrorFunction();
+			needsRecalculation = false;
 		}
 
-		bool vc::optimization::OptimizationProblem::solveErrorFunction() {
+		Eigen::Matrix4d getTransformation(int camera_index) {
+			if (needsRecalculation) {
+				calculateTransformations();
+			}
+			return getCurrentTransformation(camera_index);
+		}
 
-			initializeWith();
+		Eigen::Matrix4d getRotationMatrix(int camera_index) {
+			try {
+				Eigen::Vector3d rotationVector(
+					rotations.at(camera_index).at(0),
+					rotations.at(camera_index).at(1),
+					rotations.at(camera_index).at(2)
+				);
+				return generateTransformationMatrix(0.0, 0.0, 0.0, rotationVector.norm(), rotationVector.normalized());
+			}
+			catch (std::out_of_range&) {
+				return Eigen::Matrix4d::Identity();
+			}
+			catch (std::exception&) {
+				return Eigen::Matrix4d::Identity();
+			}
+		}
 
-			std::vector<Eigen::Matrix4d> initialTransformations = bestTransformations;
+		Eigen::Matrix4d getTranslationMatrix(int camera_index) {
+			try {
+				return generateTransformationMatrix(
+					translations.at(camera_index).at(0),
+					translations.at(camera_index).at(1),
+					translations.at(camera_index).at(2),
+					0.0, Eigen::Vector3d::Identity()
+				);
+			}
+			catch (std::out_of_range&) {
+				return Eigen::Matrix4d::Identity();
+			}
+			catch (std::exception&) {
+				return Eigen::Matrix4d::Identity();
+			}
+		}
+
+		Eigen::Matrix4d getScaleMatrix(int camera_index) {
+			try {
+				return generateScaleMatrix(
+					scales.at(camera_index).at(0),
+					scales.at(camera_index).at(1),
+					scales.at(camera_index).at(2)
+				);
+			}
+			catch (std::out_of_range&) {
+				return Eigen::Matrix4d::Identity();
+			}
+			catch (std::exception&) {
+				return Eigen::Matrix4d::Identity();
+			}
+		}
+
+		void setup() {
+			for (int i = 0; i < 4; i++)
+			{
+				Eigen::Vector3d translation = currentTranslations[i].block<3, 1>(0, 3);
+				double angle = Eigen::AngleAxisd(currentRotations[i].block<3, 3>(0, 0)).angle();
+				Eigen::Vector3d rotation = Eigen::AngleAxisd(currentRotations[i].block<3, 3>(0, 0)).axis().normalized();
+				rotation *= angle;
+				Eigen::Vector3d scale = currentScales[i].diagonal().block<3, 1>(0, 0);
+
+				for (int j = 0; j < 3; j++)
+				{
+					translations[i][j] = translation[j];
+					rotations[i][j] = rotation[j];
+					scales[i][j] = scale[j];
+				}
+			}
+			calculateTransformations();
+		}
+
+		void initialize() {
+			vc::optimization::BundleAdjustment bundleAdjustment = vc::optimization::BundleAdjustment(verbose);
+			bundleAdjustment.characteristicPoints = characteristicPoints;
+			if (bundleAdjustment.optimizeOnPoints()) {
+				bestTransformations = bundleAdjustment.bestTransformations;
+				currentRotations = bundleAdjustment.currentRotations;
+				currentTranslations = bundleAdjustment.currentTranslations;
+				currentScales = bundleAdjustment.currentScales;
+				hasInitialization = true;
+				setup();
+			}
+			else {
+				hasInitialization = false;
+			}
+		}
+
+		bool solveErrorFunction() {
+
+			//std::vector<Eigen::Matrix4d> initialTransformations = bestTransformations;
+			std::vector<Eigen::Matrix4d> initialTransformations(OptimizationProblem::bestTransformations);
 
 			int baseId = 0;
 
 			for (int relativeId = 1; relativeId < characteristicPoints.size(); relativeId++) {
-				//getCurrentRelativeTransformation
-				
-				//bestTransformations[relativeId] = getBestRelativeTransformation(baseId, relativeId) * estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], getBestRelativeTransformation(relativeId, baseId));
-				
-				//std::cout << "Best:" << bestTransformations[relativeId] << std::endl;
-				//std::cout << "Best2:" << getCurrentTransformation(relativeId) << std::endl;
-				//bestTransformations[relativeId] = getCurrentTransformation(relativeId)* getCurrentTransformation(baseId).inverse() * estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], getCurrentTransformation(baseId) * getCurrentTransformation(relativeId).inverse());
-				
-				bestTransformations[relativeId] = getBestRelativeTransformation *  estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], Eigen::Matrix4d::Identity());
+								
+				Eigen::Matrix4d pose = estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], Eigen::Matrix4d::Identity());
 
+				Eigen::Matrix3d rotationMatrix = pose.block<3, 3>(0, 0);
+				Eigen::Vector3d translation = pose.block<3, 1>(0, 3);
 				
-				//std::cout << "Best3:" << bestTransformations[relativeId] << std::endl;
+				double rotation[9];
+				double angle_axis[3];
+
+				for (int i = 0; i < 3; i++) {
+					for (int j = 0; j < 3; j++) {
+						rotation[i*3 + j] = rotationMatrix(j, i);
+					}
+				}
+
+				ceres::RotationMatrixToAngleAxis(rotation, angle_axis);
+
+				for (int i = 0; i < 3; i++) {
+					rotations[relativeId].push_back(angle_axis[i]);
+				}
+
+				for (int i = 0; i < 3; i++) {
+					translations[relativeId].push_back(translation(i));
+				}
 			}
 
-			//std::cout << vc::utils::toString("Initial", initialTransformations);
-			//std::cout << vc::utils::toString("Final", bestTransformations);
+			calculateTransformations();
 
-			//std::cout << std::endl;
+			std::cout << "ICP" << std::endl;
+			std::cout << vc::utils::toString("Initial", initialTransformations);
+			std::cout << vc::utils::toString("Final", bestTransformations);
+			std::cout << std::endl;
 
 			return true;
 		}
@@ -259,35 +393,6 @@ namespace vc::optimization {
 			auto& targetPoints = target.getFilteredPoints(matchingHashes, verbose);
 
 			Eigen::Matrix4d estimatedPose = initialPose;
-
-			//Eigen::Matrix3d rotationMatrix = estimatedPose.block(0, 0, 3, 3);
-			//
-			//double R[9] = { 0 };
-			//double T[3] = { 0 };
-			//double angleAxis[3];
-			//double pose[6] = { 0 };
-
-			//for (size_t i = 0; i < 3; ++i)
-			//{
-			//	for (size_t j = 0; j < 3; ++j)
-			//	{
-			//		R[i * 3 + j] = rotationMatrix(i, j);
-			//	}
-			//}
-
-			//ceres::RotationMatrixToAngleAxis<double>(R, angleAxis);
-			//
-			//for (int i = 0; i < 3; i++) {
-			//	T[i] = estimatedPose(3, i);
-			//}
-
-			//for (int i = 0; i < 3; i++)
-			//	pose[i] = angleAxis[i];
-
-			//for (int i = 0; i < 3; i++)
-			//	pose[i+3] = T[i];
-
-			//auto poseIncrement = PoseIncrement<double>(pose);
 
 			double incrementArray[6];
 			auto poseIncrement = PoseIncrement<double>(incrementArray);
@@ -308,7 +413,7 @@ namespace vc::optimization {
 				ceres::Solver::Summary summary;
 
 				ceres::Solve(options, &problem, &summary);
-				std::cout << summary.BriefReport() << std::endl;
+				//std::cout << summary.BriefReport() << std::endl;
 				//std::cout << summary.FullReport() << std::endl;
 
 				// Update the current pose estimate (we always update the pose from the left, using left-increment notation).
@@ -316,8 +421,10 @@ namespace vc::optimization {
 				estimatedPose = PoseIncrement<double>::convertToMatrix(poseIncrement) * estimatedPose;
 				poseIncrement.setZero();
 
-				std::cout << "Optimization iteration done." << std::endl;
+				//std::cout << "Optimization iteration done." << std::endl;
 			}
+
+			//std::cout << "Pose: " << estimatedPose << std::endl << std::endl;
 
 			return estimatedPose;
 		}
@@ -331,7 +438,7 @@ namespace vc::optimization {
 			options.use_nonmonotonic_steps = false;
 			options.linear_solver_type = ceres::DENSE_QR;
 			options.minimizer_progress_to_stdout = 0;
-			options.max_num_iterations = 20;
+			options.max_num_iterations = 1;
 			options.update_state_every_iteration = true;
 			options.num_threads = 8;
 		}
@@ -344,9 +451,6 @@ namespace vc::optimization {
 			{
 				auto relativePoint = sourcePoints[hash];
 				auto basePoint = targetPoints[hash];
-
-				//const auto& sourcePoint = sourcePoints[i];
-				//const auto& targetPoint = targetPoints[match.idx];
 
 				bool valid = true;
 				for (int i = 0; i < 3; i++)

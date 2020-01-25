@@ -94,6 +94,9 @@
     <ClInclude Include="optimization\ICP.hpp">
       <Filter>Optimization</Filter>
     </ClInclude>
+    <ClInclude Include="optimization\CeresOptimizationProblem.hpp">
+      <Filter>Optimization</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -54,7 +54,8 @@ using namespace vc::enums;
 //#include <io.h>
 #include "MarchingCubes.hpp"
 
-#include "optimization/optimizationProblem.hpp"
+#include "optimization/OptimizationProblem.hpp"
+#include "optimization/CeresOptimizationProblem.hpp"
 #include "optimization/BundleAdjustment.hpp"
 #include "optimization/Procrustes.hpp"
 #include "optimization/ICP.hpp"
