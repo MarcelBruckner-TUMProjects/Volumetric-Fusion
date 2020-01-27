@@ -24,7 +24,7 @@ uniform usampler2D depthFrame;
 uniform vec2 depthResolution;
 uniform float depthScale;
 
-layout (local_size_x = 1) in;
+layout (local_size_x = 32) in;
 
 struct VtxData {
    vec4 vtx_pos;       // 4N [GOOD] -- Largest base alignment

@@ -76,7 +76,7 @@ std::vector<int> DEFAULT_DEPTH_STREAM = { 640, 480 };
 
 //std::vector<int> CALIBRATION_COLOR_STREAM = { 640, 480 };
 //std::vector<int> CALIBRATION_DEPTH_STREAM = { 640, 480 };
-std::vector<int> CALIBRATION_COLOR_STREAM = { 1920, 1080 };
+std::vector<int> CALIBRATION_COLOR_STREAM = { 1280, 720 };
 std::vector<int> CALIBRATION_DEPTH_STREAM = { 1280, 720 };
 
 // camera
@@ -298,7 +298,7 @@ int main(int argc, char* argv[]) try {
 			}
 		}
 
-		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
+		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 			if (calibrateCameras) {
 				optimizationProblemGUI->render();
 			}
@@ -316,7 +316,7 @@ int main(int argc, char* argv[]) try {
 			else if (state.renderState == RenderState::ONLY_DEPTH) {
 				pipelines[i]->renderDepth(x, y, aspect, width, height);
 			}
-			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
+			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 				if (state.renderState != RenderState::MULTI_POINTCLOUD) {
 					x = -1;
 					y = -1;

@@ -16,7 +16,8 @@
 
 namespace vc::fusion {
 	const int INVALID_TSDF_VALUE = 5;
-	const int SHADER_LAYOUT_X = 1;
+	const int VOXELGRID_SHADER_LAYOUT_X = 32;
+	const int MARCHING_CUBES_SHADER_LAYOUT_X = 16;
 	   
 	class Voxelgrid {
 	protected:
@@ -162,7 +163,7 @@ namespace vc::fusion {
 			voxelgridComputeShader->setVec3("origin", origin);
 			voxelgridComputeShader->setBool("setPosition", true);
 
-			glDispatchCompute(num_gridPoints / SHADER_LAYOUT_X, 1, 1);
+			glDispatchCompute(num_gridPoints / VOXELGRID_SHADER_LAYOUT_X, 1, 1);
 
 			glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
@@ -285,7 +286,7 @@ namespace vc::fusion {
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, colorWidth, colorHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, color_frame.get_data());
 			voxelgridComputeShader->setInt("colorFrame", 1);
 
-			glDispatchCompute(num_gridPoints / SHADER_LAYOUT_X, 1, 1);
+			glDispatchCompute(num_gridPoints / MARCHING_CUBES_SHADER_LAYOUT_X , 1, 1);
 
 			glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		}
@@ -315,7 +316,7 @@ namespace vc::fusion {
 
 			zeroTriangleCounter();
 
-			glDispatchCompute(num_gridPoints, 1, 1);
+			glDispatchCompute(num_gridPoints / MARCHING_CUBES_SHADER_LAYOUT_X, 1, 1);
 			glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 			GLuint userCounters[1];
@@ -324,7 +325,7 @@ namespace vc::fusion {
 			glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
 			GLuint numTriangles = userCounters[0];
 
-			std::cout << vc::utils::toString("Calculated numTriangles", numTriangles);
+			//std::cout << vc::utils::toString("Calculated numTriangles", numTriangles);
 
 			marchingCubesComputeShader->setBool("onlyCount", false);
 			triangles = std::vector<vc::fusion::Triangle>(numTriangles);
@@ -334,7 +335,7 @@ namespace vc::fusion {
 			glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Triangle) * numTriangles, triangles.data(), GL_DYNAMIC_COPY);
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, triangleBuffer);
 
-			glDispatchCompute(num_gridPoints, 1, 1);
+			glDispatchCompute(num_gridPoints / MARCHING_CUBES_SHADER_LAYOUT_X, 1, 1);
 			glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 		/*	glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleBuffer);

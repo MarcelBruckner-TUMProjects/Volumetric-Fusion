@@ -5,7 +5,7 @@ uniform float isolevel;
 uniform int INVALID_TSDF_VALUE;
 uniform bool onlyCount;
 
-layout (local_size_x = 1) in;
+layout (local_size_x = 16) in;
 
 struct VtxData {
    vec4 pos;       // 4N [GOOD] -- Largest base alignment
