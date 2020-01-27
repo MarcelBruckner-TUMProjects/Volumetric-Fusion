@@ -98,7 +98,7 @@ int calculateCubeIndex(int hashes[8]){
 
 InterpolationResult VertexInterp(VtxData p1, VtxData p2)
 {
-    if(p1.tsdf.w == INVALID_TSDF_VALUE || p2.tsdf.w == INVALID_TSDF_VALUE){
+    if(p1.tsdf.z <= 0 || p2.tsdf.z <= 0){
         return InterpolationResult(vec4(-1000), vec4(-1000));
     }
 
@@ -144,12 +144,21 @@ void main(){
     int hashes[8] = getHashes(pos);
     int cubeindex = calculateCubeIndex(hashes);
     
-
-
     if(edgeTable[cubeindex].value == 0){
 		return;
 	}
     
+//    if(onlyCount){
+//        atomicCounterIncrement(numTriangles);
+//        return;
+//    }else{
+//        triangles[0].pos0 = vec4(pos, edgeTable[cubeindex].value);        
+//        triangles[0].pos1 = vec4(hashes[0], hashes[1], hashes[2], hashes[3]);        
+//        triangles[0].pos2 = vec4(hashes[4], hashes[5], hashes[6], hashes[7]);        
+//
+//        return;
+//    }
+
 	InterpolationResult vertlist[12];
     
     if (bool(edgeTable[cubeindex].value & 1))
@@ -176,12 +185,7 @@ void main(){
         vertlist[10] = VertexInterp(verts[hashes[2]], verts[hashes[6]]);
     if (bool(edgeTable[cubeindex].value & 2048))
         vertlist[11] = VertexInterp(verts[hashes[3]], verts[hashes[7]]);
-			
-//    for(int i = 0; i < 12; i++){
-//        triangles[i / 3].pos[i % 3] = vertlist[i];        
-//    }
-//    return;
-
+		
 	for (int i = 0; triTable[cubeindex * 16 + i].value != -1; i += 3) {
 		InterpolationResult a = vertlist[triTable[cubeindex * 16 + i + 0].value];
         if(!isValid(a)) continue;
@@ -197,9 +201,9 @@ void main(){
 			    triangles[t].pos0 = a.pos;
 			    triangles[t].pos1 = b.pos;
 			    triangles[t].pos2 = c.pos;
-			    triangles[t].color0 = a.color;
-			    triangles[t].color1 = b.color;
-			    triangles[t].color2 = c.color;
+			    triangles[t].color0 = vec4(a.color.xyz,1);
+			    triangles[t].color1 = vec4(b.color.xyz,1);
+			    triangles[t].color2 = vec4(c.color.xyz,1);
 //			    triangles[t].color0 = vec4(1, 0, 0, 1);
 //			    triangles[t].color1 = vec4(0, 1, 0, 1);
 //			    triangles[t].color2 = vec4(0, 0, 1, 1);

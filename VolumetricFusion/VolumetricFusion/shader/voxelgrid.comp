@@ -35,7 +35,7 @@ struct VtxData {
 // std140 is pretty important here, it is the only way to guarantee the data
 //   structure is aligned as described above and that the stride between
 //     elements in verts[] is 0.
-layout (std140, binding = 1) buffer VertexBuffer {
+layout (std140, binding = 0) buffer VertexBuffer {
    VtxData verts [];
 };
 

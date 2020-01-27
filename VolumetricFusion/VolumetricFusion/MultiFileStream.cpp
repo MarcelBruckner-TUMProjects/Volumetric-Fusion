@@ -93,7 +93,7 @@ double lastFrame = 0.0;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::VOLUMETRIC_FUSION);
 //std::vector<vc::imgui::PipelineGUI> pipelineGuis;
 vc::imgui::AllPipelinesGUI* allPipelinesGui;
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
@@ -103,7 +103,7 @@ bool overlayCharacteristicPoints = true;
 
 vc::fusion::Voxelgrid* voxelgrid;
 vc::imgui::FusionGUI* fusionGUI;
-vc::fusion::MarchingCubes* marchingCubes;
+//vc::fusion::MarchingCubes* marchingCubes;
 
 vc::rendering::CoordinateSystem* coordinateSystem;
 
@@ -125,9 +125,9 @@ int main(int argc, char* argv[]) try {
 	//GLFWwindow* hiddenComputeWindow = setupComputeWindow();
 	//glfwMakeContextCurrent(window);
 
-	//voxelgrid = new vc::fusion::FourCellMockVoxelGrid();
 	voxelgrid = new vc::fusion::Voxelgrid();
-	marchingCubes = new vc::fusion::MarchingCubes();
+	//voxelgrid = new vc::fusion::SingleCellMockVoxelGrid();
+	//marchingCubes = new vc::fusion::MarchingCubes();
 
 	//voxelgrid = new vc::fusion::FourCellMockVoxelGrid();
 	////vc::fusion::marchingCubes(voxelgrid);
@@ -284,7 +284,7 @@ int main(int argc, char* argv[]) try {
 				}
 
 				if (fusionGUI->marchingCubes) {
-					marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
+					voxelgrid->computeMarchingCubes();
 				}
 				frameNumberForVoxelgrid = 0;
 				//blockInput = false;
@@ -294,11 +294,11 @@ int main(int argc, char* argv[]) try {
 				voxelgrid->renderGrid(model, view, projection);
 			}
 			if (fusionGUI->renderMesh) {
-				marchingCubes->render(model, view, projection);
+				voxelgrid->renderMarchingCubes(model, view, projection);
 			}
 		}
 
-		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
 			if (calibrateCameras) {
 				optimizationProblemGUI->render();
 			}
@@ -316,7 +316,7 @@ int main(int argc, char* argv[]) try {
 			else if (state.renderState == RenderState::ONLY_DEPTH) {
 				pipelines[i]->renderDepth(x, y, aspect, width, height);
 			}
-			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
 				if (state.renderState != RenderState::MULTI_POINTCLOUD) {
 					x = -1;
 					y = -1;

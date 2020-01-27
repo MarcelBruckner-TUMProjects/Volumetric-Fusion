@@ -21,10 +21,10 @@ void main()
     float t = tsdf.y;
 
     // Blue: invalid point
-    if(tsdf.w > 0){
-        vs_out.color = vec4(0.0, 0.0, 0.0, -1.0);
-        gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
-//        vs_out.color = vec4(0.0, 0.0, 1, .5);
+    if(tsdf.z <= 0){
+//        vs_out.color = vec4(0.0, 0.0, 0.0, -1.0);
+//        gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
+        vs_out.color = vec4(0.0, 0.0, 1, .5);
         return;
     }
     
