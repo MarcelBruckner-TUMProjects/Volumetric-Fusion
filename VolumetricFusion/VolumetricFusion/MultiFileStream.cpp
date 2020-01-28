@@ -167,7 +167,7 @@ int main(int argc, char* argv[]) try {
 				addPipeline(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM, folderSettings.recordingsFolder));
 			}
 			else if (state.captureState == CaptureState::STREAMING) {
-				addPipeline(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM));
+				addPipeline(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM, i == 0 ? 1 : 2));
 			}
 			i++;
 		}
