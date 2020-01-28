@@ -217,10 +217,12 @@ namespace vc::optimization {
         }
 
         void getCharacteristicPoints(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
+            std::vector<vc::optimization::ACharacteristicPoints> current(pipelines.size());
             for (int i = 0; i < pipelines.size(); i++)
             {
-                characteristicPoints[i] = CharacteristicPoints(pipelines[i]);
+                current[i] = CharacteristicPoints(pipelines[i]);
             }
+            characteristicPoints = current;
         }
 
         virtual void randomize() {

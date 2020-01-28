@@ -242,6 +242,8 @@ namespace vc::rendering {
 
             const int width = color_image.as<rs2::video_frame>().get_width();
             const int height = color_image.as<rs2::video_frame>().get_height();
+
+            glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, textures[0]);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, color_image.get_data());
 
@@ -260,26 +262,30 @@ namespace vc::rendering {
 
             TEXTURE_shader->use();
             TEXTURE_shader->setVec2("aspect", x_aspect, y_aspect );
-            glBindVertexArray(VAOs[0]);
+            TEXTURE_shader->setInt("onlyColorTexture", 0);
+
+            initializeTextureBuffer();
+
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
             glBindVertexArray(0);
 
-           /* glBindBuffer(GL_ARRAY_BUFFER, COLOR_VBO);
-            glBufferData(GL_ARRAY_BUFFER, vertices.size(), vertices.data(), GL_STREAM_DRAW);*/
+          
         }
     };
     
-    void startFrame(GLFWwindow* window) {
+    void startFrame(GLFWwindow* window, int width, int height) {
         glfwMakeContextCurrent(window);
         // render
         // ------
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glBlendEquation(GL_FUNC_ADD);
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         //glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glViewport(0, 0, width, height);
     }
 
     void setViewport(const int viewport_width, const int viewport_height, const int pos_x, const int pos_y) {

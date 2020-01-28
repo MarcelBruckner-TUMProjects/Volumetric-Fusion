@@ -1,0 +1,213 @@
+#version 430
+	
+uniform ivec3 sizeNormalized;
+uniform float isolevel;
+uniform int INVALID_TSDF_VALUE;
+uniform bool onlyCount;
+
+layout (local_size_x = 16) in;
+
+struct VtxData {
+   vec4 pos;       // 4N [GOOD] -- Largest base alignment
+   vec4 tsdf;
+   vec4 color;
+};                      // ^^ 8 * sizeof (GLfloat) per-vtx
+
+struct TriData {
+    vec4 pos0;
+    vec4 color0;
+    vec4 pos1;
+    vec4 color1;
+    vec4 pos2;
+    vec4 color2;
+};
+
+struct EdgeTableData {
+    int value;
+};
+
+struct TriTableData {
+    int value;
+};
+
+struct InterpolationResult {
+    vec4 pos;
+    vec4 color;
+};
+
+layout (std140, binding = 0) buffer VertexBuffer {
+   VtxData verts [];
+};
+
+layout (std140, binding = 1) buffer TriangleBuffer {
+   TriData triangles [];
+};
+
+layout (packed, binding = 2) buffer EdgeTableBuffer {
+   EdgeTableData edgeTable [];
+};
+
+layout (packed, binding = 3) buffer TriTableBuffer {
+   TriTableData triTable [];
+};
+
+layout(binding = 4) uniform atomic_uint numTriangles;
+
+ivec3 unhash(uint hash){
+    uint x = hash % sizeNormalized.x;
+    uint y = uint(hash / sizeNormalized.x) % sizeNormalized.y;
+    uint z = uint(hash/ (sizeNormalized.x * sizeNormalized.y)) % sizeNormalized.z;
+
+    ivec3 pos = ivec3(x, y, z);
+    return pos;
+}
+
+int hashFunc(ivec3 pos){
+    return pos.x + pos.y * sizeNormalized.x + pos.z * sizeNormalized.x * sizeNormalized.y; 
+}
+
+int[8] getHashes(ivec3 pos){
+    return int[]
+    (
+        hashFunc(pos + ivec3(0,0,1)),
+        hashFunc(pos + ivec3(1,0,1)),
+    
+        hashFunc(pos + ivec3(1,0,0)),
+        hashFunc(pos + ivec3(0,0,0)),
+    
+        hashFunc(pos + ivec3(0,1,1)),
+        hashFunc(pos + ivec3(1,1,1)),
+    
+        hashFunc(pos + ivec3(1,1,0)),
+        hashFunc(pos + ivec3(0,1,0))
+    );
+}
+
+int calculateCubeIndex(int hashes[8]){
+    int cubeindex = 0;
+    if (verts[hashes[0]].tsdf[1] < isolevel) cubeindex |= 1;
+    if (verts[hashes[1]].tsdf[1] < isolevel) cubeindex |= 2;
+    if (verts[hashes[2]].tsdf[1] < isolevel) cubeindex |= 4;
+    if (verts[hashes[3]].tsdf[1] < isolevel) cubeindex |= 8;
+    if (verts[hashes[4]].tsdf[1] < isolevel) cubeindex |= 16;
+    if (verts[hashes[5]].tsdf[1] < isolevel) cubeindex |= 32;
+    if (verts[hashes[6]].tsdf[1] < isolevel) cubeindex |= 64;
+    if (verts[hashes[7]].tsdf[1] < isolevel) cubeindex |= 128;
+    return cubeindex;
+}
+
+InterpolationResult VertexInterp(VtxData p1, VtxData p2)
+{
+    if(p1.tsdf.z <= 0 || p2.tsdf.z <= 0){
+        return InterpolationResult(vec4(-1000), vec4(-1000));
+    }
+
+    if (abs(isolevel - p1.tsdf[1]) < 0.00001)
+        return InterpolationResult(p1.pos, p1.color);
+    if (abs(isolevel - p2.tsdf[1]) < 0.00001)
+        return InterpolationResult(p2.pos, p2.color);
+    if (abs(p1.tsdf[1] - p2.tsdf[1]) < 0.00001)
+        return InterpolationResult(p1.pos, p1.color);
+    float mu = (isolevel - p1.tsdf[1]) / (p2.tsdf[1] - p1.tsdf[1]);
+    InterpolationResult result;
+    result.pos = p1.pos + mu * (p2.pos - p1.pos);
+    result.color = p1.color + mu * (p2.color - p1.color);
+         
+    result.pos[3] = 1.0f;
+    result.color[3] = 1.0f;
+
+    return result;
+}
+
+bool isValid(InterpolationResult v){
+	for (int i = 0; i < 4; i++)
+	{
+		if (abs(v.pos[i]) > 1e2) {
+			return false;
+		}
+	}
+	return v.pos[2] != 0 || v.pos[3] != 0 ;
+}
+
+void main(){	
+    uint hash = gl_GlobalInvocationID.x;
+
+    ivec3 pos = unhash(hash);
+
+    if(pos.x >= sizeNormalized.x - 1 || 
+        pos.y >= sizeNormalized.y - 1 || 
+        pos.z >= sizeNormalized.z - 1 ) {  
+
+        return;
+    }
+    
+    int hashes[8] = getHashes(pos);
+    int cubeindex = calculateCubeIndex(hashes);
+    
+    if(edgeTable[cubeindex].value == 0){
+		return;
+	}
+    
+//    if(onlyCount){
+//        atomicCounterIncrement(numTriangles);
+//        return;
+//    }else{
+//        triangles[0].pos0 = vec4(pos, edgeTable[cubeindex].value);        
+//        triangles[0].pos1 = vec4(hashes[0], hashes[1], hashes[2], hashes[3]);        
+//        triangles[0].pos2 = vec4(hashes[4], hashes[5], hashes[6], hashes[7]);        
+//
+//        return;
+//    }
+
+	InterpolationResult vertlist[12];
+    
+    if (bool(edgeTable[cubeindex].value & 1))
+        vertlist[0] = VertexInterp(verts[hashes[0]], verts[hashes[1]]);
+    if (bool(edgeTable[cubeindex].value & 2))
+        vertlist[1] = VertexInterp(verts[hashes[1]], verts[hashes[2]]);
+    if (bool(edgeTable[cubeindex].value & 4))
+        vertlist[2] = VertexInterp(verts[hashes[2]], verts[hashes[3]]);
+    if (bool(edgeTable[cubeindex].value & 8))
+        vertlist[3] = VertexInterp(verts[hashes[3]], verts[hashes[0]]);
+    if (bool(edgeTable[cubeindex].value & 16))
+        vertlist[4] = VertexInterp(verts[hashes[4]], verts[hashes[5]]);
+    if (bool(edgeTable[cubeindex].value & 32))
+        vertlist[5] = VertexInterp(verts[hashes[5]], verts[hashes[6]]);
+    if (bool(edgeTable[cubeindex].value & 64))
+        vertlist[6] = VertexInterp(verts[hashes[6]], verts[hashes[7]]);
+    if (bool(edgeTable[cubeindex].value & 128))
+        vertlist[7] = VertexInterp(verts[hashes[7]], verts[hashes[4]]);
+    if (bool(edgeTable[cubeindex].value & 256))
+        vertlist[8] = VertexInterp(verts[hashes[0]], verts[hashes[4]]);
+    if (bool(edgeTable[cubeindex].value & 512))
+        vertlist[9] = VertexInterp(verts[hashes[1]], verts[hashes[5]]);
+    if (bool(edgeTable[cubeindex].value & 1024))
+        vertlist[10] = VertexInterp(verts[hashes[2]], verts[hashes[6]]);
+    if (bool(edgeTable[cubeindex].value & 2048))
+        vertlist[11] = VertexInterp(verts[hashes[3]], verts[hashes[7]]);
+		
+	for (int i = 0; triTable[cubeindex * 16 + i].value != -1; i += 3) {
+		InterpolationResult a = vertlist[triTable[cubeindex * 16 + i + 0].value];
+        if(!isValid(a)) continue;
+        InterpolationResult b = vertlist[triTable[cubeindex * 16 + i + 1].value];
+        if(!isValid(b)) continue;
+        InterpolationResult c = vertlist[triTable[cubeindex * 16 + i + 2].value];
+        if(!isValid(c)) continue;
+
+            uint t = atomicCounterIncrement(numTriangles);
+            if(!onlyCount){
+//                triangles[t].pos0 = vec4(hashes[0],hashes[1],hashes[2],hashes[3]);
+//                triangles[t].pos1 = vec4(hashes[4],hashes[5],hashes[6],hashes[7]);
+			    triangles[t].pos0 = a.pos;
+			    triangles[t].pos1 = b.pos;
+			    triangles[t].pos2 = c.pos;
+			    triangles[t].color0 = vec4(a.color.xyz,1);
+			    triangles[t].color1 = vec4(b.color.xyz,1);
+			    triangles[t].color2 = vec4(c.color.xyz,1);
+//			    triangles[t].color0 = vec4(1, 0, 0, 1);
+//			    triangles[t].color1 = vec4(0, 1, 0, 1);
+//			    triangles[t].color2 = vec4(0, 0, 1, 1);
+            }
+	}
+}
+ 

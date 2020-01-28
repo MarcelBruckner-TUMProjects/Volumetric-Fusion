@@ -28,7 +28,7 @@ void main()
     gl_Position = projection * view * model * relativeTransformation * gl_Position;
     gl_Position = correction * gl_Position;
 
-    if(z == 0){
+    if(z <= 0.1){
         texCoord = vec2(-1.0f, -1.0f);
     }else{
         texCoord = uv;

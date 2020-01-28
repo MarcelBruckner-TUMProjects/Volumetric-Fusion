@@ -88,8 +88,14 @@ namespace vc::processing {
 	}
 
 
+	const int SQUARES_X = 5;
+	const int SQUARES_Y = 5;
+	const float SQUARE_LENGTH = 0.04;
+	const float MARKER_LENGTH = 0.035;
+
 	class ChArUco {
 	public:
+
 		rs2::frame_queue charucoProcessingQueues;
 		std::shared_ptr<rs2::processing_block > charucoProcessingBlocks;
 
@@ -111,7 +117,10 @@ namespace vc::processing {
 			const auto charucoPoseEstimation = [camera, this](cv::Mat& image, unsigned long long frameId) {
 				try {
 					cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-					cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(5, 5, 0.04f, 0.02f, dictionary);
+					cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(SQUARES_X, SQUARES_Y, SQUARE_LENGTH, MARKER_LENGTH, dictionary);
+
+					//cv::Ptr<cv::aruco::DetectorParameters> params;
+					//params->cornerRefinementMethod = cv::aruco::CORNER_REFINE_SUBPIX;
 
 					cv::aruco::detectMarkers(image, dictionary, markerCorners, ids);
 
@@ -164,6 +173,28 @@ namespace vc::processing {
 
 			charucoProcessingBlocks = std::make_shared<rs2::processing_block>(vc::processing::createColorProcessingBlock(charucoPoseEstimation));
 			charucoProcessingBlocks->start(charucoProcessingQueues); // Bind output of the processing block to be enqueued into the queue
+		}
+
+		static void generateBoard(int numberOfBoards = 6) {
+			cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+			cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(SQUARES_X, SQUARES_Y, SQUARE_LENGTH, MARKER_LENGTH, dictionary);
+			int numMarkersPerBoard = (SQUARES_X * SQUARES_Y / 2);
+			for (int boardNr = 0; boardNr < numberOfBoards; boardNr++) {
+				std::vector<int> ids;
+
+				for (int i = 0; i < numMarkersPerBoard; i++)
+				{
+					ids.emplace_back(i + boardNr * numMarkersPerBoard);
+				}
+				board->ids = ids;
+				cv::Mat boardImage;
+				board->draw(cv::Size(4096, 4096), boardImage, 00, 1);
+
+				std::stringstream ss;
+				ss << "charuco\\board_";
+				ss << SQUARES_X << "_" << SQUARES_Y << "_" << boardNr * numMarkersPerBoard << "_" << (boardNr + 1) * numMarkersPerBoard - 1 << ".png";
+				imwrite(ss.str(), boardImage);
+			}
 		}
 	};
 }

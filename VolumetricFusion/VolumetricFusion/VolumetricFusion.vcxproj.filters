@@ -31,7 +31,9 @@
     <ClInclude Include="FileAccess.hpp" />
     <ClInclude Include="glad\include\glad\glad.h" />
     <ClInclude Include="glad\include\KHR\khrplatform.h" />
+    <ClInclude Include="happly.h" />
     <ClInclude Include="ImGuiHelpers.hpp" />
+    <ClInclude Include="MarchingCubes.hpp" />
     <ClInclude Include="Processing.hpp" />
     <ClInclude Include="Rendering.hpp" />
     <ClInclude Include="Settings.hpp" />
@@ -97,6 +99,7 @@
     <ClInclude Include="optimization\CeresOptimizationProblem.hpp">
       <Filter>Optimization</Filter>
     </ClInclude>
+    <ClInclude Include="Structs.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -159,6 +162,18 @@
       <Filter>Shader</Filter>
     </None>
     <None Include="shader\voxelgrid.comp">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\marchingCubes.comp">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\countTriangles.comp">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\mesh.frag">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="shader\mesh.vert">
       <Filter>Shader</Filter>
     </None>
   </ItemGroup>

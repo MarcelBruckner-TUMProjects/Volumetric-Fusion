@@ -38,6 +38,10 @@
     <None Include="shader\compute_shader.comp" />
     <None Include="shader\coordinate.fs" />
     <None Include="shader\coordinate.vs" />
+    <None Include="shader\countTriangles.comp" />
+    <None Include="shader\marchingCubes.comp" />
+    <None Include="shader\mesh.frag" />
+    <None Include="shader\mesh.vert" />
     <None Include="shader\pointcloud.frag" />
     <None Include="shader\pointcloud.vs" />
     <None Include="shader\pointcloud_new.vert" />
@@ -67,6 +71,7 @@
     <ClInclude Include="FileAccess.hpp" />
     <ClInclude Include="glad\include\glad\glad.h" />
     <ClInclude Include="glad\include\KHR\khrplatform.h" />
+    <ClInclude Include="happly.h" />
     <ClInclude Include="ImGuiHelpers.hpp" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
@@ -91,6 +96,7 @@
     <ClInclude Include="Settings.hpp" />
     <ClInclude Include="Shader.hpp" />
     <ClInclude Include="stb_image.h" />
+    <ClInclude Include="Structs.hpp" />
     <ClInclude Include="Tables.hpp" />
     <ClInclude Include="Utils.hpp" />
     <ClInclude Include="Voxelgrid.hpp" />
@@ -184,7 +190,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>C:\Users\Marcel Bruckner\Documents\Volumetric-Fusion\third-party\boost_1_66_0;$(ProjectDir)..;..\..\include\Ceres\gflags\bin\include;..\..\include\Ceres\gflags\src;..\..\include\Ceres\bin\config;..\..\include\Ceres\eigen;..\..\include\Ceres\glog\src;..\..\include\Ceres\glog\bin;..\..\include\Ceres\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;_SILENCE_CXX17_NEGATORS_DEPRECATION_WARNING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -219,7 +225,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(ProjectDir)..;D:\glm;D:\TUM Semester\Program Files\OpenGL\glad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>PROJECT_DIR=R"($(SolutionDir))";GOOGLE_GLOG_DLL_DECL=;CERES_USING_STATIC_LIBRARY;NDEBUG;_CONSOLE;CERES_MSVC_USE_UNDERSCORE_PREFIXED_BESSEL_FUNCTIONS;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>PROJECT_DIR=R"($(SolutionDir))";GOOGLE_GLOG_DLL_DECL=;CERES_USING_STATIC_LIBRARY;NDEBUG;_CONSOLE;CERES_MSVC_USE_UNDERSCORE_PREFIXED_BESSEL_FUNCTIONS;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_SILENCE_CXX17_NEGATORS_DEPRECATION_WARNING;_CRT_NONSTDC_NO_DEPRECATE;_ENABLE_EXTENDED_ALIGNED_STORAGE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>

@@ -1,9 +1,3 @@
-#define _ENABLE_EXTENDED_ALIGNED_STORAGE
-
-//#define GLOG_NO_ABBREVIATED_SEVERITIES
-#define _CRT_NONSTDC_NO_DEPRECATE
-#define _SILENCE_CXX17_NEGATORS_DEPRECATION_WARNING
-
 #pragma region Includes
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
@@ -50,12 +44,11 @@ using namespace vc::enums;
 
 #include "camera.hpp"
 #include "shader.hpp"
-#include <VolumetricFusion\Voxelgrid.hpp>
-//#include <io.h>
 #include "MarchingCubes.hpp"
 
 #include "optimization/OptimizationProblem.hpp"
 #include "optimization/CeresOptimizationProblem.hpp"
+#include "Processing.hpp"
 #include "optimization/BundleAdjustment.hpp"
 #include "optimization/Procrustes.hpp"
 #include "optimization/ICP.hpp"
@@ -74,11 +67,11 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow* window);
 void setCalibration();
 void addPipeline(std::shared_ptr<  vc::capture::CaptureDevice> pipeline);
-void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance);
+GLFWwindow* setupWindow();
+GLFWwindow* setupComputeWindow();
 
 // settings
 int SCR_WIDTH = 800 * 2;
-int TOP_BAR_HEIGHT = 0;
 int SCR_HEIGHT = 600 * 2 ;
 
 std::vector<int> DEFAULT_COLOR_STREAM = { 640, 480 };
@@ -86,7 +79,7 @@ std::vector<int> DEFAULT_DEPTH_STREAM = { 640, 480 };
 
 //std::vector<int> CALIBRATION_COLOR_STREAM = { 640, 480 };
 //std::vector<int> CALIBRATION_DEPTH_STREAM = { 640, 480 };
-std::vector<int> CALIBRATION_COLOR_STREAM = { 1920, 1080 };
+std::vector<int> CALIBRATION_COLOR_STREAM = { 1280, 720 };
 std::vector<int> CALIBRATION_DEPTH_STREAM = { 1280, 720 };
 
 // camera
@@ -112,7 +105,8 @@ bool visualizeCharucoResults = true;
 bool overlayCharacteristicPoints = true;
 
 vc::fusion::Voxelgrid* voxelgrid;
-vc::imgui::VoxelgridGUI* voxelgridGUI = new vc::imgui::VoxelgridGUI(voxelgrid);
+vc::imgui::FusionGUI* fusionGUI;
+//vc::fusion::MarchingCubes* marchingCubes;
 
 vc::rendering::CoordinateSystem* coordinateSystem;
 
@@ -123,74 +117,33 @@ vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
 vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::ICP();
 vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState, setCalibration, &calibrateCameras, &camera);
 
+vc::settings::FolderSettings folderSettings;
+ImGuiIO io;
+
+bool blockInput = false;
+
 int main(int argc, char* argv[]) try {	
-	////vc::optimization::MockProcrustes().optimize();
-	//vc::optimization::MockBundleAdjustment().optimize();
+	
+	GLFWwindow* window = setupWindow();
+	//GLFWwindow* hiddenComputeWindow = setupComputeWindow();
+	//glfwMakeContextCurrent(window);
+
+	//vc::processing::ChArUco::generateBoard();
 	//return 0;
 
-	google::InitGoogleLogging("Bundle Adjustment");
-	ceres::Solver::Summary summary;
-
-	vc::settings::FolderSettings folderSettings;
-	folderSettings.recordingsFolder = "recordings/allCameras/";
-
-	// glfw: initialize and configure
-	// ------------------------------
-	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-
-	// glfw window creation
-	// --------------------
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Volumetric Capture", NULL, NULL);
-	if (window == NULL)
-	{
-		std::cout << "Failed to create GLFW window" << std::endl;
-		glfwTerminate();
-		return -1;
-	}
-	glfwMakeContextCurrent(window);
-	
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-	glfwSetCursorPosCallback(window, mouse_callback);
-	glfwSetMouseButtonCallback(window, mouse_button_callback);
-	glfwSetScrollCallback(window, scroll_callback);
-	glfwSetKeyCallback(window, key_callback);
-	
-	// tell GLFW to capture our mouse
-	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-	// glad: load all OpenGL function pointers
-	// ---------------------------------------
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-	{
-		std::cout << "Failed to initialize GLAD" << std::endl;
-		return -1;
-	}
-
-	glad_set_post_callback([](const char* name, void* funcptr, int len_args, ...) {
-		GLenum error_code;
-
-		(void)funcptr;
-		(void)len_args;
-
-		error_code = glad_glGetError();
-
-		if (error_code != GL_NO_ERROR) {
-			// shut this up for a while
-			fprintf(stderr, "ERROR %d in %s\n", error_code, name);
-		}
-	});
-
-	ImGuiIO io = vc::imgui::init(window, SCR_WIDTH, SCR_HEIGHT);
-
 	voxelgrid = new vc::fusion::Voxelgrid();
+	//voxelgrid = new vc::fusion::SingleCellMockVoxelGrid();
+	//marchingCubes = new vc::fusion::MarchingCubes();
+
+	//voxelgrid = new vc::fusion::FourCellMockVoxelGrid();
+	////vc::fusion::marchingCubes(voxelgrid);
+	//marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
+	//return 0;
+
 	coordinateSystem = new vc::rendering::CoordinateSystem();
 	optimizationProblem->setupOpenGL();
 	optimizationProblemGUI = new vc::imgui::OptimizationProblemGUI(optimizationProblem);
-
+	fusionGUI = new vc::imgui::FusionGUI(voxelgrid);
 	//ImGui_ImplGlfw_Init(window, false);
 	
 	//vc::rendering::Rendering rendering(app, viewOrientation);
@@ -215,7 +168,7 @@ int main(int argc, char* argv[]) try {
 				addPipeline(std::make_shared < vc::capture::RecordingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM, folderSettings.recordingsFolder));
 			}
 			else if (state.captureState == CaptureState::STREAMING) {
-				addPipeline(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM));
+				addPipeline(std::make_shared < vc::capture::StreamingCaptureDevice>(ctx, device, DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM, i == 0 ? 1 : 2));
 			}
 			i++;
 		}
@@ -276,11 +229,18 @@ int main(int argc, char* argv[]) try {
 	});
 #pragma endregion
 	   
+	//fusionThread = std::thread([&stopped, &hiddenComputeWindow]() {
+	//	while (!stopped) {
+	//		if (state.renderState == RenderState::VOLUMETRIC_FUSION) {
+	//			glfwMakeContextCurrent(hiddenComputeWindow);
+	//			vc::utils::sleepFor("Sleeping in compute", 50);
+	//		}
+	//	}
+	//});
+
 #pragma region Main loop
 
-	float f = 0;
-	char* buf = "";
-	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT - TOP_BAR_HEIGHT);
+	int frameNumberForVoxelgrid = 0;
 	while (!glfwWindowShouldClose(window))
 	{
 		// per-frame time logic
@@ -307,8 +267,8 @@ int main(int argc, char* argv[]) try {
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
 
-		vc::rendering::startFrame(window);
-		optimizationProblem->calculateTransformations();
+		vc::rendering::startFrame(window, SCR_WIDTH, SCR_HEIGHT);
+		//optimizationProblem->calculateTransformations();
 
 		glfwPollEvents();
 
@@ -316,10 +276,35 @@ int main(int argc, char* argv[]) try {
 
 		programGui->render();
 
-		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
-			if (state.renderState == RenderState::VOLUMETRIC_FUSION) {
-				voxelgridGUI->render();
+		if (state.renderState == RenderState::VOLUMETRIC_FUSION) {
+			fusionGUI->render();
+
+			//if (vc::imgui::getFrameRate() > 20) 
+			{
+				//blockInput = true;
+				if (fusionGUI->fuse) {
+					for (int i = 0; i < pipelines.size() && i < 4; i++)
+					{
+						voxelgrid->integrateFrameGPU(pipelines[i], optimizationProblem->getBestRelativeTransformation(0, i), i == 0);
+					}
+				}
+
+				if (fusionGUI->marchingCubes) {
+					voxelgrid->computeMarchingCubes();
+				}
+				frameNumberForVoxelgrid = 0;
+				//blockInput = false;
 			}
+
+			if (fusionGUI->renderVoxelgrid) {
+				voxelgrid->renderGrid(model, view, projection);
+			}
+			if (fusionGUI->renderMesh) {
+				voxelgrid->renderMarchingCubes(model, view, projection);
+			}
+		}
+
+		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 			if (calibrateCameras) {
 				optimizationProblemGUI->render();
 			}
@@ -337,15 +322,13 @@ int main(int argc, char* argv[]) try {
 			else if (state.renderState == RenderState::ONLY_DEPTH) {
 				pipelines[i]->renderDepth(x, y, aspect, width, height);
 			}
-			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
+			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
 				if (state.renderState != RenderState::MULTI_POINTCLOUD) {
 					x = -1;
 					y = -1;
 				}
 				vc::rendering::setViewport(width, height, x, y);
-				if (state.renderState == RenderState::VOLUMETRIC_FUSION && voxelgridGUI->renderVoxelgrid) {
-					voxelgrid->renderGrid(model, view, projection);
-				}
+				
 				if (programGui->showCoordinateSystem) {
 					coordinateSystem->render(model, view, projection);
 				}
@@ -353,10 +336,6 @@ int main(int argc, char* argv[]) try {
 				
 				if (calibrateCameras && optimizationProblemGUI->highlightMarkerCorners) {
 					optimizationProblem->render(model, view, projection, i);
-				}
-
-				if (voxelgridGUI->fuse) {
-					volumetricFusion(pipelines[i], optimizationProblem->getBestRelativeTransformation(i, 0), voxelgridGUI->truncationDistance);
 				}
 			}
 		}
@@ -396,18 +375,6 @@ catch (const std::exception & e)
 }
 #pragma endregion
 
-void volumetricFusion(const std::shared_ptr<vc::capture::CaptureDevice> pipeline, Eigen::Matrix4d relativeTransformation, float truncationDistance) {
-		//voxelgrid->integrateFramesCPU(pipelines, optimizationProblem->bestTransformations);
-		voxelgrid->integrateFrameGPU(pipeline, relativeTransformation, voxelgridGUI->truncationDistance);
-
-		voxelgridGUI->fuse = false;
-
-		if (voxelgridGUI->marchingCubes) {
-			vc::fusion::marchingCubes(voxelgrid);
-			voxelgridGUI->marchingCubes = false;
-		}
-}
-
 void setCalibration() {
 	calibrateCameras.store(calibrateCameras);
 	for (int i = 0; i < pipelines.size(); i++) {
@@ -434,6 +401,9 @@ bool isKeyPressed(GLFWwindow* window, int key) {
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow* window)
 {
+	if (blockInput) {
+		return;
+	}
 	if (isKeyPressed(window, GLFW_KEY_W)) {
 		camera.ProcessKeyboard(vc::io::Camera_Movement::FORWARD, deltaTime);
 	}
@@ -449,6 +419,9 @@ void processInput(GLFWwindow* window)
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	if (blockInput) {
+		return;
+	}
 	if (action == GLFW_PRESS || action == GLFW_REPEAT) {
 		switch (key) {
 		case GLFW_KEY_ESCAPE: {
@@ -477,6 +450,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		}
 		case GLFW_KEY_4: {
 			state.renderState = RenderState::CALIBRATED_POINTCLOUD;
+			break;
+		}
+		case GLFW_KEY_5: {
+			state.renderState = RenderState::VOLUMETRIC_FUSION;
 			break;
 		}
 		case GLFW_KEY_V: {
@@ -521,6 +498,9 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 // -------------------------------------------------------
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
+	if (blockInput) {
+		return;
+	}
 	if (mouseButtonDown[GLFW_MOUSE_BUTTON_1]) {
 		if (firstMouse)
 		{
@@ -543,6 +523,9 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 
 void mouse_button_callback(GLFWwindow*, int button, int action, int mods)
 {
+	if (blockInput) {
+		return;
+	}
 	if (action == GLFW_PRESS) {
 		firstMouse = true;
 	}
@@ -553,7 +536,108 @@ void mouse_button_callback(GLFWwindow*, int button, int action, int mods)
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
+	if (blockInput) {
+		return;
+	}
 	camera.ProcessMouseScroll(yoffset);
 }
 
+void gladErrorCallback(const char* name, void* funcptr, int len_args, ...) {
+	GLenum error_code;
+
+	(void)funcptr;
+	(void)len_args;
+
+	error_code = glad_glGetError();
+
+	if (error_code != GL_NO_ERROR) {
+		// shut this up for a while
+		fprintf(stderr, "ERROR %d in %s\n", error_code, name);
+	}
+}
+
+GLFWwindow* setupWindow() {
+	google::InitGoogleLogging("Bundle Adjustment");
+	ceres::Solver::Summary summary;
+	folderSettings.recordingsFolder = "recordings/allCameras/";
+
+	// glfw: initialize and configure
+	// ------------------------------
+	glfwInit();
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+
+	// glfw window creation
+	// --------------------
+	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Volumetric Capture", NULL, NULL);
+	if (window == NULL)
+	{
+		std::cout << "Failed to create GLFW window" << std::endl;
+		glfwTerminate();
+		throw new std::exception("Failed to create GLFW window");
+	}
+	glfwMakeContextCurrent(window);
+
+	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	glfwSetCursorPosCallback(window, mouse_callback);
+	glfwSetMouseButtonCallback(window, mouse_button_callback);
+	glfwSetScrollCallback(window, scroll_callback);
+	glfwSetKeyCallback(window, key_callback);
+
+	// tell GLFW to capture our mouse
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+	// glad: load all OpenGL function pointers
+	// ---------------------------------------
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	{
+		std::cout << "Failed to initialize GLAD" << std::endl;
+		throw new std::exception("Failed to initialize GLAD");
+	}
+
+	glad_set_post_callback(gladErrorCallback);
+
+	io = vc::imgui::init(window, SCR_WIDTH, SCR_HEIGHT);
+
+	return window;
+}
+
+GLFWwindow* setupComputeWindow() {
+	// glfw: initialize and configure
+	// ------------------------------
+	//glfwInit();
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_VISIBLE, false);
+
+	// glfw window creation
+	// --------------------
+	GLFWwindow* window = glfwCreateWindow(100, 100, "Volumetric Capture - Compute", NULL, NULL);
+	if (window == NULL)
+	{
+		std::cout << "Failed to create GLFW window" << std::endl;
+		glfwTerminate();
+		throw new std::exception("Failed to create GLFW window");
+	}
+	glfwMakeContextCurrent(window);
+
+	// tell GLFW to capture our mouse
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+	// glad: load all OpenGL function pointers
+	// ---------------------------------------
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	{
+		std::cout << "Failed to initialize GLAD" << std::endl;
+		throw new std::exception("Failed to initialize GLAD");
+	}
+
+	glad_set_post_callback(gladErrorCallback);
+	
+	return window;
+}
 #pragma endregion
