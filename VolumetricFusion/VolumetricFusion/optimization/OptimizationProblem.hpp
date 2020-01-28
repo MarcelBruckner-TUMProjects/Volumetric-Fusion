@@ -283,8 +283,6 @@ namespace vc::optimization {
 
         virtual bool specific_optimize() = 0;
 		
-
-
         void render(glm::mat4 model, glm::mat4 view, glm::mat4 projection, int i) {
             //std::cout << characteristicPointsRenderers.size() << std::endl;
             //std::cout << characteristicPoints.size() << std::endl;
