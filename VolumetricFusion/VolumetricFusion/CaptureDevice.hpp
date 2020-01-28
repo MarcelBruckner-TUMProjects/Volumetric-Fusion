@@ -165,7 +165,7 @@ namespace vc::capture {
 
 		void captureThreadFunction() {
 			std::vector<rs2::filter*> filters;
-			//filters.emplace_back(new rs2::hole_filling_filter(1)); // Try 0, 1, 2
+			filters.emplace_back(new rs2::hole_filling_filter(1)); // Try 0, 1, 2
 			//filters.emplace_back(new rs2::threshold_filter(0.2, 1.2)); // Try 0, 1, 2
 			//filters.emplace_back(new rs2::spatial_filter()); // Try 0, 1, 2
 			//filters.emplace_back(new rs2::temporal_filter());

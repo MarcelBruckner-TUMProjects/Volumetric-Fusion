@@ -46,6 +46,8 @@ using namespace vc::enums;
 #include "shader.hpp"
 #include "MarchingCubes.hpp"
 
+#include "Processing.hpp"
+
 #include "optimization/optimizationProblem.hpp"
 #include "optimization/BundleAdjustment.hpp"
 #include "optimization/Procrustes.hpp"
@@ -124,6 +126,9 @@ int main(int argc, char* argv[]) try {
 	GLFWwindow* window = setupWindow();
 	//GLFWwindow* hiddenComputeWindow = setupComputeWindow();
 	//glfwMakeContextCurrent(window);
+
+	//vc::processing::ChArUco::generateBoard();
+	//return 0;
 
 	voxelgrid = new vc::fusion::Voxelgrid();
 	//voxelgrid = new vc::fusion::SingleCellMockVoxelGrid();
