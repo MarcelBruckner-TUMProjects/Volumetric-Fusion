@@ -36,37 +36,37 @@ namespace vc::optimization {
         const int num_intrinsic_parameters = 4;
         const int num_distCoeff_parameters = 4;
 
-        std::vector<std::vector<double>> translations;
-        std::vector<std::vector<double>> rotations;
-        std::vector<std::vector<double>> scales;
+        std::vector<std::vector<std::vector<double>>> translations;
+        std::vector<std::vector<std::vector<double>>> rotations;
+        std::vector<std::vector<std::vector<double>>> scales;
+        
+        std::vector<std::vector<std::vector<double>>> intrinsics;
+        std::vector<std::vector<std::vector<double>>> distCoeffs;
 
-        std::vector<std::vector<double>> intrinsics;
-        std::vector<std::vector<double>> distCoeffs;
 
-
-        Eigen::Matrix4d getTransformation(int camera_index) {
+        Eigen::Matrix4d getTransformation(int from , int to) {
             if (needsRecalculation) {
                 calculateTransformations();
             }
-            return OptimizationProblem::getCurrentTransformation(camera_index);
+            return OptimizationProblem::getCurrentTransformation(from, to);
         }
 
-        void randomize() {
-            Eigen::Vector3d randomTranslation = Eigen::Vector3d::Random();
-            translations[1][0] += (double)randomTranslation[0];
-            translations[1][1] += (double)randomTranslation[1];
-            translations[1][2] += (double)randomTranslation[2];
+        //void randomize() {
+        //    Eigen::Vector3d randomTranslation = Eigen::Vector3d::Random();
+        //    translations[1][0] += (double)randomTranslation[0];
+        //    translations[1][1] += (double)randomTranslation[1];
+        //    translations[1][2] += (double)randomTranslation[2];
 
-            Eigen::Vector3d randomRotation = Eigen::Vector3d::Random();
-            randomRotation.normalize();
-            double angle = std::rand() % 360;
-            randomRotation *= glm::radians(angle);
-            rotations[1][0] += (double)randomRotation[0];
-            rotations[1][1] += (double)randomRotation[1];
-            rotations[1][2] += (double)randomRotation[2];
+        //    Eigen::Vector3d randomRotation = Eigen::Vector3d::Random();
+        //    randomRotation.normalize();
+        //    double angle = std::rand() % 360;
+        //    randomRotation *= glm::radians(angle);
+        //    rotations[1][0] += (double)randomRotation[0];
+        //    rotations[1][1] += (double)randomRotation[1];
+        //    rotations[1][2] += (double)randomRotation[2];
 
-            needsRecalculation = true;
-        }
+        //    needsRecalculation = true;
+        //}
 
         bool init(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines) {
             if (!OptimizationProblem::init(pipelines)) {

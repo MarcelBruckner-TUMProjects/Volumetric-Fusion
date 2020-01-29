@@ -75,7 +75,7 @@ void main(){
     }
 
     vec2 pixelCoordinate = projectedVoxelCenter.xy / projectedVoxelCenter.z;
-    pixelCoordinate /= 2.0f;
+//    pixelCoordinate /= 2.0f;
     
     if(pixelCoordinate.x < 0 || pixelCoordinate.y < 0 || pixelCoordinate.x >= depthResolution.x || pixelCoordinate.y >= depthResolution.y) {
 //        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);

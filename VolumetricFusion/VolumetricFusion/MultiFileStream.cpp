@@ -49,7 +49,7 @@ using namespace vc::enums;
 #include "Processing.hpp"
 
 #include "optimization/optimizationProblem.hpp"
-#include "optimization/BundleAdjustment.hpp"
+//#include "optimization/BundleAdjustment.hpp"
 #include "optimization/Procrustes.hpp"
 #include "glog/logging.h"
 
@@ -70,16 +70,13 @@ GLFWwindow* setupWindow();
 GLFWwindow* setupComputeWindow();
 
 // settings
-int SCR_WIDTH = 800 * 2;
-int SCR_HEIGHT = 600 * 2 ;
+int SCR_WIDTH = 848 * 2;
+int SCR_HEIGHT = 480 * 2 ;
 
-std::vector<int> DEFAULT_COLOR_STREAM = { 640, 480 };
-std::vector<int> DEFAULT_DEPTH_STREAM = { 640, 480 };
-
-//std::vector<int> CALIBRATION_COLOR_STREAM = { 640, 480 };
-//std::vector<int> CALIBRATION_DEPTH_STREAM = { 640, 480 };
-std::vector<int> CALIBRATION_COLOR_STREAM = { 1280, 720 };
-std::vector<int> CALIBRATION_DEPTH_STREAM = { 1280, 720 };
+std::vector<int> DEFAULT_COLOR_STREAM = { 848, 480 };
+std::vector<int> DEFAULT_DEPTH_STREAM = { 848, 480 };
+//std::vector<int> DEFAULT_COLOR_STREAM = { 1280, 720 };
+//std::vector<int> DEFAULT_DEPTH_STREAM = { 1280, 720 };
 
 // camera
 vc::io::Camera camera(glm::vec3(0.0f, 0.0f, -1.0f));
@@ -95,7 +92,7 @@ double lastFrame = 0.0;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::VOLUMETRIC_FUSION);
+vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::VOLUMETRIC_FUSION);
 //std::vector<vc::imgui::PipelineGUI> pipelineGuis;
 vc::imgui::AllPipelinesGUI* allPipelinesGui;
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
@@ -109,11 +106,11 @@ vc::imgui::FusionGUI* fusionGUI;
 
 vc::rendering::CoordinateSystem* coordinateSystem;
 
-std::atomic_bool calibrateCameras = false;
+std::atomic_bool calibrateCameras = true;
 std::atomic_bool renderCoordinateSystem = false;
 
 vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
-vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment();
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::Procrustes();
 vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState, setCalibration, &calibrateCameras, &camera);
 
 vc::settings::FolderSettings folderSettings;
@@ -122,22 +119,12 @@ ImGuiIO io;
 bool blockInput = false;
 
 int main(int argc, char* argv[]) try {	
-	
+	//vc::processing::ChArUco::generateMarkers(std::vector<int>{6, 7, 8, 9 });
+	//return 0;
+
 	GLFWwindow* window = setupWindow();
-	//GLFWwindow* hiddenComputeWindow = setupComputeWindow();
-	//glfwMakeContextCurrent(window);
-
-	//vc::processing::ChArUco::generateBoard();
-	//return 0;
-
+	   
 	voxelgrid = new vc::fusion::Voxelgrid();
-	//voxelgrid = new vc::fusion::SingleCellMockVoxelGrid();
-	//marchingCubes = new vc::fusion::MarchingCubes();
-
-	//voxelgrid = new vc::fusion::FourCellMockVoxelGrid();
-	////vc::fusion::marchingCubes(voxelgrid);
-	//marchingCubes->compute(voxelgrid->sizeNormalized, voxelgrid->verts);
-	//return 0;
 
 	coordinateSystem = new vc::rendering::CoordinateSystem();
 	optimizationProblem->setupOpenGL();
@@ -145,12 +132,9 @@ int main(int argc, char* argv[]) try {
 	fusionGUI = new vc::imgui::FusionGUI(voxelgrid);
 	//ImGui_ImplGlfw_Init(window, false);
 	
-	//vc::rendering::Rendering rendering(app, viewOrientation);
-
 	rs2::context ctx; // Create librealsense context for managing devices
 	rs2::log_to_file(RS2_LOG_SEVERITY_WARN, "realsense_rs2.log");
 
-	//std::vector<vc::data::Data> datas;
 	std::vector<std::string> streamNames;
 
 	if (state.captureState == CaptureState::RECORDING || state.captureState == CaptureState::STREAMING) {
@@ -173,9 +157,6 @@ int main(int argc, char* argv[]) try {
 		}
 	}
 	else if (state.captureState == CaptureState::PLAYING) {
-
-		//std::cout << folderSettings.recordingsFolder << std::endl;
-
 		std::vector<std::string> filenames = vc::file_access::listFilesInFolder(folderSettings.recordingsFolder);
 
 		for (int i = 0; i < filenames.size() && i < 4; i++)
@@ -200,22 +181,16 @@ int main(int argc, char* argv[]) try {
 		
 	std::thread calibrationThread;
 	std::thread fusionThread;
-
-	// Program state (mostly for recordings)
-	struct {
-		std::vector<int> highestFrameIds = { -1, -1, -1, -1 };
-		bool allMarkersDetected = false;
-		bool allPipelinesEnteredLooped = false;
-	} programState;
-
+		
 	for (int i = 0; i < pipelines.size(); i++) {
 		pipelines[i]->chArUco->visualize = visualizeCharucoResults;
+		pipelines[i]->setResolutions(DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM);
 	}
 
 #pragma region Camera Calibration Thread
 
 	setCalibration();
-	calibrationThread = std::thread([&stopped, &programState]() {
+	calibrationThread = std::thread([&stopped]() {
 		while (!stopped) {
 			if (!calibrateCameras) {
 				continue;
@@ -284,7 +259,7 @@ int main(int argc, char* argv[]) try {
 				if (fusionGUI->fuse) {
 					for (int i = 0; i < pipelines.size() && i < 4; i++)
 					{
-						voxelgrid->integrateFrameGPU(pipelines[i], optimizationProblem->getBestRelativeTransformation(0, i), i == 0);
+						voxelgrid->integrateFrameGPU(pipelines[i], optimizationProblem->getBestTransformation(i), i == 0);
 					}
 				}
 
@@ -331,7 +306,7 @@ int main(int argc, char* argv[]) try {
 				if (programGui->showCoordinateSystem) {
 					coordinateSystem->render(model, view, projection);
 				}
-				pipelines[i]->renderPointcloud(model, view, projection, optimizationProblem->getBestRelativeTransformation(i, 0), allPipelinesGui->alphas[i]);
+				pipelines[i]->renderPointcloud(model, view, projection, optimizationProblem->getBestTransformation(i), allPipelinesGui->alphas[i]);
 				
 				if (calibrateCameras && optimizationProblemGUI->highlightMarkerCorners) {
 					optimizationProblem->render(model, view, projection, i);
@@ -377,12 +352,12 @@ catch (const std::exception & e)
 void setCalibration() {
 	calibrateCameras.store(calibrateCameras);
 	for (int i = 0; i < pipelines.size(); i++) {
-		if (calibrateCameras) {
+		/*if (calibrateCameras) {
 			pipelines[i]->setResolutions(CALIBRATION_COLOR_STREAM, CALIBRATION_DEPTH_STREAM);
 		}
 		else {
 			pipelines[i]->setResolutions(DEFAULT_COLOR_STREAM, DEFAULT_DEPTH_STREAM);
-		}
+		}*/
 		pipelines[i]->calibrate(calibrateCameras);
 	}
 }
