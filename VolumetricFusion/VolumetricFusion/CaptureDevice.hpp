@@ -178,7 +178,8 @@ namespace vc::capture {
 
 		void captureThreadFunction() {
 			std::vector<rs2::filter*> filters;
-			//filters.emplace_back(new rs2::high_confidence_filter());
+			filters.emplace_back(new rs2::decimation_filter(1));
+			filters.emplace_back(new rs2::spatial_filter(1.0f, 8.0f, 2.0f, 4.0f));
 			//filters.emplace_back(new rs2::hole_filling_filter(1)); // Try 0, 1, 2
 			//filters.emplace_back(new rs2::threshold_filter(0.2, 1.2)); // Try 0, 1, 2
 			//filters.emplace_back(new rs2::spatial_filter()); // Try 0, 1, 2

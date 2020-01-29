@@ -42,11 +42,11 @@ namespace vc::optimization {
         unsigned long long hash(int markerId, int cornerId, bool verbose = false) {
             unsigned long long value = std::hash<unsigned long long>()(std::hash<int>()(markerId * 128) + std::hash<int>()(cornerId));
 
-            //if (verbose) {
-            //    std::stringstream ss;
-            //    ss << "Hash of " << markerId << ", " << cornerId << ": " << value;
-            //    std::cout << vc::utils::asHeader(ss.str());
-            //}
+            if (verbose) {
+                std::stringstream ss;
+                ss << "Hash of " << markerId << ", " << cornerId << ": " << value;
+                std::cout << vc::utils::asHeader(ss.str());
+            }
 
             return value;
         }

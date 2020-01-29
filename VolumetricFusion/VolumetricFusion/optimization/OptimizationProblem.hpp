@@ -49,6 +49,8 @@ namespace vc::optimization {
         long sleepDuration = -1l;
         bool verbose = false;
 
+        int numberOfPipelines = 0;
+
         std::vector<CharacteristicPointsRenderer> characteristicPointsRenderers;
 
         std::vector<double> bestErrors;
@@ -216,19 +218,30 @@ namespace vc::optimization {
             //randomize();
             vc::utils::sleepFor("Pre optimization", sleepDuration);
 
-            auto success = specific_optimize();
+            if (!specific_optimize()) {
+                return false;
+            }
 
             vc::utils::sleepFor("After optimization", sleepDuration);
 
             evaluate();
 
-            return success;
+            for (int i = 1; i < characteristicPoints.size(); i++)
+            {
+                if (bestErrors[i] == DBL_MAX) {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         virtual bool optimize(std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines = std::vector<std::shared_ptr<vc::capture::CaptureDevice>>()) {
             if (!init(pipelines)) {
                 return false;
             }
+
+            numberOfPipelines = pipelines.size();
 
             getCharacteristicPoints(pipelines);
             return optimizeOnPoints();
@@ -246,7 +259,7 @@ namespace vc::optimization {
                     newSeenIndices.emplace_back(seenIndex);
                 }
                 newSeenIndices.emplace_back(startIndex);
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < characteristicPoints.size(); i++)
                 {
                     if (vc::utils::contains(newSeenIndices, i)) {
                         continue;
@@ -259,7 +272,7 @@ namespace vc::optimization {
                         //std::stringstream ss;
                         //ss << index << " - " << startIndex;
                         //std::cout << vc::utils::toString(ss.str(), transformation);
-                        if (std::abs(transformation.bottomRightCorner<1, 1>()[0] - 1) > 1e-2) {
+                        if (transformation.block<3,3>(0,0).isZero()) {
                             continue;
                         }
                         followingPath.push_back(startIndex);
@@ -282,8 +295,6 @@ namespace vc::optimization {
         }
 
         void evaluate() {
-
-
             for (int i = 0; i < characteristicPoints.size(); i++)
             {
                 auto result = enumerate(i);
@@ -292,9 +303,9 @@ namespace vc::optimization {
                 {
                     double error = 0;
 
-                    for (int i = 1; i < path.size(); i++)
+                    for (int j = 1; j < path.size(); j++)
                     {
-                        error += calculateRelativeError(i - 1, i);
+                        error += calculateRelativeError(j - 1, j);
                     }
 
                     if (error <= bestErrors[i]) {
@@ -409,8 +420,8 @@ namespace vc::optimization {
 
             characteristicPoints[0] = (MockCharacteristicPoints());
             characteristicPoints[1] = (MockCharacteristicPoints());
-            characteristicPoints[2] = (MockCharacteristicPoints());
-            characteristicPoints[3] = (MockCharacteristicPoints());
+            //characteristicPoints[2] = (MockCharacteristicPoints());
+            //characteristicPoints[3] = (MockCharacteristicPoints());
 
             for (int i = 0; i < points.size(); i++)
             {
@@ -422,8 +433,23 @@ namespace vc::optimization {
             characteristicPoints[0].markerCorners[7].emplace_back(Eigen::Vector4d(-1.0f, -1.0f, 0.0f, 1.0f));
             characteristicPoints[1].markerCorners[9].emplace_back(Eigen::Vector4d(-1.0f, -1.0f, 0.0f, 1.0f));
 
-            //currentTransformations[0] = Eigen::Matrix4d::Identity();
-            //currentTransformations[1] = baseTransformation * relativeTransformation.inverse();
+            //currentTranslations[0][0] = Eigen::Matrix4d::Identity();
+            //currentTranslations[0][1] = baseTranslation * relativeTranslation.inverse();
+
+            //currentRotations[0][0] = Eigen::Matrix4d::Identity();
+            //currentRotations[0][1] = baseRotation * relativeRotation.inverse();
+
+            //currentScales[0][0] = Eigen::Matrix4d::Identity();
+            //currentScales[0][1] = baseScale * relativeScale.inverse();
+
+            //currentTranslations[1][1] = Eigen::Matrix4d::Identity();
+            //currentTranslations[1][0] = relativeTranslation * baseTranslation.inverse();
+
+            //currentRotations[1][1] = Eigen::Matrix4d::Identity();
+            //currentRotations[1][0] = relativeRotation * baseRotation.inverse();
+
+            //currentScales[1][1] = Eigen::Matrix4d::Identity();
+            //currentScales[1][0] = relativeScale * baseScale.inverse();
 
             expectedRelativeTransformation = baseTransformation * relativeTransformation.inverse();
         }

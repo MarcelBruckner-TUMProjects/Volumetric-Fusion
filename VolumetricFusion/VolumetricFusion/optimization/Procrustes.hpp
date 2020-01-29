@@ -27,8 +27,6 @@ namespace vc::optimization {
 
         bool vc::optimization::OptimizationProblem::specific_optimize() {
 
-            bool success = true;
-
             for (int i = 0; i < characteristicPoints.size(); i++)
             {
                 for (int j = 0; j < characteristicPoints.size(); j++)
@@ -38,17 +36,20 @@ namespace vc::optimization {
                         currentRotations[i][j] = Eigen::Matrix4d::Identity();
                         currentScales[i][j] = Eigen::Matrix4d::Identity();
                     }
-                    if (!calculateRelativetranformation(characteristicPoints[i], characteristicPoints[j], &currentTranslations[i][j], &currentRotations[i][j], &currentScales[i][j])) {
-                        success = false;
+                    else {
+                        calculateRelativetranformation(characteristicPoints[i], characteristicPoints[j], &currentTranslations[i][j], &currentRotations[i][j], &currentScales[i][j]);
                     }
+                     
                 }
             }
 
-            return success;
+            return true;
         }
 
         bool calculateRelativetranformation(ACharacteristicPoints& source, ACharacteristicPoints& target, Eigen::Matrix4d* finalTranslation, Eigen::Matrix4d* finalRotation, Eigen::Matrix4d* finalScale) {
-            std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(source.getHashes(verbose), target.getHashes(verbose));
+            auto sourceHashes = source.getHashes(verbose);
+            auto targetHashes = target.getHashes(verbose);
+            std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(sourceHashes, targetHashes);
 
             if (matchingHashes.size() <= 4) {
                 std::cerr << "At least 5 points are needed for Procrustes. Provided: " << matchingHashes.size() << std::endl;

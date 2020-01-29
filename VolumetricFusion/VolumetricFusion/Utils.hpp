@@ -99,7 +99,7 @@ namespace vc::utils {
 		
 		for (auto& v : vec)
 		{
-			ss << toString(v);
+			ss << toString(v, valueDelimiter);
 			ss << pipeDelimiter;
 		}
 		std::string intermediate = ss.str();
@@ -111,6 +111,16 @@ namespace vc::utils {
 	template <typename T>
 	std::string toString(std::string header, std::vector<std::vector<T>> vec, std::string valueDelimiter = ", ", std::string pipeDelimiter = " | ") {
 		return asHeader(header) + toString(vec, valueDelimiter, pipeDelimiter);
+	}
+	
+	template <typename T>
+	std::string toString(std::string header, Eigen::Matrix<T, 4, 1> b) {
+		std::stringstream ss;
+		ss << asHeader(header);
+
+			ss << b << std::endl;
+
+		return ss.str();
 	}
 
 	std::string toString(std::string header, std::vector<Eigen::Matrix4d> b) {

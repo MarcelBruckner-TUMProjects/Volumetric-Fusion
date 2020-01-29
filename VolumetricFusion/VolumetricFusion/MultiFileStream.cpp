@@ -49,7 +49,7 @@ using namespace vc::enums;
 #include "Processing.hpp"
 
 #include "optimization/optimizationProblem.hpp"
-//#include "optimization/BundleAdjustment.hpp"
+#include "optimization/BundleAdjustment.hpp"
 #include "optimization/Procrustes.hpp"
 #include "glog/logging.h"
 
@@ -92,7 +92,7 @@ double lastFrame = 0.0;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::VOLUMETRIC_FUSION);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::VOLUMETRIC_FUSION);
 //std::vector<vc::imgui::PipelineGUI> pipelineGuis;
 vc::imgui::AllPipelinesGUI* allPipelinesGui;
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
@@ -110,7 +110,8 @@ std::atomic_bool calibrateCameras = true;
 std::atomic_bool renderCoordinateSystem = false;
 
 vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
-vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::Procrustes();
+//vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment(true);
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment(true);
 vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState, setCalibration, &calibrateCameras, &camera);
 
 vc::settings::FolderSettings folderSettings;
@@ -121,6 +122,10 @@ bool blockInput = false;
 int main(int argc, char* argv[]) try {	
 	//vc::processing::ChArUco::generateMarkers(std::vector<int>{6, 7, 8, 9 });
 	//return 0;
+
+	google::InitGoogleLogging("Bundle Adjustment");
+	ceres::Solver::Summary summary;
+	folderSettings.recordingsFolder = "recordings/bundleAdjustmentTest/";
 
 	GLFWwindow* window = setupWindow();
 	   
@@ -531,9 +536,6 @@ void gladErrorCallback(const char* name, void* funcptr, int len_args, ...) {
 }
 
 GLFWwindow* setupWindow() {
-	google::InitGoogleLogging("Bundle Adjustment");
-	ceres::Solver::Summary summary;
-	folderSettings.recordingsFolder = "recordings/allCameras/";
 
 	// glfw: initialize and configure
 	// ------------------------------
