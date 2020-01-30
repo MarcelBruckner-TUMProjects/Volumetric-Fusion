@@ -27,29 +27,35 @@ namespace vc::optimization {
 
         bool vc::optimization::OptimizationProblem::specific_optimize() {
 
-            currentTranslations[0] = Eigen::Matrix4d::Identity();
-            currentRotations[0] = Eigen::Matrix4d::Identity();
-            currentScales[0] = Eigen::Matrix4d::Identity();
+            bool success = true;
 
-            for (int i = 1; i < characteristicPoints.size(); i++)
+            for (int i = 0; i < characteristicPoints.size(); i++)
             {
-                if (!calculateRelativetranformation(characteristicPoints[i], characteristicPoints[0], i)) {
-                    return false;
+                for (int j = 0; j < characteristicPoints.size(); j++)
+                {
+                    if (i == j) {
+                        currentTranslations[i][j] = Eigen::Matrix4d::Identity();
+                        currentRotations[i][j] = Eigen::Matrix4d::Identity();
+                        currentScales[i][j] = Eigen::Matrix4d::Identity();
+                    }
+                    if (!calculateRelativetranformation(characteristicPoints[i], characteristicPoints[j], &currentTranslations[i][j], &currentRotations[i][j], &currentScales[i][j])) {
+                        success = false;
+                    }
                 }
             }
 
-            return true;
+            return success;
         }
 
-        bool calculateRelativetranformation(ACharacteristicPoints& source, ACharacteristicPoints& target, int index) {
+        bool calculateRelativetranformation(ACharacteristicPoints& source, ACharacteristicPoints& target, Eigen::Matrix4d* finalTranslation, Eigen::Matrix4d* finalRotation, Eigen::Matrix4d* finalScale) {
             std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(source.getHashes(verbose), target.getHashes(verbose));
 
             if (matchingHashes.size() <= 4) {
                 std::cerr << "At least 5 points are needed for Procrustes. Provided: " << matchingHashes.size() << std::endl;
 
-                currentTranslations[index] = Eigen::Matrix4d::Identity();
-                currentRotations[index] = Eigen::Matrix4d::Identity();
-                currentScales[index] = Eigen::Matrix4d::Identity();
+                *finalTranslation   = Eigen::Matrix4d::Zero();
+                *finalRotation      = Eigen::Matrix4d::Zero();
+                *finalScale         = Eigen::Matrix4d::Zero();
                 return false;
             }
 
@@ -71,17 +77,17 @@ namespace vc::optimization {
 
             std::stringstream ss;
 
-            Eigen::Vector4d translation = sourceMean - rotation * targetMean;
-            Eigen::Matrix4d finalTrans = generateTransformationMatrix(translation, 0);
+            Eigen::Vector4d _translation = sourceMean - rotation * targetMean;
+            Eigen::Matrix4d translation = generateTransformationMatrix(_translation, 0);
 
-            ss << vc::utils::toString("Translation", finalTrans);
+            ss << vc::utils::toString("Translation", translation);
 
             Eigen::Matrix4d scaling = (sourceDistance / targetDistance) * Eigen::Matrix4d::Identity();
             scaling.bottomRightCorner<1, 1>() << 1.0;
             
             ss << vc::utils::toString("Scaling", scaling);
 
-            auto finalTransformation = Eigen::Matrix4d(finalTrans * rotation * scaling);
+            auto finalTransformation = Eigen::Matrix4d(translation * rotation * scaling);
 
             ss << vc::utils::toString("Final transformation", finalTransformation);
 
@@ -89,9 +95,9 @@ namespace vc::optimization {
                 std::cout << ss.str();
             }
 
-            currentTranslations[index] = finalTrans;
-            currentRotations[index] = rotation;
-            currentScales[index] = scaling;
+            *finalTranslation = translation;
+            *finalRotation = rotation;
+            *finalScale = scaling;
 
             return true;
         }

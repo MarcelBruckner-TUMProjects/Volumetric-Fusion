@@ -19,6 +19,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "Utils.hpp"
+#include <stdarg.h>
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -88,10 +89,10 @@ namespace vc::processing {
 	}
 
 
-	const int SQUARES_X = 5;
-	const int SQUARES_Y = 5;
-	const float SQUARE_LENGTH = 0.04;
-	const float MARKER_LENGTH = 0.035;
+	const int SQUARES_X = 1;
+	const int SQUARES_Y = 1;
+	const float SQUARE_LENGTH = 0.20f / SQUARES_X;
+	const float MARKER_LENGTH = SQUARE_LENGTH * 0.9;
 
 	class ChArUco {
 	public:
@@ -116,48 +117,17 @@ namespace vc::processing {
 
 			const auto charucoPoseEstimation = [camera, this](cv::Mat& image, unsigned long long frameId) {
 				try {
+					std::vector<std::vector<cv::Point2f>> rejectedCandidates;
+					cv::Ptr<cv::aruco::DetectorParameters> parameters = cv::aruco::DetectorParameters::create();
+					parameters->cornerRefinementMethod = cv::aruco::CORNER_REFINE_SUBPIX;
 					cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-					cv::Ptr<cv::aruco::CharucoBoard> board = cv::aruco::CharucoBoard::create(SQUARES_X, SQUARES_Y, SQUARE_LENGTH, MARKER_LENGTH, dictionary);
-
-					//cv::Ptr<cv::aruco::DetectorParameters> params;
-					//params->cornerRefinementMethod = cv::aruco::CORNER_REFINE_SUBPIX;
-
-					cv::aruco::detectMarkers(image, dictionary, markerCorners, ids);
-
-					/*int i = 0;
-					for (auto corner_list : markerCorners) {
-						std::cout << ids[i++] << std::endl;
-						for (auto corner : corner_list) {
-							std::cout << corner << std::endl;
-						}
-					}*/
-
-					// if at least one marker detected
+					cv::aruco::detectMarkers(image, dictionary, markerCorners, ids, parameters, rejectedCandidates);
 					if (ids.size() > 0) {
 						if (visualize) {
 							cv::aruco::drawDetectedMarkers(image, markerCorners, ids);
 						}
-						cv::aruco::interpolateCornersCharuco(markerCorners, ids, image, board, charucoCorners, charucoIds);
-						// if at least one charuco corner detected
-						if (charucoIds.size() > 0) {
-							if (visualize) {
-								cv::aruco::drawDetectedCornersCharuco(image, charucoCorners, charucoIds, cv::Scalar(255, 0, 0));
-							}
+						hasMarkersDetected = true;
 
-							if (camera.depthScale < 0) {
-								return;
-							}
-
-							bool valid = cv::aruco::estimatePoseCharucoBoard(charucoCorners, charucoIds, board, camera.K, camera.distCoeffs, rotation, translation);
-							// if charuco pose is valid
-							if (valid) {
-								if (visualize) {
-									cv::aruco::drawAxis(image, camera.K, camera.distCoeffs, rotation, translation, 0.1f);
-								}
-
-								hasMarkersDetected = true;
-							}
-						}
 					}
 				}
 				catch (const cv::Exception & e) {
@@ -194,6 +164,19 @@ namespace vc::processing {
 				ss << "charuco\\board_";
 				ss << SQUARES_X << "_" << SQUARES_Y << "_" << boardNr * numMarkersPerBoard << "_" << (boardNr + 1) * numMarkersPerBoard - 1 << ".png";
 				imwrite(ss.str(), boardImage);
+			}
+		}
+
+		static void generateMarkers(std::vector<int> ids) {
+			for (auto& id : ids)
+			{
+				cv::Mat markerImage;
+				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+				cv::aruco::drawMarker(dictionary, id, 4096, markerImage, 1);
+				std::stringstream ss;
+				ss << "charuco\\board_";
+				ss << "marker_" << id << ".png";
+				cv::imwrite(ss.str(), markerImage);
 			}
 		}
 	};
