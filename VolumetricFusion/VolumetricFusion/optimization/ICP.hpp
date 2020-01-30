@@ -147,8 +147,8 @@ namespace vc::optimization {
 
 	public:
 		ICP(bool verbose = false, long sleepDuration = -1l) 
-			:CeresOptimizationProblem(verbose, sleepDuration),
-			m_nIterations{ 50 }
+			:CeresOptimizationProblem(verbose, sleepDuration)
+			//,m_nIterations{ 50 }
 		{
 			for (int i = 0; i < 4; i++)
 			{
@@ -161,9 +161,9 @@ namespace vc::optimization {
 			}
 		}
 
-		void setNbOfIterations(unsigned nIterations) {
-			m_nIterations = nIterations;
-		}
+		//void setNbOfIterations(unsigned nIterations) {
+		//	m_nIterations = nIterations;
+		//}
 
 		std::map<unsigned long long, Eigen::Vector4d> transformPoints(std::map<unsigned long long, Eigen::Vector4d>& sourcePoints, std::vector<unsigned long long>& matchingHashes, Eigen::Matrix4d& pose) {
 			
@@ -249,7 +249,7 @@ namespace vc::optimization {
 			auto poseIncrement = PoseIncrement<double>(incrementArray);
 			poseIncrement.setZero();
 
-			for (int i = 0; i < m_nIterations; ++i) {
+			//for (int i = 0; i < m_nIterations; ++i) {
 
 				//std::cout << "Iteration: " << i << std::endl;
 
@@ -264,7 +264,7 @@ namespace vc::optimization {
 				ceres::Solver::Summary summary;
 
 				ceres::Solve(options, &problem, &summary);
-				//std::cout << summary.BriefReport() << std::endl;
+				std::cout << summary.BriefReport() << std::endl;
 				//std::cout << summary.FullReport() << std::endl;
 
 				// Update the current pose estimate (we always update the pose from the left, using left-increment notation).
@@ -273,7 +273,7 @@ namespace vc::optimization {
 				poseIncrement.setZero();
 
 				//std::cout << "Optimization iteration done." << std::endl;
-			}
+			//}
 
 			//std::cout << "Pose: " << estimatedPose << std::endl << std::endl;
 
@@ -281,7 +281,7 @@ namespace vc::optimization {
 		}
 
 	private:
-		unsigned m_nIterations;
+		//unsigned m_nIterations;
 		
 		void configureSolver(ceres::Solver::Options& options) {
 			// Ceres options.
@@ -289,7 +289,7 @@ namespace vc::optimization {
 			options.use_nonmonotonic_steps = false;
 			options.linear_solver_type = ceres::DENSE_QR;
 			options.minimizer_progress_to_stdout = 0;
-			options.max_num_iterations = 5;
+			options.max_num_iterations = 30;
 			options.update_state_every_iteration = true;
 			options.num_threads = 8;
 		}
