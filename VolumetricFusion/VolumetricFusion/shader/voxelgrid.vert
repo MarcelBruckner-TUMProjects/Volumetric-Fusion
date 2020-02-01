@@ -15,18 +15,18 @@ out VS_OUT {
 
 void main()
 {    
+// Blue: invalid point
+    if(tsdf.z <= 0){
+        vs_out.color = vec4(0.0, 0.0, 0.0, -1.0);
+        gl_Position = vec4(-10.0, 0.0, 0.0, 0.0);
+//        vs_out.color = vec4(0.0, 0.0, 1, .5);
+        return;
+    }
+
     gl_Position = projection * view * model * aPos;
     gl_Position *= coordinate_correction;
     
     float t = tsdf.y;
-
-    // Blue: invalid point
-    if(tsdf.z <= 0){
-//        vs_out.color = vec4(0.0, 0.0, 0.0, -1.0);
-//        gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
-        vs_out.color = vec4(0.0, 0.0, 1, .5);
-        return;
-    }
     
     if(t < 0) {
         // Red: Behind poindcloud

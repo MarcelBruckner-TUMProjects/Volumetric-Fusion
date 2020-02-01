@@ -161,7 +161,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\Program Files\OpenGL\glfw-3.3\include;C:\Program Files\OpenGL\glm-stable;C:\dev\eigen;C:\dev\glfw-3.3\include;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\include;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party;$(OPENCV_DIR)\..\..\..\include;glad\include;C:\dev\glm-0.9.9.6;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\Marcel\Repositories\Volumetric-Fusion\include\flann-1.9.1\src\cpp\flann;C:\Program Files\OpenGL\glfw-3.3\include;C:\Program Files\OpenGL\glm-stable;C:\dev\eigen;C:\dev\glfw-3.3\include;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\include;C:\Users\Kevin Bein\Projects\Volumetric-Fusion\third-party;$(OPENCV_DIR)\..\..\..\include;glad\include;C:\dev\glm-0.9.9.6;$(IncludePath)</IncludePath>
     <LibraryPath>$(OPENCV_DIR)\lib;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\lib\x64;C:\dev\opencv\build\lib\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -187,13 +187,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Users\Marcel Bruckner\Documents\Volumetric-Fusion\third-party\boost_1_66_0;$(ProjectDir)..;..\..\include\Ceres\gflags\bin\include;..\..\include\Ceres\gflags\src;..\..\include\Ceres\bin\config;..\..\include\Ceres\eigen;..\..\include\Ceres\glog\src;..\..\include\Ceres\glog\bin;..\..\include\Ceres\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Marcel\Repositories\Volumetric-Fusion\include\flann-1.9.1\src\cpp;C:\Users\Marcel Bruckner\Documents\Volumetric-Fusion\third-party\boost_1_66_0;$(ProjectDir)..;..\..\include\Ceres\gflags\bin\include;..\..\include\Ceres\gflags\src;..\..\include\Ceres\bin\config;..\..\include\Ceres\eigen;..\..\include\Ceres\glog\src;..\..\include\Ceres\glog\bin;..\..\include\Ceres\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS;_SILENCE_CXX17_NEGATORS_DEPRECATION_WARNING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\Users\Marcel Bruckner\Documents\Volumetric-Fusion\VolumetricFusion\packages\boost.1.71.0.0\lib;..\..\include\Ceres\bin\lib\Debug;..\..\include\Ceres\gflags\bin\lib\Debug;..\..\include\Ceres\glog\bin\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ceres-debug.lib;gtest-debug.lib;test_util-debug.lib;glogd.lib;gflags_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\Marcel\Repositories\Volumetric-Fusion\include\flann-1.9.1\build\lib\Debug;C:\Users\Marcel Bruckner\Documents\Volumetric-Fusion\VolumetricFusion\packages\boost.1.71.0.0\lib;..\..\include\Ceres\bin\lib\Debug;..\..\include\Ceres\gflags\bin\lib\Debug;..\..\include\Ceres\glog\bin\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ceres-debug.lib;gtest-debug.lib;test_util-debug.lib;glogd.lib;gflags_debug.lib;flann.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>true</Profile>
     </Link>
     <PreBuildEvent>

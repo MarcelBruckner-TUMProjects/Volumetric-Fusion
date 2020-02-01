@@ -19,9 +19,10 @@ void main()
     vec2 uv = aPos / depth_resolution;
     float z = texture(depth_frame, uv).x * depth_scale;
     
-    vec3 pos = vec3(aPos * 2.0f, 1.0f) * cam2World; 
-//    vec3 pos = vec3(aPos, 1.0f) * cam2World; 
+//    vec3 pos = vec3(aPos * 2.0f, 1.0f) * cam2World; 
+    vec3 pos = vec3(aPos, 1.0f); 
     
+    pos *= cam2World;
     pos *= z;
     
     gl_Position = vec4(pos, 1.0f);

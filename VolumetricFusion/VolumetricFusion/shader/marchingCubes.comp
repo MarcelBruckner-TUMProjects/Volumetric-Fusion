@@ -1,9 +1,11 @@
 #version 430
 	
+uniform float resolution;
 uniform ivec3 sizeNormalized;
 uniform float isolevel;
 uniform int INVALID_TSDF_VALUE;
 uniform bool onlyCount;
+uniform vec3 cameraPos;
 
 layout (local_size_x = 16) in;
 
@@ -98,7 +100,7 @@ int calculateCubeIndex(int hashes[8]){
 
 InterpolationResult VertexInterp(VtxData p1, VtxData p2)
 {
-    if(p1.tsdf.z <= 0 || p2.tsdf.z <= 0){
+    if(p1.tsdf.w == INVALID_TSDF_VALUE || p2.tsdf.w == INVALID_TSDF_VALUE){
         return InterpolationResult(vec4(-1000), vec4(-1000));
     }
 
@@ -108,6 +110,8 @@ InterpolationResult VertexInterp(VtxData p1, VtxData p2)
         return InterpolationResult(p2.pos, p2.color);
     if (abs(p1.tsdf[1] - p2.tsdf[1]) < 0.00001)
         return InterpolationResult(p1.pos, p1.color);
+//    if (abs(p1.tsdf[1] - p2.tsdf[1]) > 4 * resolution)
+//        return InterpolationResult(vec4(-1000), vec4(-1000));
     float mu = (isolevel - p1.tsdf[1]) / (p2.tsdf[1] - p1.tsdf[1]);
     InterpolationResult result;
     result.pos = p1.pos + mu * (p2.pos - p1.pos);
@@ -193,6 +197,15 @@ void main(){
         if(!isValid(b)) continue;
         InterpolationResult c = vertlist[triTable[cubeindex * 16 + i + 2].value];
         if(!isValid(c)) continue;
+
+//        vec3 triangleNormal = cross(b.pos.xyz - a.pos.xyz, c.pos.xyz - a.pos.xyz);
+//        vec3 lookDirection = cameraPos - a.pos.xyz;
+//        
+//        float angle = dot(triangleNormal, lookDirection);
+//
+//        if(angle > 0.1){
+//            continue;
+//        }
 
             uint t = atomicCounterIncrement(numTriangles);
             if(!onlyCount){
