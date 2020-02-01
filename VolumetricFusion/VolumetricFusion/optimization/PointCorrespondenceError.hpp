@@ -32,8 +32,8 @@ namespace vc::optimization {
     ///
     /// </summary>
     struct PointCorrespondenceError {
-        PointCorrespondenceError(unsigned long long hash, ceres::Vector relative_frame_point, ceres::Vector base_frame_point)
-            : hash(hash), relative_frame_point(relative_frame_point), base_frame_point(base_frame_point) {}
+        PointCorrespondenceError(unsigned long long hash, ceres::Vector fromPoint, ceres::Vector toPoint, bool verbose = false)
+            : hash(hash), fromPoint(fromPoint), toPoint(toPoint), verbose(verbose) {}
                
         std::string twoVectorsAside(ceres::Vector a, ceres::Vector b) const {
             std::stringstream ss;
@@ -82,61 +82,55 @@ namespace vc::optimization {
 
         template <typename T>
         bool operator()(
-            const T* const _relativeTranslation, const T* const _relativeRotation, const T* const _relativeScale,
-            const T* const _baseTranslation, const T* const _baseRotation, const T* const _baseScale,
+            const T* const _translation, const T* const _rotation, const T* const _scale,
+            //const T* const _baseTranslation, const T* const _baseRotation, const T* const _baseScale,
             T* residuals) const {
                         
             std::stringstream ss;
 
-            ss << vc::utils::asHeader("Base --> Relative");
-            ss << twoVectorsAside(base_frame_point, relative_frame_point);
+            ss << vc::utils::asHeader("From --> To");
+            ss << twoVectorsAside(fromPoint, toPoint);
             
-            Eigen::Matrix<T, 4, 1> transformedPoint = Eigen::Matrix<T, 4, 1>(base_frame_point.cast<T>());
+            Eigen::Matrix<T, 4, 1> transformedPoint = Eigen::Matrix<T, 4, 1>(fromPoint.cast<T>());
             ss << vc::utils::toString("b", transformedPoint);
+            
+            transformedPoint = Eigen::Matrix<T, 4, 1>(buildScale(_scale) * transformedPoint);
+            ss << vc::utils::toString("S * b", transformedPoint);
 
-            transformedPoint = Eigen::Matrix<T, 4, 1>(buildTranslation(_baseTranslation).inverse() * transformedPoint);
-            ss << vc::utils::toString("Tb^-1 * b", transformedPoint);
+            transformedPoint = Eigen::Matrix<T, 4, 1>(buildRotation(_rotation) * transformedPoint);
+            ss << vc::utils::toString("R * (S * b)", transformedPoint);
 
-            transformedPoint = Eigen::Matrix<T, 4, 1>(buildRotation(_baseRotation).inverse() * transformedPoint);
-            ss << vc::utils::toString("Rb^-1 * (Tb^-1 * b)", transformedPoint);
-
-            transformedPoint = Eigen::Matrix<T, 4, 1>(buildScale(_baseScale).inverse() * transformedPoint);
-            ss << vc::utils::toString("Sb^-1 * (Rb^-1 * (Tb^-1 * b))", transformedPoint);
-
-            transformedPoint = Eigen::Matrix<T, 4, 1>(buildScale(_relativeScale) * transformedPoint);
-            ss << vc::utils::toString("Sr * (Sb^-1 * (Rb^-1 * (Tb^-1 * b)))", transformedPoint);
-
-            transformedPoint = Eigen::Matrix<T, 4, 1>(buildRotation(_relativeRotation) * transformedPoint);
-            ss << vc::utils::toString("Rr * (Sr * (Sb^-1 * (Rb^-1 * (Tb^-1 * b))))", transformedPoint);
-
-            transformedPoint = Eigen::Matrix<T, 4, 1>(buildTranslation(_relativeTranslation) * transformedPoint);
-            ss << vc::utils::toString("Tr * (Rr * (Sr * (Sb^-1 * (Rb^-1 * (Tb^-1 * b)))))", transformedPoint);
+            transformedPoint = Eigen::Matrix<T, 4, 1>(buildTranslation(_translation) * transformedPoint);
+            ss << vc::utils::toString("T * (R * (S * b))", transformedPoint);
 
             // *********************************************************************************
             // Final cost evaluation
-            Eigen::Matrix<T, 4, 1> error = Eigen::Matrix<T, 4, 1>(relative_frame_point - transformedPoint);
+            Eigen::Matrix<T, 4, 1> error = Eigen::Matrix<T, 4, 1>(toPoint - transformedPoint);
 
             for (int i = 0; i < 3; i++)
             {
                 residuals[i] = error[i];
             }
 
-            ss << vc::utils::toString("Residuals", error);
+            if (verbose) {
+                ss << vc::utils::toString("Residuals", error);
 
-            std::cout << ss.str() << "************************************************************************************************************" << std::endl;
+                std::cout << ss.str() << "************************************************************************************************************" << std::endl;
+            }
 
             return true;
         }
 
         unsigned long long hash;
-        ceres::Vector relative_frame_point;
-        ceres::Vector base_frame_point;
-
+        ceres::Vector fromPoint;
+        ceres::Vector toPoint;
+        bool verbose;
+        
         // Factory to hide the construction of the CostFunction object from
         // the client code.
-        static ceres::CostFunction* Create(unsigned long long hash, ceres::Vector relativeFramePoint, ceres::Vector baseFramePoint) {
-            return (new ceres::AutoDiffCostFunction<PointCorrespondenceError, 3, 3, 3, 3, 3, 3, 3>(
-                new PointCorrespondenceError(hash, relativeFramePoint, baseFramePoint)));
+        static ceres::CostFunction* Create(unsigned long long hash, ceres::Vector fromPoint, ceres::Vector toPoint, bool verbose = false) {
+            return (new ceres::AutoDiffCostFunction<PointCorrespondenceError, 3, 3, 3, 3>(
+                new PointCorrespondenceError(hash, fromPoint, toPoint, verbose)));
         }
     };
 }

@@ -37,53 +37,57 @@ namespace vc::optimization {
                         currentScales[i][j] = Eigen::Matrix4d::Identity();
                     }
                     else {
+                        std::stringstream ss;
+                        ss << "(" << i << ", " << j << ")";
+                        std::cout << vc::utils::asHeader(ss.str());
+
                         calculateRelativetranformation(characteristicPoints[i], characteristicPoints[j], &currentTranslations[i][j], &currentRotations[i][j], &currentScales[i][j]);
-                    }
-                     
+                    }                     
                 }
             }
 
             return true;
         }
 
-        bool calculateRelativetranformation(ACharacteristicPoints& source, ACharacteristicPoints& target, Eigen::Matrix4d* finalTranslation, Eigen::Matrix4d* finalRotation, Eigen::Matrix4d* finalScale) {
-            auto sourceHashes = source.getHashes(verbose);
-            auto targetHashes = target.getHashes(verbose);
-            std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(sourceHashes, targetHashes);
+        bool calculateRelativetranformation(ACharacteristicPoints& from, ACharacteristicPoints& to, Eigen::Matrix4d* finalTranslation, Eigen::Matrix4d* finalRotation, Eigen::Matrix4d* finalScale) {
+            auto fromHashes = from.getHashes(verbose);
+            auto toHashes = to.getHashes(verbose);
+            std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(fromHashes, toHashes);
 
-            if (matchingHashes.size() <= 4) {
-                std::cerr << "At least 5 points are needed for Procrustes. Provided: " << matchingHashes.size() << std::endl;
 
-                *finalTranslation   = Eigen::Matrix4d::Zero();
-                *finalRotation      = Eigen::Matrix4d::Zero();
-                *finalScale         = Eigen::Matrix4d::Zero();
+            if (matchingHashes.size() <= 0) {
+                std::cerr << "At least 1 points are needed for Procrustes. Provided: " << matchingHashes.size() << std::endl;
+
+                *finalTranslation   = Eigen::Matrix4d::Identity();
+                *finalRotation      = Eigen::Matrix4d::Identity();
+                *finalScale         = Eigen::Matrix4d::Identity();
                 return false;
             }
 
-            auto& sourcePoints = source.getFilteredPoints(matchingHashes, verbose);
-            auto& targetPoints = target.getFilteredPoints(matchingHashes, verbose);
+            auto& fromPoints = from.getFilteredPoints(matchingHashes, verbose);
+            auto& toPoints = to.getFilteredPoints(matchingHashes, verbose);
 
-            auto& sourceMean = getCenterOfGravity(sourcePoints, verbose);
-            auto& targetMean = getCenterOfGravity(targetPoints, verbose);
+            auto& fromMean = getCenterOfGravity(fromPoints, verbose);
+            auto& toMean = getCenterOfGravity(toPoints, verbose);
 
-            double sourceDistance = getAverageDistance(sourcePoints, sourceMean, verbose);
-            double targetDistance = getAverageDistance(targetPoints, targetMean, verbose);
+            double fromDistance = getAverageDistance(fromPoints, fromMean, verbose);
+            double toDistance = getAverageDistance(toPoints, toMean, verbose);
 
             auto& rotation = estimateRotation(
                 matchingHashes,
-                sourcePoints, sourceMean, sourceDistance,
-                targetPoints, targetMean, targetDistance,
+                fromPoints, fromMean, fromDistance,
+                toPoints, toMean, toDistance,
                 verbose
             );
 
             std::stringstream ss;
 
-            Eigen::Vector4d _translation = sourceMean - rotation * targetMean;
+            Eigen::Vector4d _translation = toMean - rotation * fromMean;
             Eigen::Matrix4d translation = generateTransformationMatrix(_translation, 0);
 
             ss << vc::utils::toString("Translation", translation);
 
-            Eigen::Matrix4d scaling = (sourceDistance / targetDistance) * Eigen::Matrix4d::Identity();
+            Eigen::Matrix4d scaling = (toDistance / fromDistance) * Eigen::Matrix4d::Identity();
             scaling.bottomRightCorner<1, 1>() << 1.0;
             
             ss << vc::utils::toString("Scaling", scaling);
@@ -104,23 +108,23 @@ namespace vc::optimization {
         }
 
         Eigen::Matrix4d estimateRotation(std::vector<unsigned long long> hashes,
-            std::map<unsigned long long, Eigen::Vector4d> sourcePoints, Eigen::Vector4d sourceMean, double sourceDistance,
-            std::map<unsigned long long, Eigen::Vector4d> targetPoints, Eigen::Vector4d targetMean, double targetDistance,
+            std::map<unsigned long long, Eigen::Vector4d> fromPoints, Eigen::Vector4d fromMean, double fromDistance,
+            std::map<unsigned long long, Eigen::Vector4d> toPoints, Eigen::Vector4d toMean, double toDistance,
             bool verbose = true) {
 
             std::stringstream ss;
 
             const unsigned int nPoints = hashes.size();
-            Eigen::MatrixXd sourceMatrix(nPoints, 3);
-            Eigen::MatrixXd targetMatrix(nPoints, 3);
+            Eigen::MatrixXd fromMatrix(nPoints, 3);
+            Eigen::MatrixXd toMatrix(nPoints, 3);
 
             for (int i = 0; i < nPoints; i++)
             {
-                sourceMatrix.block<1, 3>(i, 0) = (sourcePoints[hashes[i]] - sourceMean).block<3,1>(0,0).transpose();
-                targetMatrix.block<1, 3>(i, 0) = (targetPoints[hashes[i]] - targetMean).block<3, 1>(0, 0).transpose();
+                fromMatrix.block<1, 3>(i, 0) = (fromPoints[hashes[i]] - fromMean).block<3,1>(0,0).transpose();
+                toMatrix.block<1, 3>(i, 0) = (toPoints[hashes[i]] - toMean).block<3, 1>(0, 0).transpose();
             }
 
-            Eigen::Matrix3d A = sourceMatrix.transpose() * targetMatrix;
+            Eigen::Matrix3d A = toMatrix.transpose() * fromMatrix;
             Eigen::JacobiSVD<Eigen::Matrix3d> svd(A, Eigen::ComputeFullU | Eigen::ComputeFullV);
 
             const Eigen::Matrix3d& U = svd.matrixU();

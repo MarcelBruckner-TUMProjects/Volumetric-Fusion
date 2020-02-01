@@ -74,9 +74,9 @@ namespace vc::optimization {
         Eigen::Matrix4d getRotationMatrix(int from, int to) {
             try {
                 Eigen::Vector3d rotationVector(
-                    rotations.at(to).at(from).at(0),
-                    rotations.at(to).at(from).at(1),
-                    rotations.at(to).at(from).at(2)
+                    rotations.at(from).at(to).at(0),
+                    rotations.at(from).at(to).at(1),
+                    rotations.at(from).at(to).at(2)
                 );
                 return generateTransformationMatrix(0.0, 0.0, 0.0, rotationVector.norm(), rotationVector.normalized());
             }
@@ -91,9 +91,9 @@ namespace vc::optimization {
         Eigen::Matrix4d getTranslationMatrix(int from, int to) {
             try {
                 return generateTransformationMatrix(
-                    translations.at(to).at(from).at(0),
-                    translations.at(to).at(from).at(1),
-                    translations.at(to).at(from).at(2),
+                    translations.at(from).at(to).at(0),
+                    translations.at(from).at(to).at(1),
+                    translations.at(from).at(to).at(2),
                     0.0, Eigen::Vector3d::Identity()
                 );
             }
@@ -108,9 +108,9 @@ namespace vc::optimization {
         Eigen::Matrix4d getScaleMatrix(int from, int to) {
             try {
                 return generateScaleMatrix(
-                    scales.at(to).at(from).at(0),
-                    scales.at(to).at(from).at(1),
-                    scales.at(to).at(from).at(2)
+                    scales.at(from).at(to).at(0),
+                    scales.at(from).at(to).at(1),
+                    scales.at(from).at(to).at(2)
                 );
             }
             catch (std::out_of_range&) {
@@ -123,28 +123,39 @@ namespace vc::optimization {
 
     public:
         void calculateTransformations() {
-            for (int i = 0; i < translations.size(); i++) {
-                for (int j = 0; j < translations.size(); j++)
+            for (int from = 0; from < translations.size(); from++) {
+                for (int to = 0; to < translations.size(); to++)
                 {
-                    if (!(i < 2 && j < 2)) {
+                    if (from == to || !(from < 3 && to < 3)) {
                         continue;
                     }
-                    std::stringstream ss;
-                    std::cout << vc::utils::asHeader("Pre recalculation");
-                    ss << "(" << i << ", " << j << ")";
-                    std::cout << vc::utils::asHeader("translations" + ss.str()) << vc::utils::toString(translations[i][j]);
-                    std::cout << vc::utils::asHeader("rotations" + ss.str()) << vc::utils::toString(rotations[i][j]);
-                    std::cout << vc::utils::asHeader("scales" + ss.str()) << vc::utils::toString(scales[i][j]);
-                    currentTranslations[i][j] = getTranslationMatrix(i, j);
-                    currentRotations[i][j] = getRotationMatrix(i, j);
-                    currentScales[i][j] = getScaleMatrix(i, j);
+                    //std::stringstream ss;
+                    //std::cout << vc::utils::asHeader("Pre recalculation");
+                    //ss << "(" << from << ", " << to << ")";
+                    //std::cout << vc::utils::asHeader("translations" + ss.str()) << vc::utils::toString(translations[from][to]);
+                    //std::cout << vc::utils::asHeader("rotations" + ss.str()) << vc::utils::toString(rotations[from][to]);
+                    //std::cout << vc::utils::asHeader("scales" + ss.str()) << vc::utils::toString(scales[from][to]);
 
-                    std::cout << vc::utils::asHeader("Post recalculation");
-                    ss = std::stringstream();
-                    ss << "(" << i << ", " << j << ")";
-                    std::cout << vc::utils::asHeader("translations" + ss.str()) << vc::utils::toString(translations[i][j]);
-                    std::cout << vc::utils::asHeader("rotations" + ss.str()) << vc::utils::toString(rotations[i][j]);
-                    std::cout << vc::utils::asHeader("scales" + ss.str()) << vc::utils::toString(scales[i][j]);
+                    //std::cout << vc::utils::toString("translations" + ss.str(), currentTranslations[from][to]);
+                    //std::cout << vc::utils::toString("rotations" + ss.str(), currentRotations[from][to]);
+                    //std::cout << vc::utils::toString("scales" + ss.str(), currentScales[from][to]);
+
+                    currentTranslations[from][to] = getTranslationMatrix(from, to);
+                    currentRotations[from][to] = getRotationMatrix(from, to);
+                    currentScales[from][to] = getScaleMatrix(from, to);
+
+                    //std::cout << vc::utils::asHeader("Post recalculation");
+                    //ss = std::stringstream();
+                    //ss << "(" << from << ", " << to << ")";
+                    //std::cout << vc::utils::asHeader("translations" + ss.str()) << vc::utils::toString(translations[from][to]);
+                    //std::cout << vc::utils::asHeader("rotations" + ss.str()) << vc::utils::toString(rotations[from][to]);
+                    //std::cout << vc::utils::asHeader("scales" + ss.str()) << vc::utils::toString(scales[from][to]);
+
+                    //std::cout << vc::utils::toString("translations" + ss.str(), currentTranslations[from][to]);
+                    //std::cout << vc::utils::toString("rotations" + ss.str(), currentRotations[from][to]);
+                    //std::cout << vc::utils::toString("scales" + ss.str(), currentScales[from][to]);
+                 
+                    //ss = std::stringstream();
                 }
             }
 
@@ -170,12 +181,19 @@ namespace vc::optimization {
             OptimizationProblem::clear();
             needsRecalculation = true;
         }
+
+        void reset() {
+            OptimizationProblem::reset();
+            setup();
+            //hasProcrustesInitialization = true;
+            hasProcrustesInitialization = false;
+        }
         
         void solveProblem(ceres::Problem* problem) {
             std::vector<Eigen::Matrix4d> initialTransformations = bestTransformations;
             
             ceres::Solver::Options options;
-            options.num_threads = 1;
+            options.num_threads = 8;
             options.linear_solver_type = ceres::DENSE_QR;
             options.minimizer_progress_to_stdout = verbose;
             options.max_num_iterations = 20;
@@ -183,6 +201,7 @@ namespace vc::optimization {
             //options.callbacks.emplace_back(new LoggingCallback(this));
             ceres::Solver::Summary summary;
             ceres::Solve(options, problem, &summary);
+            
             calculateTransformations();
 
             if (verbose) {
@@ -194,71 +213,54 @@ namespace vc::optimization {
             }
         }
 
+        bool isValid(Eigen::Vector4d point) {
+            for (int i = 0; i < 3; i++)
+            {
+                if (std::abs(point[i]) > 10e5) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         bool solvePointCorrespondenceError() {
             // Create residuals for each observation in the bundle adjustment problem. The
             // parameters for cameras and points are added automatically.
             ceres::Problem problem;
-            for (int baseId = 0; baseId < characteristicPoints.size(); baseId++)
+            for (int from = 0; from < characteristicPoints.size(); from++)
             {
-                ACharacteristicPoints baseFramePoints = characteristicPoints[baseId];
+                ACharacteristicPoints fromPoints = characteristicPoints[from];
                 
-                for (int relativeId = 1; relativeId < characteristicPoints.size(); relativeId++) {
-                    if (baseId == relativeId) {
+                for (int to = 0; to < characteristicPoints.size(); to++) {
+                    if (from == to) {
                         continue;
                     }
 
-                    ACharacteristicPoints relativeFramePoints = characteristicPoints[relativeId];
-                    std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(baseFramePoints.getHashes(verbose), relativeFramePoints.getHashes(verbose));
-
-                    //if (matchingHashes.size() <= 4) {
-                    //    std::cerr << "At least 5 points are needed for Procrustes. Provided: " << matchingHashes.size() << std::endl;
-                    //    return Eigen::Matrix4d::Identity();
-                    //}
-
-                    auto& filteredBaseFramePoints = baseFramePoints.getFilteredPoints(matchingHashes, verbose);
-                    auto& filteredRelativeFramePoints = relativeFramePoints.getFilteredPoints(matchingHashes, verbose);
+                    ACharacteristicPoints toPoints = characteristicPoints[to];
+                    std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(fromPoints.getHashes(verbose), toPoints.getHashes(verbose));
+                    
+                    auto& filteredFromPoints = fromPoints.getFilteredPoints(matchingHashes, verbose);
+                    auto& filteredToPoints = toPoints.getFilteredPoints(matchingHashes, verbose);
 
                     for (auto& hash : matchingHashes)
                     {
-                        auto relativePoint = filteredRelativeFramePoints[hash];
-                        auto basePoint = filteredBaseFramePoints[hash];
+                        auto fromPoint = filteredFromPoints[hash];
+                        auto toPoint = filteredToPoints[hash];
 
-                        bool valid = true;
-                        for (int i = 0; i < 3; i++)
-                        {
-                            if (std::abs(relativePoint[i]) > 10e5) {
-                                valid = false;
-                                break;
-                            }
-                        }
-                        if (!valid) {
-                            continue;
-                        }
-
-                        for (int i = 0; i < 3; i++)
-                        {
-                            if (std::abs(basePoint[i]) > 10e5) {
-                                valid = false;
-                                break;
-                            }
-                        }
-
-                        if (!valid) {
+                        if (!isValid(fromPoint) || !isValid(toPoint)) {
                             continue;
                         }
 
                         ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
                             hash, 
-                            relativePoint,
-                            basePoint
+                            fromPoint,
+                            toPoint,
+                            verbose
                         );
                         problem.AddResidualBlock(cost_function, NULL,
-                            translations[baseId][relativeId].data(),
-                            rotations[baseId][relativeId].data(),
-                            scales[baseId][relativeId].data(),
-                            translations[relativeId][baseId].data(),
-                            rotations[relativeId][baseId].data(),
-                            scales[relativeId][baseId].data()
+                            translations[from][to].data(),
+                            rotations[from][to].data(),
+                            scales[from][to].data()
                         );
                     }
                 }
@@ -290,21 +292,21 @@ namespace vc::optimization {
         }
 
         void setup() {
-            for (int i = 0; i < 4; i++)
+            for (int from = 0; from < 4; from++)
             {
-                for (int j = 0; j < 4; j++)
+                for (int to = 0; to < 4; to++)
                 {
-                    Eigen::Vector3d translation = currentTranslations[i][j].block<3, 1>(0, 3);
-                    double angle = Eigen::AngleAxisd(currentRotations[i][j].block<3, 3>(0, 0)).angle();
-                    Eigen::Vector3d rotation = Eigen::AngleAxisd(currentRotations[i][j].block<3, 3>(0, 0)).axis().normalized();
+                    Eigen::Vector3d translation = currentTranslations[from][to].block<3, 1>(0, 3);
+                    double angle = Eigen::AngleAxisd(currentRotations[from][to].block<3, 3>(0, 0)).angle();
+                    Eigen::Vector3d rotation = Eigen::AngleAxisd(currentRotations[from][to].block<3, 3>(0, 0)).axis().normalized();
                     rotation *= angle;
-                    Eigen::Vector3d scale = currentScales[i][j].diagonal().block<3, 1>(0, 0);
+                    Eigen::Vector3d scale = currentScales[from][to].diagonal().block<3, 1>(0, 0);
 
                     for (int k = 0; k < 3; k++)
                     {
-                        translations[i][j][k] = translation[k];
-                        rotations[i][j][k] = rotation[k];
-                        scales[i][j][k] = scale[k];
+                        translations[from][to][k] = translation[k];
+                        rotations[from][to][k] = rotation[k];
+                        scales[from][to][k] = scale[k];
                     }
                 }
             }

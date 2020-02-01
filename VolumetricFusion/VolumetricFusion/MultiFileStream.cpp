@@ -92,7 +92,7 @@ double lastFrame = 0.0;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::VOLUMETRIC_FUSION);
+vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::CALIBRATED_POINTCLOUD);
 //std::vector<vc::imgui::PipelineGUI> pipelineGuis;
 vc::imgui::AllPipelinesGUI* allPipelinesGui;
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
@@ -106,18 +106,19 @@ vc::imgui::FusionGUI* fusionGUI;
 
 vc::rendering::CoordinateSystem* coordinateSystem;
 
-std::atomic_bool calibrateCameras = true;
+std::atomic_bool calibrateCameras = false;
 std::atomic_bool renderCoordinateSystem = false;
 
 vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
-//vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment(true);
 vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment(true);
-vc::imgui::ProgramGUI* programGui = new vc::imgui::ProgramGUI(&state.renderState, setCalibration, &calibrateCameras, &camera);
+//vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::Procrustes(true);
+vc::imgui::ProgramGUI* programGui;
 
 vc::settings::FolderSettings folderSettings;
 ImGuiIO io;
 
 bool blockInput = false;
+float bg_color[3] = { 96.0 / 255, 96.0 / 255, 96.0 / 255 };
 
 int main(int argc, char* argv[]) try {	
 	//vc::processing::ChArUco::generateMarkers(std::vector<int>{6, 7, 8, 9 });
@@ -171,6 +172,7 @@ int main(int argc, char* argv[]) try {
 	}
 
 	allPipelinesGui = new vc::imgui::AllPipelinesGUI(&pipelines);
+	programGui = new vc::imgui::ProgramGUI(pipelines.size(), &state.renderState, setCalibration, &calibrateCameras, &camera, bg_color);
 
 	if (pipelines.size() <= 0) {
 		throw(rs2::error("No device or file found!"));
@@ -201,7 +203,7 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 
-			if (!optimizationProblem->optimize(pipelines)) {
+			if (!optimizationProblem->optimize(pipelines, programGui->activeCameras)) {
 				continue;
 			}
 		}
@@ -246,7 +248,7 @@ int main(int argc, char* argv[]) try {
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		//glm::mat4 projection = glm::ortho(0.0f, (float)SCR_WIDTH, 0.0f, (float)SCR_HEIGHT, 0.1f, 100.0f);
 
-		vc::rendering::startFrame(window, SCR_WIDTH, SCR_HEIGHT);
+		vc::rendering::startFrame(window, SCR_WIDTH, SCR_HEIGHT, bg_color);
 		//optimizationProblem->calculateTransformations();
 
 		glfwPollEvents();
@@ -262,14 +264,18 @@ int main(int argc, char* argv[]) try {
 			{
 				//blockInput = true;
 				if (fusionGUI->fuse) {
+					bool cleared = false;
 					for (int i = 0; i < pipelines.size() && i < 4; i++)
 					{
-						voxelgrid->integrateFrameGPU(pipelines[i], optimizationProblem->getBestTransformation(i), i == 0);
+						if (programGui->activeCameras[i]) {
+							voxelgrid->integrateFrameGPU(pipelines[i], optimizationProblem->getBestTransformation(i), !cleared);
+							cleared = true;
+						}
 					}
 				}
 
 				if (fusionGUI->marchingCubes) {
-					voxelgrid->computeMarchingCubes();
+					voxelgrid->computeMarchingCubes(camera.Position);
 				}
 				frameNumberForVoxelgrid = 0;
 				//blockInput = false;
@@ -283,7 +289,7 @@ int main(int argc, char* argv[]) try {
 			}
 		}
 
-		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
 			if (calibrateCameras) {
 				optimizationProblemGUI->render();
 			}
@@ -292,6 +298,10 @@ int main(int argc, char* argv[]) try {
 		
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
+			if (!programGui->activeCameras[i]) {
+				continue;
+			}
+
 			int x = i % 2;
 			int y = (int)floor(i / 2);
 
@@ -301,7 +311,7 @@ int main(int argc, char* argv[]) try {
 			else if (state.renderState == RenderState::ONLY_DEPTH) {
 				pipelines[i]->renderDepth(x, y, aspect, width, height);
 			}
-			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD) {
+			else if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
 				if (state.renderState != RenderState::MULTI_POINTCLOUD) {
 					x = -1;
 					y = -1;

@@ -273,7 +273,7 @@ namespace vc::rendering {
         }
     };
     
-    void startFrame(GLFWwindow* window, int width, int height) {
+    void startFrame(GLFWwindow* window, int width, int height, float* bg_color) {
         glfwMakeContextCurrent(window);
         // render
         // ------
@@ -282,7 +282,7 @@ namespace vc::rendering {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glBlendEquation(GL_FUNC_ADD);
 
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClearColor(bg_color[0], bg_color[1], bg_color[2], 1.0f);
         //glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glViewport(0, 0, width, height);

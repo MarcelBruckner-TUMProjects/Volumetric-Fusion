@@ -30,12 +30,16 @@ namespace vc::imgui {
 		void (*calibrationCallback)();
 		std::atomic_bool* calibrateCameras;
 		vc::io::Camera* camera;
+		int num_cameras;
 
 	public:
 		bool showCoordinateSystem;
+		bool* activeCameras;
+		float* bg_color;
 		
-		ProgramGUI(vc::enums::RenderState* renderState, void (*calibrationCallback)(), std::atomic_bool* calibrateCameras, vc::io::Camera* camera) :
-			renderState(renderState), calibrationCallback(calibrationCallback), calibrateCameras(calibrateCameras), camera(camera) {}
+		ProgramGUI(int num_cameras, vc::enums::RenderState* renderState, void (*calibrationCallback)(), std::atomic_bool* calibrateCameras, vc::io::Camera* camera, float* bg_color) :
+			num_cameras(num_cameras), renderState(renderState), calibrationCallback(calibrationCallback), calibrateCameras(calibrateCameras), camera(camera),
+			activeCameras(new bool[num_cameras]{true, true, true, true}), bg_color(bg_color) {}
 
 		void render() {
 			ImGui::Begin("Program Info", nullptr, WINDOW_FLAGS);
@@ -54,15 +58,26 @@ namespace vc::imgui {
 				}
 				ImGui::TreePop();
 			}
-						
-			if (*renderState != vc::enums::RenderState::ONLY_COLOR && *renderState != vc::enums::RenderState::ONLY_DEPTH) {
-				ImGui::Separator();
-				bool checked = calibrateCameras->load();
-				if (ImGui::Checkbox("Calibrate", &checked)) {
-					calibrateCameras->store(checked);
-					calibrationCallback();
-				}
 
+			ImGui::Separator();
+
+			if (ImGui::TreeNode("Cameras")) {
+				for (int i = 0; i < num_cameras; i++)
+				{
+					ImGui::Checkbox(("Camera " + std::to_string(i)).c_str(), &activeCameras[i]);
+				}
+				ImGui::TreePop();
+			}
+
+
+			ImGui::Separator();
+			bool checked = calibrateCameras->load();
+			if (ImGui::Checkbox("Calibrate", &checked)) {
+				calibrateCameras->store(checked);
+				calibrationCallback();
+			}
+
+			if (*renderState != vc::enums::RenderState::ONLY_COLOR && *renderState != vc::enums::RenderState::ONLY_DEPTH) {
 				ImGui::Separator();
 				ImGui::Checkbox("Coordinate system", &showCoordinateSystem);
 
@@ -91,6 +106,10 @@ namespace vc::imgui {
 					*camera = vc::io::Camera(glm::vec3(0.0f, 0.0f, -1.0f));
 				}
 			}
+
+			ImGui::Separator();
+			
+			ImGui::ColorEdit3("Background", bg_color);
 
 			ImGui::Separator();
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -179,9 +198,10 @@ namespace vc::imgui {
 			ImGui::Text("Editable settings of the camera calibration.");
 
 			ImGui::Checkbox("Highlight marker corners", &highlightMarkerCorners);
-			if (ImGui::Button("Reset")) {
-				optimizationProblem->reset();
-			}
+			ImGui::Checkbox("Reset", &optimizationProblem->needsReset);
+			//if (ImGui::Button("Reset")) {
+			//	optimizationProblem->reset();
+			//}
 			ImGui::End();
 		}
 	};

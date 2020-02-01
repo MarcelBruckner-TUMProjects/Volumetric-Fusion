@@ -29,6 +29,7 @@ namespace vc::capture {
 		rs2::pipeline_profile profile;
 		std::shared_ptr < vc::rendering::Rendering> rendering;
 		std::shared_ptr < vc::processing::ChArUco> chArUco;
+		std::shared_ptr < vc::processing::EdgeEnhancement> edgeEnhancement;
 		std::shared_ptr < vc::data::Data> data;
 		std::shared_ptr < vc::camera::PinholeCamera> rgb_camera;
 		std::shared_ptr < vc::camera::PinholeCamera> depth_camera;
@@ -141,6 +142,7 @@ namespace vc::capture {
 			this->rendering = other.rendering;
 			this->data = other.data;
 			this->chArUco = other.chArUco;
+			this->edgeEnhancement = other.edgeEnhancement;
 			this->pipeline = other.pipeline;
 			this->cfg = other.cfg;
 			this->rgb_camera = other.rgb_camera;
@@ -154,13 +156,14 @@ namespace vc::capture {
 		CaptureDevice(rs2::context context) : 
 			rendering(std::make_shared<vc::rendering::Rendering>()),
 			data(std::make_shared<vc::data::Data>()),
-			chArUco(std::make_shared<vc::processing::ChArUco>()),
 			pipeline(std::make_shared<rs2::pipeline>(context)),
 			paused(std::make_shared<std::atomic_bool>(true)),
 			stopped(std::make_shared<std::atomic_bool>(false)),
 			calibrateCameras(std::make_shared<std::atomic_bool>(false)),
 			depth_camera(std::make_shared<vc::camera::MockPinholeCamera>()),
 			rgb_camera(std::make_shared<vc::camera::MockPinholeCamera>()),
+			chArUco(std::make_shared<vc::processing::ChArUco>()),
+			edgeEnhancement(std::make_shared<vc::processing::EdgeEnhancement>()),
 			thread(std::make_shared<std::thread>(&vc::capture::CaptureDevice::captureThreadFunction, this))
 		{
 			//setCameras();
@@ -172,16 +175,18 @@ namespace vc::capture {
 			this->rgb_camera = std::make_shared<vc::camera::PinholeCamera>(this->pipeline->get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics());
 			this->depth_camera = std::make_shared<vc::camera::PinholeCamera>(this->pipeline->get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>().get_intrinsics(),
 			this->pipeline->get_active_profile().get_device().first<rs2::depth_sensor>().get_depth_scale());
-			chArUco->startCharucoProcessing(*rgb_camera);
+			chArUco->startProcessing();
+			edgeEnhancement->depthScale = depth_camera->depthScale;
+			edgeEnhancement->startProcessing();
 			calibrateCameras->store(tmpCalibrate);
 		}
 
 		void captureThreadFunction() {
 			std::vector<rs2::filter*> filters;
-			filters.emplace_back(new rs2::decimation_filter(1));
-			filters.emplace_back(new rs2::spatial_filter(1.0f, 8.0f, 2.0f, 4.0f));
+			//filters.emplace_back(new rs2::threshold_filter(0.2, 2.0)); // Try 0, 1, 2
+			//filters.emplace_back(new vc::processing::EdgeEnhancementFilter());
+			//filters.emplace_back(new rs2::spatial_filter(1.0f, 8.0f, 2.0f, 4.0f));
 			//filters.emplace_back(new rs2::hole_filling_filter(1)); // Try 0, 1, 2
-			//filters.emplace_back(new rs2::threshold_filter(0.2, 1.2)); // Try 0, 1, 2
 			//filters.emplace_back(new rs2::spatial_filter()); // Try 0, 1, 2
 			//filters.emplace_back(new rs2::temporal_filter());
 
@@ -205,30 +210,33 @@ namespace vc::capture {
 						return;       //  it might not provide depth and we don't want to crash
 					}
 
-					rs2::frame filteredDepthFrame = depthFrame; // Does not copy the frame, only adds a reference
-
 					rs2::frame colorFrame = frameset.get_color_frame();
 
 					if (calibrateCameras->load()) {
 						// Send color frame for processing
-						chArUco->charucoProcessingBlocks->invoke(colorFrame);
+						chArUco->processingBlock->invoke(colorFrame);
 						// Wait for results
-						colorFrame = chArUco->charucoProcessingQueues.wait_for_frame();
+						colorFrame = chArUco->processingQueues.wait_for_frame();
 					}
+					//else {
+					//	edgeEnhancement->processingBlock->invoke(depthFrame);
+					//	depthFrame = edgeEnhancement->processingQueues.wait_for_frame();
+					//}
 
 					data->frameId = frameset.get_color_frame().get_frame_number();
 					data->filteredColorFrames = colorFrame;
 
 					// Apply filters.
-					for (auto&& filter : filters) {
-						filteredDepthFrame = filter->process(filteredDepthFrame);
-					}
+					//for (auto&& filter : filters) {
+					//	depthFrame = filter->process(depthFrame);
+					//}
+
 
 					// Push filtered & original data to their respective queues
-					data->filteredDepthFrames = filteredDepthFrame;
+					data->filteredDepthFrames = depthFrame;
 
 					rs2::colorizer colorizer;
-					data->colorizedDepthFrames = colorizer.process(filteredDepthFrame);		// Colorize the depth frame with a color map
+					data->colorizedDepthFrames = colorizer.process(depthFrame);		// Colorize the depth frame with a color map
 
 					//data->points = data->pointclouds.calculate(depthFrame);  // Generate pointcloud from the depth data
 					//data->pointclouds.map_to(data->colorizedDepthFrames);      // Map the colored depth to the point cloud

@@ -93,7 +93,11 @@ void main(){
         return;
     }
     
-    float tsdf = clamp(projectedVoxelCenter.z - realDepth, -truncationDistance, truncationDistance);
+    float tsdf = projectedVoxelCenter.z - realDepth;
+    if(abs(tsdf) > truncationDistance){
+        return;
+    }
+//    float tsdf = clamp(, -truncationDistance, truncationDistance);
     
 //    float oldWeight = ;
 //    float oldTsdf = ;
