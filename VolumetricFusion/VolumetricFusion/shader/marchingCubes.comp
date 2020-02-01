@@ -136,6 +136,10 @@ bool isValid(InterpolationResult v){
 void main(){	
     uint hash = gl_GlobalInvocationID.x;
 
+    if(verts[hash].tsdf.w == INVALID_TSDF_VALUE){
+        return;
+    }
+
     ivec3 pos = unhash(hash);
 
     if(pos.x >= sizeNormalized.x - 1 || 
