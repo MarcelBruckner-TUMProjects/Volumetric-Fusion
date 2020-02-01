@@ -44,6 +44,8 @@ namespace vc::capture {
 		rs2::device device;
 		int masterSlaveId = 0;
 
+		float thresholdDistance = 1.5f;
+
 		bool startPipeline() {
 			try {
 				this->profile = this->pipeline->start(this->cfg);
@@ -182,14 +184,6 @@ namespace vc::capture {
 		}
 
 		void captureThreadFunction() {
-			std::vector<rs2::filter*> filters;
-			//filters.emplace_back(new rs2::threshold_filter(0.2, 2.0)); // Try 0, 1, 2
-			//filters.emplace_back(new vc::processing::EdgeEnhancementFilter());
-			//filters.emplace_back(new rs2::spatial_filter(1.0f, 8.0f, 2.0f, 4.0f));
-			//filters.emplace_back(new rs2::hole_filling_filter(1)); // Try 0, 1, 2
-			//filters.emplace_back(new rs2::spatial_filter()); // Try 0, 1, 2
-			//filters.emplace_back(new rs2::temporal_filter());
-
 			while (!stopped->load()) //While application is running
 			{
 				while (paused->load()) {
@@ -226,10 +220,12 @@ namespace vc::capture {
 					data->frameId = frameset.get_color_frame().get_frame_number();
 					data->filteredColorFrames = colorFrame;
 
-					// Apply filters.
-					//for (auto&& filter : filters) {
-					//	depthFrame = filter->process(depthFrame);
-					//}
+					std::vector<rs2::filter*> filters;
+					filters.emplace_back(new rs2::threshold_filter(0.2, thresholdDistance)); 
+
+					for (auto&& filter : filters) {
+						depthFrame = filter->process(depthFrame);
+					}
 
 
 					// Push filtered & original data to their respective queues

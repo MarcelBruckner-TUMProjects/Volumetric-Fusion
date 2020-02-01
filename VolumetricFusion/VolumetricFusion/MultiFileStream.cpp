@@ -110,7 +110,7 @@ std::atomic_bool calibrateCameras = false;
 std::atomic_bool renderCoordinateSystem = false;
 
 vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
-vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment(true);
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment();
 //vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::Procrustes(true);
 vc::imgui::ProgramGUI* programGui;
 
@@ -285,11 +285,12 @@ int main(int argc, char* argv[]) try {
 				voxelgrid->renderGrid(model, view, projection);
 			}
 			if (fusionGUI->renderMesh) {
-				voxelgrid->renderMarchingCubes(model, view, projection);
+				voxelgrid->renderMarchingCubes(model, view, projection, fusionGUI->wireframeMode);
 			}
 		}
 
-		if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) {
+		//if (state.renderState == RenderState::MULTI_POINTCLOUD || state.renderState == RenderState::CALIBRATED_POINTCLOUD || state.renderState == RenderState::VOLUMETRIC_FUSION) 
+		{
 			if (calibrateCameras) {
 				optimizationProblemGUI->render();
 			}

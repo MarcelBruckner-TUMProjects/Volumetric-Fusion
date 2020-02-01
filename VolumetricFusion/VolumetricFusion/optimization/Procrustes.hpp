@@ -52,11 +52,11 @@ namespace vc::optimization {
         bool calculateRelativetranformation(ACharacteristicPoints& from, ACharacteristicPoints& to, Eigen::Matrix4d* finalTranslation, Eigen::Matrix4d* finalRotation, Eigen::Matrix4d* finalScale) {
             auto fromHashes = from.getHashes(verbose);
             auto toHashes = to.getHashes(verbose);
-            std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(fromHashes, toHashes);
+            std::vector<int> matchingHashes = vc::utils::findOverlap(fromHashes, toHashes);
 
 
-            if (matchingHashes.size() <= 0) {
-                std::cerr << "At least 1 points are needed for Procrustes. Provided: " << matchingHashes.size() << std::endl;
+            if (matchingHashes.size() < 3) {
+                std::cerr << "At least 3 points are needed for Procrustes. Provided: " << matchingHashes.size() << std::endl;
 
                 *finalTranslation   = Eigen::Matrix4d::Identity();
                 *finalRotation      = Eigen::Matrix4d::Identity();
@@ -107,9 +107,9 @@ namespace vc::optimization {
             return true;
         }
 
-        Eigen::Matrix4d estimateRotation(std::vector<unsigned long long> hashes,
-            std::map<unsigned long long, Eigen::Vector4d> fromPoints, Eigen::Vector4d fromMean, double fromDistance,
-            std::map<unsigned long long, Eigen::Vector4d> toPoints, Eigen::Vector4d toMean, double toDistance,
+        Eigen::Matrix4d estimateRotation(std::vector<int> hashes,
+            std::map<int, Eigen::Vector4d> fromPoints, Eigen::Vector4d fromMean, double fromDistance,
+            std::map<int, Eigen::Vector4d> toPoints, Eigen::Vector4d toMean, double toDistance,
             bool verbose = true) {
 
             std::stringstream ss;
@@ -148,7 +148,7 @@ namespace vc::optimization {
             //return Eigen::Matrix4d::Identity();
         }
 
-        Eigen::Vector4d getCenterOfGravity(std::map<unsigned long long, Eigen::Vector4d> points, bool verbose = true) {
+        Eigen::Vector4d getCenterOfGravity(std::map<int, Eigen::Vector4d> points, bool verbose = true) {
             Eigen::Vector4d centerOfGravity(0, 0, 0, 0);
 
             for (auto& point : points)
@@ -164,7 +164,7 @@ namespace vc::optimization {
             return centerOfGravity;
         }
 
-        double getAverageDistance(std::map<unsigned long long, Eigen::Vector4d> points, Eigen::Vector4d mean, bool verbose = true) {
+        double getAverageDistance(std::map<int, Eigen::Vector4d> points, Eigen::Vector4d mean, bool verbose = true) {
             double distance = 0;
 
             for (auto& point : points)

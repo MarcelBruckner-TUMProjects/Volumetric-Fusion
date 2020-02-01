@@ -40,8 +40,8 @@ namespace vc::optimization {
             return allForRendering;
         }
 
-        unsigned long long hash(int markerId, int cornerId, bool verbose = false) {
-            unsigned long long value = std::hash<unsigned long long>()(std::hash<int>()(markerId * 128) + std::hash<int>()(cornerId));
+        int hash(int markerId, int cornerId, bool verbose = false) {
+            int value = markerId * 1000 + cornerId;
 
             //if (verbose) {
             //    std::stringstream ss;
@@ -63,20 +63,20 @@ namespace vc::optimization {
             }
         }
 
-        std::map<unsigned long long, Eigen::Vector4d> getFlattenedPoints(bool verbose = false) {
-            std::map<unsigned long long, Eigen::Vector4d> flattened;
+        std::map<int, Eigen::Vector4d> getFlattenedPoints(bool verbose = false) {
+            std::map<int, Eigen::Vector4d> flattened;
 
-            iterateAllPoints([&flattened](Eigen::Vector4d& point, unsigned long long hash) {
+            iterateAllPoints([&flattened](Eigen::Vector4d& point, int hash) {
                 flattened[hash] = point;
             }, verbose);
 
             return flattened;
         }
 
-        std::map<unsigned long long, Eigen::Vector4d> getFilteredPoints(std::vector<unsigned long long> keys, bool verbose = false) {
-            std::map<unsigned long long, Eigen::Vector4d> flattened;
+        std::map<int, Eigen::Vector4d> getFilteredPoints(std::vector<int> keys, bool verbose = false) {
+            std::map<int, Eigen::Vector4d> flattened;
 
-            iterateAllPoints([&flattened, &keys](Eigen::Vector4d& point, unsigned long long hash) {
+            iterateAllPoints([&flattened, &keys](Eigen::Vector4d& point, int hash) {
                 if (vc::utils::contains(keys, hash)) {
                     flattened[hash] = point;
                 }
@@ -85,12 +85,12 @@ namespace vc::optimization {
             return flattened;
         }
 
-        std::vector<unsigned long long> getHashes(bool verbose = false) {
-            std::vector<unsigned long long> flattened;
+        std::vector<int> getHashes(bool verbose = false) {
+            std::vector<int> flattened;
 
             //std::cout << vc::utils::asHeader("New hashset") << std::endl;
 
-            iterateAllPoints([&flattened](Eigen::Vector4d& point, unsigned long long hash) {
+            iterateAllPoints([&flattened](Eigen::Vector4d& point, int hash) {
                 flattened.push_back(hash);
             }, verbose);
 

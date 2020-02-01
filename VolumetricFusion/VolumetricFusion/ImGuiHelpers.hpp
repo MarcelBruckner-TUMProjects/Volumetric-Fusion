@@ -174,6 +174,9 @@ namespace vc::imgui {
 				ss = std::stringstream();
 				ss << "Alpha" << "##" << i;
 				ImGui::SliderFloat(ss.str().c_str(), &alphas[i], 0.0f, 1.0f);
+				ss = std::stringstream();
+				ss << "Max distance" << "##" << i;
+				ImGui::SliderFloat(ss.str().c_str(), &(*pipelines)[i]->thresholdDistance, 0.2f, 3.0f);
 			}
 
 			//ImGui::Separator();
@@ -213,13 +216,14 @@ namespace vc::imgui {
 	public:
 		bool renderVoxelgrid = true;
 		bool fuse = true;
-		float resolution = 0.05;
+		float resolution = 0.025;
 		float* size;
 		float* origin;
 
 		bool renderMesh = false;
 		bool marchingCubes = false;
 		float truncationDistance;
+		bool wireframeMode = false;
 
 		FusionGUI(vc::fusion::Voxelgrid* voxelgrid) :
 			voxelgrid(voxelgrid),
@@ -237,7 +241,7 @@ namespace vc::imgui {
 			ImGui::Begin("Volumetric Fusion", nullptr, WINDOW_FLAGS);
 			ImGui::Text("Editable settings of the fusion stage.");
 
-			if (ImGui::SliderFloat("Resolution", &resolution, 0.005, 0.1)) {
+			if (ImGui::SliderFloat("Resolution", &resolution, 0.001, 0.05)) {
 				resetVoxelgrid();
 			}
 
@@ -264,9 +268,9 @@ namespace vc::imgui {
 
 			ImGui::Separator();
 
-			ImGui::Checkbox("Render mesh", &renderMesh);
-
 			ImGui::Checkbox("Marching cubes", &marchingCubes);
+			ImGui::Checkbox("Render mesh", &renderMesh);
+			ImGui::Checkbox("Wireframe mode", &wireframeMode);
 
 			ImGui::End();
 		}

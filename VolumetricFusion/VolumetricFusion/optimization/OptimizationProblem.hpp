@@ -354,12 +354,12 @@ namespace vc::optimization {
                 return DBL_MAX;
             }
 
-            std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(
+            std::vector<int> matchingHashes = vc::utils::findOverlap(
                 characteristicPoints[from].getHashes(verbose), characteristicPoints[to].getHashes(verbose)
             );
 
-            if (matchingHashes.size() == 0) {
-                return DBL_MAX;
+            if (matchingHashes.size() <= 4) {
+                    return DBL_MAX;
             }
 
             auto& basePoints = characteristicPoints[to].getFilteredPoints(matchingHashes, verbose);
@@ -463,10 +463,40 @@ namespace vc::optimization {
                 Eigen::Vector4d(1.0f, -1.0f, 0.0f, 1.0f),
                 Eigen::Vector4d(-1.0f, 1.0f, 0.0f, 1.0f),
                 Eigen::Vector4d(-1.0f, -1.0f, 0.0f, 1.0f),
-                //Eigen::Vector4d(0.5f, 0.5f, 0.0f, 1.0f),
-                //Eigen::Vector4d(0.5f, -0.5f, 0.0f, 1.0f),
-                //Eigen::Vector4d(-0.5f, 0.5f, 0.0f, 1.0f),
-                //Eigen::Vector4d(-0.5f, -0.5f, 0.0f, 1.0f)
+                Eigen::Vector4d(0.5f, 0.5f, 1.0f, 1.0f),
+                Eigen::Vector4d(0.5f, -0.5f, 1.0f, 1.0f),
+                Eigen::Vector4d(-0.5f, 0.5f, -1.0f, 1.0f),
+                Eigen::Vector4d(-0.5f, -0.5f, -1.0f, 1.0f),
+
+                Eigen::Vector4d(-1.0f, 1.0f, 0.0f, 1.0f) ,
+                Eigen::Vector4d(-1.0f, 1.0f, 1.0f, 1.0f) ,
+                Eigen::Vector4d(-1.0f, -1.0f, 0.0f, 1.0f),
+                Eigen::Vector4d(1.0f, 1.0f, 0.0f, 1.0f),
+                Eigen::Vector4d(1.0f, -1.0f, 0.0f, 1.0f),
+                Eigen::Vector4d(-0.5f, 0.5f, 1.0f, 1.0f),
+                Eigen::Vector4d(-0.5f, -0.5f, 1.0f, 1.0f),
+                Eigen::Vector4d(0.5f, 0.5f, -1.0f, 1.0f),
+                Eigen::Vector4d(0.5f, -0.5f, -1.0f, 1.0f),
+
+                Eigen::Vector4d(-1.0f, -1.0f, 0.0f, 1.0f) ,
+                Eigen::Vector4d(-1.0f, -1.0f, 1.0f, 1.0f) ,
+                Eigen::Vector4d(-1.0f, 1.0f, 0.0f, 1.0f),
+                Eigen::Vector4d(1.0f, -1.0f, 0.0f, 1.0f),
+                Eigen::Vector4d(1.0f, 1.0f, 0.0f, 1.0f),
+                Eigen::Vector4d(-0.5f, -0.5f, 1.0f, 1.0f),
+                Eigen::Vector4d(-0.5f, 0.5f, 1.0f, 1.0f),
+                Eigen::Vector4d(0.5f, -0.5f, -1.0f, 1.0f),
+                Eigen::Vector4d(0.5f, 0.5f, -1.0f, 1.0f),
+
+                Eigen::Vector4d(-1.0f, -1.0f, -0.0f, 1.0f) ,
+                Eigen::Vector4d(-1.0f, -1.0f, -1.0f, 1.0f) ,
+                Eigen::Vector4d(-1.0f, 1.0f, -0.0f, 1.0f),
+                Eigen::Vector4d(1.0f, -1.0f, -0.0f, 1.0f),
+                Eigen::Vector4d(1.0f, 1.0f, -0.0f, 1.0f),
+                Eigen::Vector4d(-0.5f, -0.5f, -1.0f, 1.0f),
+                Eigen::Vector4d(-0.5f, 0.5f, -1.0f, 1.0f),
+                Eigen::Vector4d(0.5f, -0.5f, 1.0f, 1.0f),
+                Eigen::Vector4d(0.5f, 0.5f, 1.0f, 1.0f)
             };
 
             characteristicPoints[0] = (MockCharacteristicPoints());

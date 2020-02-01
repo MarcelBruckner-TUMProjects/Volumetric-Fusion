@@ -193,7 +193,7 @@ namespace vc::optimization {
             std::vector<Eigen::Matrix4d> initialTransformations = bestTransformations;
             
             ceres::Solver::Options options;
-            options.num_threads = 8;
+            options.num_threads = 16;
             options.linear_solver_type = ceres::DENSE_QR;
             options.minimizer_progress_to_stdout = verbose;
             options.max_num_iterations = 20;
@@ -237,7 +237,7 @@ namespace vc::optimization {
                     }
 
                     ACharacteristicPoints toPoints = characteristicPoints[to];
-                    std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(fromPoints.getHashes(verbose), toPoints.getHashes(verbose));
+                    std::vector<int> matchingHashes = vc::utils::findOverlap(fromPoints.getHashes(verbose), toPoints.getHashes(verbose));
                     
                     auto& filteredFromPoints = fromPoints.getFilteredPoints(matchingHashes, verbose);
                     auto& filteredToPoints = toPoints.getFilteredPoints(matchingHashes, verbose);

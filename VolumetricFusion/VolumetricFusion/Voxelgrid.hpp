@@ -201,7 +201,7 @@ namespace vc::fusion {
 			glBindVertexArray(0);
 		}
 
-		void renderMarchingCubes(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
+		void renderMarchingCubes(glm::mat4 model, glm::mat4 view, glm::mat4 projection, bool wireframeMode) {
 			glBindVertexArray(triangleVertexArray);
 			glBindBuffer(GL_ARRAY_BUFFER, triangleBuffer);
 			//glBufferData(GL_ARRAY_BUFFER, sizeof(Triangle) * triangles.size(), triangles.data(), GL_DYNAMIC_DRAW);
@@ -215,8 +215,12 @@ namespace vc::fusion {
 			triangleShader->setMat4("view", view);
 			triangleShader->setMat4("projection", projection);
 			triangleShader->setMat4("coordinate_correction", vc::rendering::COORDINATE_CORRECTION);
+			if (wireframeMode) {
+				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			}
 			glDrawArrays(GL_TRIANGLES, 0, triangles.size() * 3);
 			glBindVertexArray(0);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		}
 
 		void printVerts() {
