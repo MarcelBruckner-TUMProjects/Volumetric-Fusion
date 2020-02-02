@@ -27,6 +27,7 @@ namespace vc::optimization {
     public:
         std::map<int, std::vector<Eigen::Vector4d>> markerCorners;
         std::vector<glm::vec4> allForRendering;
+        int highestMarkerID;
 
         ACharacteristicPoints(){}
 
@@ -39,8 +40,8 @@ namespace vc::optimization {
             return allForRendering;
         }
 
-        unsigned long long hash(int markerId, int cornerId, bool verbose = false) {
-            unsigned long long value = std::hash<unsigned long long>()(std::hash<int>()(markerId * 128) + std::hash<int>()(cornerId));
+        int hash(int markerId, int cornerId, bool verbose = false) {
+            int value = markerId * 1000 + cornerId;
 
             //if (verbose) {
             //    std::stringstream ss;
@@ -62,20 +63,20 @@ namespace vc::optimization {
             }
         }
 
-        std::map<unsigned long long, Eigen::Vector4d> getFlattenedPoints(bool verbose = false) {
-            std::map<unsigned long long, Eigen::Vector4d> flattened;
+        std::map<int, Eigen::Vector4d> getFlattenedPoints(bool verbose = false) {
+            std::map<int, Eigen::Vector4d> flattened;
 
-            iterateAllPoints([&flattened](Eigen::Vector4d& point, unsigned long long hash) {
+            iterateAllPoints([&flattened](Eigen::Vector4d& point, int hash) {
                 flattened[hash] = point;
             }, verbose);
 
             return flattened;
         }
 
-        std::map<unsigned long long, Eigen::Vector4d> getFilteredPoints(std::vector<unsigned long long> keys, bool verbose = false) {
-            std::map<unsigned long long, Eigen::Vector4d> flattened;
+        std::map<int, Eigen::Vector4d> getFilteredPoints(std::vector<int> keys, bool verbose = false) {
+            std::map<int, Eigen::Vector4d> flattened;
 
-            iterateAllPoints([&flattened, &keys](Eigen::Vector4d& point, unsigned long long hash) {
+            iterateAllPoints([&flattened, &keys](Eigen::Vector4d& point, int hash) {
                 if (vc::utils::contains(keys, hash)) {
                     flattened[hash] = point;
                 }
@@ -84,12 +85,12 @@ namespace vc::optimization {
             return flattened;
         }
 
-        std::vector<unsigned long long> getHashes(bool verbose = false) {
-            std::vector<unsigned long long> flattened;
+        std::vector<int> getHashes(bool verbose = false) {
+            std::vector<int> flattened;
 
             //std::cout << vc::utils::asHeader("New hashset") << std::endl;
 
-            iterateAllPoints([&flattened](Eigen::Vector4d& point, unsigned long long hash) {
+            iterateAllPoints([&flattened](Eigen::Vector4d& point, int hash) {
                 flattened.push_back(hash);
             }, verbose);
 
@@ -144,16 +145,17 @@ namespace vc::optimization {
 
             std::vector<int> ids = pipeline->chArUco->ids;
             std::vector<std::vector<cv::Point2f>> markerCorners = pipeline->chArUco->markerCorners;
-
-            std::vector<int> charucoIds = pipeline->chArUco->charucoIds;
-            std::vector<cv::Point2f> charucoCorners = pipeline->chArUco->charucoCorners;
-            
+                        
             for (int j = 0; j < ids.size(); j++)
             {
                 if (j >= markerCorners.size()) {
                     break;
                 }
                 int markerId = ids[j];
+
+                if (markerId > highestMarkerID) {
+                    highestMarkerID = markerId;
+                }
 
                 for (int cornerId = 0; cornerId < markerCorners[j].size(); cornerId++) {
                     auto point = pixel2Point(markerCorners[j][cornerId]);
@@ -206,11 +208,11 @@ namespace vc::optimization {
                 Eigen::Vector3d point = Eigen::Vector3d(x, y, 1.0f);
                 //Eigen::Vector3d point = Eigen::Vector3d(x * 2.0f, y * 2.0f, 1.0f);
 
-                point = cam2World * point;
-
                 float depth = bilinearInterpolate(x, y);
-                
+
+                point = cam2World * point;
                 point *= depth_frame->get_distance(x, y);
+
 
                 Eigen::Vector4d v(point[0], point[1], point[2], 1.0f);
                 return v;
@@ -295,7 +297,7 @@ namespace vc::optimization {
             SHADER->setMat4("model", model);
             SHADER->setMat4("view", view);
             SHADER->setMat4("projection", projection);
-            SHADER->setInt("numberOfVertices", num_vertices / 4);
+            SHADER->setInt("numberOfVertices", characteristicPoints->highestMarkerID);
 
             glBindVertexArray(VAO);
 

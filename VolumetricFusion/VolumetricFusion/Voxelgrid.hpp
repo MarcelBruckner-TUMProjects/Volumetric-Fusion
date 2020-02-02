@@ -201,7 +201,7 @@ namespace vc::fusion {
 			glBindVertexArray(0);
 		}
 
-		void renderMarchingCubes(glm::mat4 model, glm::mat4 view, glm::mat4 projection) {
+		void renderMarchingCubes(glm::mat4 model, glm::mat4 view, glm::mat4 projection, bool wireframeMode) {
 			glBindVertexArray(triangleVertexArray);
 			glBindBuffer(GL_ARRAY_BUFFER, triangleBuffer);
 			//glBufferData(GL_ARRAY_BUFFER, sizeof(Triangle) * triangles.size(), triangles.data(), GL_DYNAMIC_DRAW);
@@ -215,8 +215,12 @@ namespace vc::fusion {
 			triangleShader->setMat4("view", view);
 			triangleShader->setMat4("projection", projection);
 			triangleShader->setMat4("coordinate_correction", vc::rendering::COORDINATE_CORRECTION);
+			if (wireframeMode) {
+				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			}
 			glDrawArrays(GL_TRIANGLES, 0, triangles.size() * 3);
 			glBindVertexArray(0);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		}
 
 		void printVerts() {
@@ -269,7 +273,7 @@ namespace vc::fusion {
 			voxelgridComputeShader->setBool("clearAsFirstFrame", clearAsFirstFrame);
 
 			voxelgridComputeShader->setMat3("world2CameraProjection", world2CameraProjection);
-			voxelgridComputeShader->setMat4("relativeTransformation", relativeTransformation);
+			voxelgridComputeShader->setMat4("relativeTransformation", relativeTransformation.inverse());
 			voxelgridComputeShader->setMat3("colorWorld2CameraProjection", colorWorld2CameraProjection);
 			voxelgridComputeShader->setFloat("depthScale", pipeline->depth_camera->depthScale);
 			voxelgridComputeShader->setVec2("depthResolution", depthWidth, depthHeight);
@@ -295,8 +299,10 @@ namespace vc::fusion {
 		}
 
 
-		void computeMarchingCubes() {
+		void computeMarchingCubes(glm::vec3 cameraPos) {
 			marchingCubesComputeShader->use();
+			marchingCubesComputeShader->setFloat("resolution", resolution);
+			marchingCubesComputeShader->setVec3("cameraPos", cameraPos);
 			marchingCubesComputeShader->setVec3i("sizeNormalized", sizeNormalized);
 			marchingCubesComputeShader->setFloat("isolevel", 0.0f);
 			marchingCubesComputeShader->setInt("INVALID_TSDF_VALUE", vc::fusion::INVALID_TSDF_VALUE);
@@ -338,12 +344,14 @@ namespace vc::fusion {
 			glDispatchCompute(num_gridPoints / MARCHING_CUBES_SHADER_LAYOUT_X, 1, 1);
 			glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-		/*	glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleBuffer);
-			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Triangle) * numTriangles, triangles.data());*/
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleBuffer);
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Triangle) * numTriangles, triangles.data());
 
-			//for (int i = 0; i < 100 && i < numTriangles; i++)
-			//{
-			//    std::cout << vc::utils::toString(std::to_string(i), &triangles[i]);
+
+			double maxAngle = 0;
+			for (int i = 0; i < 100 && i < numTriangles; i++)
+			{
+			    //std::cout << vc::utils::toString(std::to_string(i), &triangles[i]);
 			//    //for (int j = 0; j < 100 && j < numTriangles; j++)
 			//    //{
 			//    //    if (i != j && vc::utils::areEqual(&triangles[i], &triangles[j])) {
@@ -352,9 +360,14 @@ namespace vc::fusion {
 			//    //        std::cout << vc::utils::toString(std::to_string(j), &triangles[j]);
 			//    //    }
 			//    //}
-			//}
 
-			//std::cout << std::endl;
+				float angle = std::abs(triangles[i].pos0.x);
+				if (angle > maxAngle) {
+					maxAngle = angle;
+				}
+			}
+
+			std::cout << std::endl;
 
 			//exportToPly();
 		}

@@ -30,12 +30,16 @@ namespace vc::imgui {
 		void (*calibrationCallback)();
 		std::atomic_bool* calibrateCameras;
 		vc::io::Camera* camera;
+		int num_cameras;
 
 	public:
 		bool showCoordinateSystem;
+		bool* activeCameras;
+		float* bg_color;
 		
-		ProgramGUI(vc::enums::RenderState* renderState, void (*calibrationCallback)(), std::atomic_bool* calibrateCameras, vc::io::Camera* camera) :
-			renderState(renderState), calibrationCallback(calibrationCallback), calibrateCameras(calibrateCameras), camera(camera) {}
+		ProgramGUI(int num_cameras, vc::enums::RenderState* renderState, void (*calibrationCallback)(), std::atomic_bool* calibrateCameras, vc::io::Camera* camera, float* bg_color) :
+			num_cameras(num_cameras), renderState(renderState), calibrationCallback(calibrationCallback), calibrateCameras(calibrateCameras), camera(camera),
+			activeCameras(new bool[num_cameras]{true, true, true, true}), bg_color(bg_color) {}
 
 		void render() {
 			ImGui::Begin("Program Info", nullptr, WINDOW_FLAGS);
@@ -54,15 +58,26 @@ namespace vc::imgui {
 				}
 				ImGui::TreePop();
 			}
-						
-			if (*renderState != vc::enums::RenderState::ONLY_COLOR && *renderState != vc::enums::RenderState::ONLY_DEPTH) {
-				ImGui::Separator();
-				bool checked = calibrateCameras->load();
-				if (ImGui::Checkbox("Calibrate", &checked)) {
-					calibrateCameras->store(checked);
-					calibrationCallback();
-				}
 
+			ImGui::Separator();
+
+			if (ImGui::TreeNode("Cameras")) {
+				for (int i = 0; i < num_cameras; i++)
+				{
+					ImGui::Checkbox(("Camera " + std::to_string(i)).c_str(), &activeCameras[i]);
+				}
+				ImGui::TreePop();
+			}
+
+
+			ImGui::Separator();
+			bool checked = calibrateCameras->load();
+			if (ImGui::Checkbox("Calibrate", &checked)) {
+				calibrateCameras->store(checked);
+				calibrationCallback();
+			}
+
+			if (*renderState != vc::enums::RenderState::ONLY_COLOR && *renderState != vc::enums::RenderState::ONLY_DEPTH) {
 				ImGui::Separator();
 				ImGui::Checkbox("Coordinate system", &showCoordinateSystem);
 
@@ -91,6 +106,10 @@ namespace vc::imgui {
 					*camera = vc::io::Camera(glm::vec3(0.0f, 0.0f, -1.0f));
 				}
 			}
+
+			ImGui::Separator();
+			
+			ImGui::ColorEdit3("Background", bg_color);
 
 			ImGui::Separator();
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -155,6 +174,9 @@ namespace vc::imgui {
 				ss = std::stringstream();
 				ss << "Alpha" << "##" << i;
 				ImGui::SliderFloat(ss.str().c_str(), &alphas[i], 0.0f, 1.0f);
+				ss = std::stringstream();
+				ss << "Max distance" << "##" << i;
+				ImGui::SliderFloat(ss.str().c_str(), &(*pipelines)[i]->thresholdDistance, 0.2f, 3.0f);
 			}
 
 			//ImGui::Separator();
@@ -179,9 +201,10 @@ namespace vc::imgui {
 			ImGui::Text("Editable settings of the camera calibration.");
 
 			ImGui::Checkbox("Highlight marker corners", &highlightMarkerCorners);
-			if (ImGui::Button("Reset")) {
-				optimizationProblem->reset();
-			}
+			ImGui::Checkbox("Reset", &optimizationProblem->needsReset);
+			//if (ImGui::Button("Reset")) {
+			//	optimizationProblem->reset();
+			//}
 			ImGui::End();
 		}
 	};
@@ -193,13 +216,14 @@ namespace vc::imgui {
 	public:
 		bool renderVoxelgrid = true;
 		bool fuse = true;
-		float resolution = 0.05;
+		float resolution = 0.025;
 		float* size;
 		float* origin;
 
 		bool renderMesh = false;
 		bool marchingCubes = false;
 		float truncationDistance;
+		bool wireframeMode = false;
 
 		FusionGUI(vc::fusion::Voxelgrid* voxelgrid) :
 			voxelgrid(voxelgrid),
@@ -217,7 +241,8 @@ namespace vc::imgui {
 			ImGui::Begin("Volumetric Fusion", nullptr, WINDOW_FLAGS);
 			ImGui::Text("Editable settings of the fusion stage.");
 
-			if (ImGui::SliderFloat("Resolution", &resolution, 0.005, 0.1)) {
+			if (ImGui::SliderFloat("Resolution", &resolution, 0.004, 0.05)) {
+				truncationDistance = resolution * 20;
 				resetVoxelgrid();
 			}
 
@@ -234,7 +259,7 @@ namespace vc::imgui {
 			ImGui::Checkbox("Render voxelgrid", &renderVoxelgrid);
 			ImGui::Checkbox("Fuse", &fuse);
 
-			if (ImGui::SliderFloat("Truncation distance", &truncationDistance, 0, truncationDistanceRange)) {
+			if (ImGui::SliderFloat("Truncation distance", &truncationDistance, resolution * 2, resolution * 50)) {
 				voxelgrid->setTruncationDistance(truncationDistance);
 			}
 
@@ -244,9 +269,9 @@ namespace vc::imgui {
 
 			ImGui::Separator();
 
-			ImGui::Checkbox("Render mesh", &renderMesh);
-
 			ImGui::Checkbox("Marching cubes", &marchingCubes);
+			ImGui::Checkbox("Render mesh", &renderMesh);
+			ImGui::Checkbox("Wireframe mode", &wireframeMode);
 
 			ImGui::End();
 		}
