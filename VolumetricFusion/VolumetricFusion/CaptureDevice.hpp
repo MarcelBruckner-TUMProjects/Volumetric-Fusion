@@ -45,6 +45,8 @@ namespace vc::capture {
 		int masterSlaveId = 0;
 
 		float thresholdDistance = 1.5f;
+		int holeFillingMode = -1;
+		int edgeEnhancementKernelSize = 0;
 
 		bool startPipeline() {
 			try {
@@ -212,21 +214,27 @@ namespace vc::capture {
 						// Wait for results
 						colorFrame = chArUco->processingQueues.wait_for_frame();
 					}
-					//else {
-					//	edgeEnhancement->processingBlock->invoke(depthFrame);
-					//	depthFrame = edgeEnhancement->processingQueues.wait_for_frame();
-					//}
+					else {
+						//depthFrame = edgeEnhancement->processingQueues.wait_for_frame();
+					}
+
+					if (edgeEnhancementKernelSize != 0) {
+						edgeEnhancement->kernelSize = edgeEnhancementKernelSize;
+						edgeEnhancement->processingBlock->invoke(depthFrame);
+					}
 
 					data->frameId = frameset.get_color_frame().get_frame_number();
 					data->filteredColorFrames = colorFrame;
 
 					std::vector<rs2::filter*> filters;
-					filters.emplace_back(new rs2::threshold_filter(0.2, thresholdDistance)); 
+					filters.emplace_back(new rs2::threshold_filter(0.02f, thresholdDistance));
+					if (holeFillingMode != 0) {
+						filters.emplace_back(new rs2::hole_filling_filter(holeFillingMode - 1));
+					}
 
 					for (auto&& filter : filters) {
 						depthFrame = filter->process(depthFrame);
 					}
-
 
 					// Push filtered & original data to their respective queues
 					data->filteredDepthFrames = depthFrame;

@@ -199,9 +199,25 @@ namespace vc::processing {
 		void process(cv::Mat& image, unsigned long long frameId) {
 			//std::cout << vc::utils::asHeader("Edge Enhancement") << std::endl;
 
-			cv::Mat buf =
-			image.clone();
+			cv::Mat dst, detectedEdges;
+			//std::cout << image << std::endl << std::endl;
+			//cv::Canny(image, buf, kernelSize, kernelSize, 5);
+			//cv::bilateralFilter(image, buf, 5, 50, 50);
 
+			image.convertTo(detectedEdges, CV_8U); // , depthScale);
+			//cv::blur(detectedEdges, detectedEdges, cv::Size(kernelSize, kernelSize));
+			//cv::Canny(detectedEdges, detectedEdges, kernelSize, kernelSize, 5);
+			cv::bilateralFilter(detectedEdges, image, 5, kernelSize, kernelSize);
+			dst = cv::Scalar::all(0);
+			
+			
+			//image.copyTo(image, detectedEdges); // CV_16U, 1.0 / depthScale);
+			image.convertTo(image, CV_16U);
+			//std::cout << image << std::endl << std::endl;
+			//image.setTo(cv::Scalar(233.0f, 0.0f, 0.0f));
+
+			//image = dst;
+			//image.setTo(cv::Scalar(233.0f, 0.0f, 0.0f));
 
 			//buf.convertTo(buf, CV_32FC1, depthScale);
 			////std::cout << buf;
@@ -209,19 +225,20 @@ namespace vc::processing {
 			//cv::Mat bil;
 			//buf.copyTo(bil);
 			//cv::bilateralFilter(buf, bil, 5, 50, 50);
-
+			 
 			////cv::Mat can;
 			////bil.copyTo(can);
 			////cv::Canny(bil, can, 100, 300);
 
 			////buf = can;
 			//buf.convertTo(buf, CV_16U, 1.0 / depthScale);
-
-			image = buf;
+			
+			//image.setTo(cv::Scalar(233.0f, 0.0f, 0.0f));
 		}
 
 	public:
 		float depthScale;
+		int kernelSize = 0;
 
 		void setDepthScale(float depthScale) {
 			this->depthScale = depthScale;

@@ -144,6 +144,8 @@ namespace vc::imgui {
 		float overallAlpha = 1.0f;
 		float rotationSpeed = 0.0f;
 		std::vector<float> alphas;
+		int holeFillingMode = 0;
+		int edgeEnhancementKernelSize = 0;
 
 		AllPipelinesGUI(std::vector<std::shared_ptr<vc::capture::CaptureDevice>>* pipelines) : 
 			pipelines(pipelines) 
@@ -163,6 +165,18 @@ namespace vc::imgui {
 				{
 					alphas[i] = overallAlpha;
 				}
+			}
+
+			ImGui::SliderInt("Use hole filling filter", &holeFillingMode, 0, 2);
+			for (int i = 0; i < 4; i++)
+			{
+				(*pipelines)[i]->holeFillingMode = holeFillingMode;
+			}
+
+			ImGui::SliderInt("Use Edge Enhancement", &edgeEnhancementKernelSize, 0, 100);
+			for (int i = 0; i < 4; i++)
+			{
+				(*pipelines)[i]->edgeEnhancementKernelSize = edgeEnhancementKernelSize;
 			}
 
 			for (int i = 0; i < pipelines->size(); i++)

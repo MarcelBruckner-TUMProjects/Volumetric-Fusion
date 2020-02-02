@@ -193,7 +193,7 @@
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\Users\Marcel\Repositories\Volumetric-Fusion\include\flann-1.9.1\build\lib\Debug;C:\Users\Marcel Bruckner\Documents\Volumetric-Fusion\VolumetricFusion\packages\boost.1.71.0.0\lib;..\..\include\Ceres\bin\lib\Debug;..\..\include\Ceres\gflags\bin\lib\Debug;..\..\include\Ceres\glog\bin\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ceres-debug.lib;gtest-debug.lib;test_util-debug.lib;glogd.lib;gflags_debug.lib;flann.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ceres-debug.lib;gflags_debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>true</Profile>
     </Link>
     <PreBuildEvent>
