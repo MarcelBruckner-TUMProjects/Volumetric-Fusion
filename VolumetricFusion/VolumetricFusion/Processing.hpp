@@ -21,6 +21,9 @@
 #include "Utils.hpp"
 #include <stdarg.h>
 
+//#define FLANN_USE_CUDA
+#include <flann/flann.hpp>
+
 #define _USE_MATH_DEFINES
 #include <math.h>
 namespace vc::data {
@@ -35,6 +38,7 @@ namespace vc::processing {
 		std::shared_ptr<rs2::processing_block > processingBlock;
 
 		virtual void process(cv::Mat& image, unsigned long long frameId) = 0;
+		virtual void process(rs2::frame& frame, unsigned long long frameId) = 0;
 		virtual void startProcessing() = 0;
 	};
 
@@ -44,7 +48,7 @@ namespace vc::processing {
 	@param lambda a function that takes a reference to a cv::Mat as parameter:
 			basic lambda syntax: processing_blocks::createProcessingBlock([](cv::Mat &image){...})
 	*/
-	rs2::processing_block createProcessingBlock(vc::processing::Processing* lambda, int imageDescriptor, int factor, bool depthFrame) {
+	rs2::processing_block createProcessingBlock(vc::processing::Processing* lambda, int imageDescriptor, int factor, int depthFrame) {
 		return rs2::processing_block(
 			[=](rs2::frame f, rs2::frame_source& src)
 		{
@@ -55,7 +59,7 @@ namespace vc::processing {
 
 			// frame --> cv
 			cv::Mat image;
-			if (depthFrame) {
+			if (depthFrame == 1) {
 				image = cv::Mat(cv::Size(w, h), imageDescriptor, (void*)f.as<rs2::depth_frame>().get_data(), cv::Mat::AUTO_STEP);
 			}
 			else {
@@ -65,7 +69,12 @@ namespace vc::processing {
 
 
 			// Here the magic happens
-			lambda->process(image, f.get_frame_number());
+			if (depthFrame == 2) {
+				lambda->process(f.as<rs2::depth_frame>(), f.get_frame_number());
+			}
+			else {
+				lambda->process(image, f.get_frame_number());
+			}
 
 			// Allocate new frame. Copy all missing data from f.
 			// This assumes the output is same resolution and format
@@ -82,12 +91,17 @@ namespace vc::processing {
 
 	rs2::processing_block createColorProcessingBlock(vc::processing::Processing* lambda) {
 		// Don't bother the magic numbers, they describe the image channels
-		return createProcessingBlock(lambda, CV_8UC3, 3, false);
+		return createProcessingBlock(lambda, CV_8UC3, 3, 0);
 	}
 
 	rs2::processing_block createDepthProcessingBlock(vc::processing::Processing* lambda) {
 		// Don't bother the magic numbers, they describe the image channels
-		return createProcessingBlock(lambda, CV_16U, 2, true);
+		return createProcessingBlock(lambda, CV_16U, 2, 1);
+	}
+
+	rs2::processing_block createDepthPointCloudProcessingBlock(vc::processing::Processing* lambda) {
+		// Don't bother the magic numbers, they describe the image channels
+		return createProcessingBlock(lambda, CV_16U, 2, 2);
 	}
 
 	rs2::processing_block createEmpty()
@@ -192,27 +206,55 @@ namespace vc::processing {
 		}
 	};
 
+
 	class EdgeEnhancement : public DepthProcessing {
 		//float factor = 8;
 
 		// Inherited via DepthProcessing
-		void process(cv::Mat& image, unsigned long long frameId) {
+		//void process(cv::Mat& image, unsigned long long frameId) {
+		void process(rs2::depth_frame frame, unsigned long long frameId) {
+			const int nn = kernelSize;
+
+			rs2::pointcloud pc;
+			rs2::points points = pc.calculate(frame);  // Generate pointcloud from the depth data
+
+			const float* fpoints = reinterpret_cast<const float*>(points.get_vertices());
+
+			auto num_queries = frame.get_width() * frame.get_height();
+			flann::Matrix<const float> dataset = flann::Matrix<const float>(fpoints, num_queries, nn);
+			flann::Matrix<float> query;
+
+			//flann::Matrix<size_t> indices(new size_t[num_queries * nn], num_queries, nn);
+			//flann::Matrix<float> dists(new float[num_queries * nn], num_queries, nn);
+			std::vector<size_t> indices;
+			std::vector<float> dists;
+			
+			// construct an randomized kd-tree index using 4 kd-trees
+			flann::Index<flann::L2<const float>> index(dataset, flann::KDTreeIndexParams(4));
+			index.buildIndex();
+
+			// do a knn search, using 128 checks
+			index.knnSearch(dataset, indices, dists, nn, flann::SearchParams(128));
+
+			std::cout << "end knn" << std::endl;
+
+			
 			//std::cout << vc::utils::asHeader("Edge Enhancement") << std::endl;
 
-			cv::Mat dst, detectedEdges;
+			//cv::Mat dst, detectedEdges;
 			//std::cout << image << std::endl << std::endl;
 			//cv::Canny(image, buf, kernelSize, kernelSize, 5);
 			//cv::bilateralFilter(image, buf, 5, 50, 50);
 
-			image.convertTo(detectedEdges, CV_8U); // , depthScale);
+			//image.convertTo(detectedEdges, CV_8U); // , depthScale);
 			//cv::blur(detectedEdges, detectedEdges, cv::Size(kernelSize, kernelSize));
 			//cv::Canny(detectedEdges, detectedEdges, kernelSize, kernelSize, 5);
-			cv::bilateralFilter(detectedEdges, image, 5, kernelSize, kernelSize);
-			dst = cv::Scalar::all(0);
+			//cv::bilateralFilter(detectedEdges, image, 5, kernelSize, kernelSize);
+			//dst = cv::Scalar::all(0);
 			
 			
 			//image.copyTo(image, detectedEdges); // CV_16U, 1.0 / depthScale);
-			image.convertTo(image, CV_16U);
+			//image.convertTo(image, CV_16U);
 			//std::cout << image << std::endl << std::endl;
 			//image.setTo(cv::Scalar(233.0f, 0.0f, 0.0f));
 
