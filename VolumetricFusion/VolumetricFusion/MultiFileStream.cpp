@@ -46,12 +46,11 @@ using namespace vc::enums;
 #include "shader.hpp"
 #include "MarchingCubes.hpp"
 
-#include "optimization/OptimizationProblem.hpp"
-#include "optimization/CeresOptimizationProblem.hpp"
 #include "Processing.hpp"
+
+#include "optimization/optimizationProblem.hpp"
 #include "optimization/BundleAdjustment.hpp"
 #include "optimization/Procrustes.hpp"
-#include "optimization/ICP.hpp"
 #include "glog/logging.h"
 
 #pragma endregion
@@ -186,7 +185,7 @@ int main(int argc, char* argv[]) try {
 	// to prevent UI thread from blocking due to long computations.
 	std::atomic_bool stopped(false);
 	std::atomic_bool paused(false);
-		
+
 	std::thread calibrationThread;
 	std::thread fusionThread;
 		
@@ -208,9 +207,9 @@ int main(int argc, char* argv[]) try {
 				continue;
 			}
 		}
-	});
+		});
 #pragma endregion
-	   
+
 	//fusionThread = std::thread([&stopped, &hiddenComputeWindow]() {
 	//	while (!stopped) {
 	//		if (state.renderState == RenderState::VOLUMETRIC_FUSION) {
@@ -233,14 +232,14 @@ int main(int argc, char* argv[]) try {
 
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
-		
+
 		// Retina display (Mac OS) have double the pixel density
 		int w2, h2;
 		glfwGetFramebufferSize(window, &w2, &h2);
 		const bool isRetinaDisplay = w2 == width * 2 && h2 == width * 2;
 
 		const float aspect = 1.0f * width / height;
-		
+
 		// -------------------------------------------------------------------------------
 		processInput(window);
 
@@ -297,7 +296,7 @@ int main(int argc, char* argv[]) try {
 			}
 			allPipelinesGui->render();
 		}
-		
+
 		for (int i = 0; i < pipelines.size() && i < 4; ++i)
 		{
 			if (!programGui->activeCameras[i]) {
@@ -319,7 +318,7 @@ int main(int argc, char* argv[]) try {
 					y = -1;
 				}
 				vc::rendering::setViewport(width, height, x, y);
-				
+
 				if (programGui->showCoordinateSystem) {
 					coordinateSystem->render(model, view, projection);
 				}
@@ -330,7 +329,7 @@ int main(int argc, char* argv[]) try {
 				}
 			}
 		}
-				
+
 		vc::imgui::render();
 
 		glfwSwapBuffers(window);
@@ -625,7 +624,7 @@ GLFWwindow* setupComputeWindow() {
 	}
 
 	glad_set_post_callback(gladErrorCallback);
-	
+
 	return window;
 }
 #pragma endregion

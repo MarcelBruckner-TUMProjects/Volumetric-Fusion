@@ -38,18 +38,18 @@ namespace vc::optimization {
 		template <typename T>
 		bool operator()(const T* const pose, T* residuals) const {
 
-			const T* rotation = pose; 
-			const T* translation = pose + 3;
-
+			const T* scale = pose;
+			const T* rotation = pose + 3; 
+			const T* translation = pose + 6;
 			T source[3];
 			T output[3];
 
 			//std::cout << "Point source: " << T(m_sourcePoint(0)) << " " << T(m_sourcePoint(1)) << " " << T(m_sourcePoint(2)) << std::endl;
 			//std::cout << "Point target: " << T(m_targetPoint(0)) << " " << T(m_targetPoint(1)) << " " << T(m_targetPoint(2)) << std::endl << std::endl;
 
-			source[0] = T(m_sourcePoint(0));
-			source[1] = T(m_sourcePoint(1));
-			source[2] = T(m_sourcePoint(2));
+			source[0] = scale[0] * T(m_sourcePoint(0));
+			source[1] = scale[1] * T(m_sourcePoint(1));
+			source[2] = scale[2] * T(m_sourcePoint(2));
 
 			T point[3];
 
@@ -71,7 +71,7 @@ namespace vc::optimization {
 		}
 
 		static ceres::CostFunction* create(const ceres::Vector& sourcePoint, const ceres::Vector& targetPoint, const float weight) {
-			return new ceres::AutoDiffCostFunction<PointToPointConstraint, 3, 6>(new PointToPointConstraint(sourcePoint, targetPoint, weight));
+			return new ceres::AutoDiffCostFunction<PointToPointConstraint, 3, 9>(new PointToPointConstraint(sourcePoint, targetPoint, weight));
 		}
 
 	protected:
@@ -87,32 +87,12 @@ namespace vc::optimization {
 		explicit PoseIncrement(T* const array) : m_array{ array } { }
 
 		void setZero() {
-			for (int i = 0; i < 6; ++i)
+			for (int i = 0; i < 9; ++i)
 				m_array[i] = T(0);
 		}
 
 		T* getData() const {
 			return m_array;
-		}
-
-		/**
-		 * Applies the pose increment onto the input point and produces transformed output point.
-		 * Important: The memory for both 3D points (input and output) needs to be reserved (i.e. on the stack)
-		 * beforehand).
-		 */
-		void apply(T* inputPoint, T* outputPoint) const {
-			// pose[0,1,2] is angle-axis rotation.
-			// pose[3,4,5] is translation.
-			const T* rotation = m_array + 0;
-			const T* translation = m_array + 3;
-
-			T temp[3];
-
-			ceres::AngleAxisRotatePoint(rotation, inputPoint, temp);
-
-			outputPoint[0] = temp[0] + translation[0];
-			outputPoint[1] = temp[1] + translation[1];
-			outputPoint[2] = temp[2] + translation[2];
 		}
 
 		/**
@@ -123,21 +103,27 @@ namespace vc::optimization {
 			// pose[0,1,2] is angle-axis rotation.
 			// pose[3,4,5] is translation.
 			double* pose = poseIncrement.getData();
-			double* rotation = pose;
-			double* translation = pose + 3;
+			double* scale = pose;
+			double* rotation = pose + 3;
+			double* translation = pose + 6;
 
 			// Convert the rotation from SO3 to matrix notation (with column-major storage).
 			double rotationMatrix[9];
 			ceres::AngleAxisToRotationMatrix(rotation, rotationMatrix);
 
+			Eigen::Matrix4d scaleMatrix = Eigen::Matrix4d::Identity();
+			scaleMatrix(0, 0) = double(scale[0]);
+			scaleMatrix(1, 1) = double(scale[1]);
+			scaleMatrix(2, 2) = double(scale[2]);
+
 			// Create the 4x4 transformation matrix.
 			Eigen::Matrix4d matrix;
 			matrix.setIdentity();
-			matrix(0, 0) = float(rotationMatrix[0]);	matrix(0, 1) = float(rotationMatrix[3]);	matrix(0, 2) = float(rotationMatrix[6]);	matrix(0, 3) = float(translation[0]);
-			matrix(1, 0) = float(rotationMatrix[1]);	matrix(1, 1) = float(rotationMatrix[4]);	matrix(1, 2) = float(rotationMatrix[7]);	matrix(1, 3) = float(translation[1]);
-			matrix(2, 0) = float(rotationMatrix[2]);	matrix(2, 1) = float(rotationMatrix[5]);	matrix(2, 2) = float(rotationMatrix[8]);	matrix(2, 3) = float(translation[2]);
+			matrix(0, 0) = double(rotationMatrix[0]);	matrix(0, 1) = double(rotationMatrix[3]);	matrix(0, 2) = double(rotationMatrix[6]);	matrix(0, 3) = double(translation[0]);
+			matrix(1, 0) = double(rotationMatrix[1]);	matrix(1, 1) = double(rotationMatrix[4]);	matrix(1, 2) = double(rotationMatrix[7]);	matrix(1, 3) = double(translation[1]);
+			matrix(2, 0) = double(rotationMatrix[2]);	matrix(2, 1) = double(rotationMatrix[5]);	matrix(2, 2) = double(rotationMatrix[8]);	matrix(2, 3) = double(translation[2]);
 
-			return matrix;
+			return matrix * scaleMatrix;
 		}
 
 	private:
@@ -151,14 +137,17 @@ namespace vc::optimization {
 			:CeresOptimizationProblem(verbose, sleepDuration)
 			//,m_nIterations{ 50 }
 		{
+			translations = std::vector<std::vector<std::vector<double>>>(4);
+			rotations = std::vector<std::vector<std::vector<double>>>(4);
+			scales = std::vector<std::vector<std::vector<double>>>(4);
 			for (int i = 0; i < 4; i++)
 			{
-				translations.push_back(std::vector<double> { 0.0, 0.0, 0.0 });
-				rotations.push_back(std::vector<double> { 0.0, 2 * M_PI, 0.0 });
-				scales.push_back(std::vector<double> {1.0, 1.0, 1.0  });
-
-				intrinsics.push_back(std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
-				distCoeffs.push_back(std::vector<double> { 0.0, 0.0, 0.0, 0.0 });
+				for (int j = 0; j < 4; j++)
+				{
+					translations[i].push_back(std::vector<double> { 0.0, 0.0, 0.0 });
+					rotations[i].push_back(std::vector<double> { 0.0, 2 * M_PI, 0.0 });
+					scales[i].push_back(std::vector<double> {1.0, 1.0, 1.0  });
+				}
 			}
 		}
 
@@ -198,32 +187,41 @@ namespace vc::optimization {
 
 			std::vector<Eigen::Matrix4d> initialTransformations(OptimizationProblem::bestTransformations);
 
-			int baseId = 0;
-
-			for (int relativeId = 1; relativeId < characteristicPoints.size(); relativeId++) {
-								
-				Eigen::Matrix4d pose = estimatePose(characteristicPoints[relativeId], characteristicPoints[baseId], Eigen::Matrix4d::Identity());
-
-				Eigen::Matrix3d rotationMatrix = pose.block<3, 3>(0, 0);
-				Eigen::Vector3d translation = pose.block<3, 1>(0, 3);
+			for (int from = 0; from < characteristicPoints.size(); from++) {
 				
-				double rotation[9];
-				double angle_axis[3];
+				ACharacteristicPoints fromPoints = characteristicPoints[from];
 
-				for (int i = 0; i < 3; i++) {
-					for (int j = 0; j < 3; j++) {
-						rotation[i*3 + j] = rotationMatrix(j, i);
+				for (int to = 0; to < characteristicPoints.size(); to++) {
+
+					if (from == to) {
+						continue;
 					}
-				}
 
-				ceres::RotationMatrixToAngleAxis(rotation, angle_axis);
+					ACharacteristicPoints toPoints = characteristicPoints[to];
 
-				for (int i = 0; i < 3; i++) {
-					rotations[relativeId].push_back(angle_axis[i]);
-				}
+					Eigen::Matrix4d pose = estimatePose(toPoints, fromPoints, Eigen::Matrix4d::Identity());
 
-				for (int i = 0; i < 3; i++) {
-					translations[relativeId].push_back(translation(i));
+					Eigen::Matrix3d rotationMatrix = pose.block<3, 3>(0, 0);
+					Eigen::Vector3d translation = pose.block<3, 1>(0, 3);
+
+					double rotation[9];
+					double angle_axis[3];
+
+					for (int i = 0; i < 3; i++) {
+						for (int j = 0; j < 3; j++) {
+							rotation[i * 3 + j] = rotationMatrix(j, i);
+						}
+					}
+
+					ceres::RotationMatrixToAngleAxis(rotation, angle_axis);
+
+					for (int i = 0; i < 3; i++) {
+						rotations[from][to].push_back(angle_axis[i]);
+					}
+
+					for (int i = 0; i < 3; i++) {
+						translations[from][to].push_back(translation(i));
+					}
 				}
 			}
 

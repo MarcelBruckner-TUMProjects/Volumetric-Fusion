@@ -82,6 +82,7 @@
     <ClInclude Include="imgui\imstb_textedit.h" />
     <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="MarchingCubes.hpp" />
+    <ClInclude Include="NearestNeighbor.hpp" />
     <ClInclude Include="optimization\BundleAdjustment.hpp" />
     <ClInclude Include="optimization\CeresOptimizationProblem.hpp" />
     <ClInclude Include="optimization\CharacteristicPoints.hpp" />
@@ -168,8 +169,8 @@
     <LibraryPath>$(OPENCV_DIR)\lib;C:\Program Files (x86)\Intel RealSense SDK 2.0 (Win7)\lib\x64;C:\dev\opencv\build\lib\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>.\libs\ceres\ceres\include;.\libs\ceres\glog\include;.\libs\ceres\gflags\include;.\libs\Eigen;$(IncludePath)</IncludePath>
-    <LibraryPath>.\libs\ceres\ceres\lib;.\libs\ceres\glog\lib;.\libs\ceres\gflags\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>.\libs\ceres\ceres\include;.\libs\ceres\glog\include;.\libs\ceres\gflags\include;.\libs\Eigen;D:\CMake\flann\include;$(IncludePath)</IncludePath>
+    <LibraryPath>.\libs\ceres\ceres\lib;.\libs\ceres\glog\lib;.\libs\ceres\gflags\lib;D:\CMake\flann\lib;$(LibraryPath)</LibraryPath>
     <ExecutablePath>$(ExecutablePath)</ExecutablePath>
     <ReferencePath>$(ReferencePath)</ReferencePath>
   </PropertyGroup>

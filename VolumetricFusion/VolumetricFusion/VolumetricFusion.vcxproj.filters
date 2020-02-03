@@ -93,10 +93,14 @@
       <Filter>ImGui</Filter>
     </ClInclude>
     <ClInclude Include="PinholeCamera.hpp" />
+    <ClInclude Include="optimization\CeresOptimizationProblem.hpp">
+      <Filter>Optimization</Filter>
+    </ClInclude>
+    <ClInclude Include="Structs.hpp" />
     <ClInclude Include="optimization\ICP.hpp">
       <Filter>Optimization</Filter>
     </ClInclude>
-    <ClInclude Include="optimization\CeresOptimizationProblem.hpp">
+    <ClInclude Include="NearestNeighbor.hpp">
       <Filter>Optimization</Filter>
     </ClInclude>
     <ClInclude Include="Structs.hpp" />

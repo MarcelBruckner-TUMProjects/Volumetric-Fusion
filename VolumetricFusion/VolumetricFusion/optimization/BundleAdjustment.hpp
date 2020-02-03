@@ -23,113 +23,171 @@
 #include "../CaptureDevice.hpp"
 
 namespace vc::optimization {
-    class BundleAdjustment : public virtual CeresOptimizationProblem {
-    
+    class BundleAdjustment : virtual public CeresOptimizationProblem {
+    protected:
+
+        int iterationsSinceImprovement = 0;
+        int maxIterationsSinceImprovement = 5;
+
+        Eigen::Matrix4d getTransformation(int from , int to) {
+            if (needsRecalculation) {
+                calculateTransformations();
+            }
+            return OptimizationProblem::getCurrentTransformation(from, to);
+        }
+
+        //void randomize() {
+        //    Eigen::Vector3d randomTranslation = Eigen::Vector3d::Random();
+        //    translations[1][0] += (double)randomTranslation[0];
+        //    translations[1][1] += (double)randomTranslation[1];
+        //    translations[1][2] += (double)randomTranslation[2];
+
+        //    Eigen::Vector3d randomRotation = Eigen::Vector3d::Random();
+        //    randomRotation.normalize();
+        //    double angle = std::rand() % 360;
+        //    randomRotation *= glm::radians(angle);
+        //    rotations[1][0] += (double)randomRotation[0];
+        //    rotations[1][1] += (double)randomRotation[1];
+        //    rotations[1][2] += (double)randomRotation[2];
+
+        //    needsRecalculation = true;
+        //}
+
     public:
 
-        BundleAdjustment(bool verbose = false, bool withSleep = false) : CeresOptimizationProblem(verbose, withSleep) {
-            for (int i = 0; i < 4; i++)
-            {
-                for (int j = 0; j < 4; j++)
-                {
-                    translations[i].push_back(std::vector<double> { 0.0, 0.0, 0.0 });
-                    rotations[i].push_back(std::vector<double> { 0.0, 2 * M_PI, 0.0 });
-                    scales[i].push_back(std::vector<double> {1.0, 1.0, 1.0  });
-                }
-            }
-        }
+		BundleAdjustment(bool verbose = false, bool withSleep = false) : CeresOptimizationProblem(verbose, withSleep) {
+			translations = std::vector<std::vector<std::vector<double>>>(4);
+			rotations = std::vector<std::vector<std::vector<double>>>(4);
+			scales = std::vector<std::vector<std::vector<double>>>(4);
+			for (int i = 0; i < 4; i++)
+			{
+				for (int j = 0; j < 4; j++)
+				{
+					translations[i].push_back(std::vector<double> { 0.0, 0.0, 0.0 });
+					rotations[i].push_back(std::vector<double> { 0.0, 2 * M_PI, 0.0 });
+					scales[i].push_back(std::vector<double> {1.0, 1.0, 1.0  });
+				}
+			}
+		}
         
-        void solveProblem(ceres::Problem* problem) {
-            std::vector<Eigen::Matrix4d> initialTransformations(OptimizationProblem::bestTransformations);
-            
-            ceres::Solver::Options options;
-            options.num_threads = 16;
-            options.linear_solver_type = ceres::DENSE_QR;
-            options.minimizer_progress_to_stdout = verbose;
-            options.max_num_iterations = 20;
-            options.update_state_every_iteration = true;
-            //options.callbacks.emplace_back(new LoggingCallback(this));
-            ceres::Solver::Summary summary;
-            ceres::Solve(options, problem, &summary);
-            
-            calculateTransformations();
+		void solveProblem(ceres::Problem* problem) {
+			std::vector<Eigen::Matrix4d> initialTransformations = bestTransformations;
 
-    //        //if (verbose) {
-    //            //std::cout << summary.FullReport() << "\n";
-				//std::cout << "Bundle Adjustment" << std::endl;
-    //            //std::cout << vc::utils::toString("Initial", initialTransformations);
-    //            std::cout << vc::utils::toString("Final", bestTransformations);
-    //            std::cout << std::endl;
-    //        //}
-        }
+			ceres::Solver::Options options;
+			options.num_threads = 16;
+			options.linear_solver_type = ceres::DENSE_QR;
+			options.minimizer_progress_to_stdout = verbose;
+			options.max_num_iterations = 20;
+			options.update_state_every_iteration = true;
+			//options.callbacks.emplace_back(new LoggingCallback(this));
+			ceres::Solver::Summary summary;
+			ceres::Solve(options, problem, &summary);
 
-		//solvePointCorrespondenceError
-        bool solveErrorFunction() {
+			calculateTransformations();
 
-            // Create residuals for each observation in the bundle adjustment problem. The
-            // parameters for cameras and points are added automatically.
-            ceres::Problem problem;
-            for (int from = 0; from < characteristicPoints.size(); from++)
-            {
-                ACharacteristicPoints fromPoints = characteristicPoints[from];
-                
-                for (int to = 0; to < characteristicPoints.size(); to++) {
-                    if (from == to) {
-                        continue;
-                    }
+			if (verbose) {
+				std::cout << summary.FullReport() << "\n";
+				std::cout << vc::utils::toString("Initial", initialTransformations);
+				std::cout << vc::utils::toString("Final", bestTransformations);
 
-                    ACharacteristicPoints toPoints = characteristicPoints[to];
-                    std::vector<int> matchingHashes = vc::utils::findOverlap(fromPoints.getHashes(verbose), toPoints.getHashes(verbose));
-                    
-                    auto& filteredFromPoints = fromPoints.getFilteredPoints(matchingHashes, verbose);
-                    auto& filteredToPoints = toPoints.getFilteredPoints(matchingHashes, verbose);
+				std::cout << std::endl;
+			}
+		}
 
-                    for (auto& hash : matchingHashes)
-                    {
-                        auto fromPoint = filteredFromPoints[hash];
-                        auto toPoint = filteredToPoints[hash];
+		bool isValid(Eigen::Vector4d point) {
+			for (int i = 0; i < 3; i++)
+			{
+				if (std::abs(point[i]) > 10e5) {
+					return false;
+				}
+			}
+			return true;
+		}
 
-                        if (!isValid(fromPoint) || !isValid(toPoint)) {
-                            continue;
-                        }
+		bool vc::optimization::OptimizationProblem::specific_optimize() {
+			if (!hasInitialization) {
+				initialize();
+				if (!hasInitialization) {
+					return false;
+				}
+			}
 
-                        ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
-                            hash, 
-                            fromPoint,
-                            toPoint,
-                            verbose
-                        );
-                        problem.AddResidualBlock(cost_function, NULL,
-                            translations[from][to].data(),
-                            rotations[from][to].data(),
-                            scales[from][to].data()
-                        );
-                    }
-                }
-            }
+			if (!solveErrorFunction()) {
+				return false;
+			}
 
-            solveProblem(&problem);
-            return true;
-        }
+			return true;
+		}
 
-        void initialize() {
-            vc::optimization::Procrustes procrustes = vc::optimization::Procrustes(verbose);
-            procrustes.characteristicPoints = characteristicPoints;
-            if (procrustes.optimizeOnPoints()) {
-                bestTransformations = procrustes.bestTransformations;
-                currentRotations = procrustes.currentRotations;
- 
-                currentTranslations = procrustes.currentTranslations;
-                //std::cout << vc::utils::toString(currentTranslations, "\n\n", "\n\n ******************************************************************* \n\n") << std::endl;
-                //std::cout << "\n\n ########################################################################## \n\n";
-                currentScales = procrustes.currentScales;
-                hasInitialization = true;
-                setup();
-            }
-            else {
+		// solvePointCorrespondenceError
+		bool solveErrorFunction() {
+			// Create residuals for each observation in the bundle adjustment problem. The
+			// parameters for cameras and points are added automatically.
+			ceres::Problem problem;
+			for (int from = 0; from < characteristicPoints.size(); from++)
+			{
+				ACharacteristicPoints fromPoints = characteristicPoints[from];
+
+				for (int to = 0; to < characteristicPoints.size(); to++) {
+					if (from == to) {
+						continue;
+					}
+
+					ACharacteristicPoints toPoints = characteristicPoints[to];
+					std::vector<size_t> matchingHashes = vc::utils::findOverlap(fromPoints.getHashes(verbose), toPoints.getHashes(verbose));
+
+					auto& filteredFromPoints = fromPoints.getFilteredPoints(matchingHashes, verbose);
+					auto& filteredToPoints = toPoints.getFilteredPoints(matchingHashes, verbose);
+
+					for (auto& hash : matchingHashes)
+					{
+						auto fromPoint = filteredFromPoints[hash];
+						auto toPoint = filteredToPoints[hash];
+
+						if (!isValid(fromPoint) || !isValid(toPoint)) {
+							continue;
+						}
+
+						ceres::CostFunction* cost_function = PointCorrespondenceError::Create(
+							hash,
+							fromPoint,
+							toPoint,
+							verbose
+						);
+						problem.AddResidualBlock(cost_function, NULL,
+							translations[from][to].data(),
+							rotations[from][to].data(),
+							scales[from][to].data()
+						);
+					}
+				}
+			}
+
+			solveProblem(&problem);
+			return true;
+		}
+
+
+		void initialize() {
+			vc::optimization::Procrustes procrustes = vc::optimization::Procrustes(verbose);
+			procrustes.characteristicPoints = characteristicPoints;
+			if (procrustes.optimizeOnPoints()) {
+				bestTransformations = procrustes.bestTransformations;
+				currentRotations = procrustes.currentRotations;
+
+				currentTranslations = procrustes.currentTranslations;
+				//std::cout << vc::utils::toString(currentTranslations, "\n\n", "\n\n ******************************************************************* \n\n") << std::endl;
+				//std::cout << "\n\n ########################################################################## \n\n";
+				currentScales = procrustes.currentScales;
+				//std::cout << vc::utils::toString(currentScales, "\n\n", "\n\n ******************************************************************* \n\n") << std::endl;
+				//std::cout << "\n\n ########################################################################## \n\n";
+				hasInitialization = true;
+				setup();
+			}
+			else {
 				hasInitialization = false;
-            }
-        }
+			}
+		}
     };
 
     class MockBundleAdjustment : public BundleAdjustment, public MockOptimizationProblem {

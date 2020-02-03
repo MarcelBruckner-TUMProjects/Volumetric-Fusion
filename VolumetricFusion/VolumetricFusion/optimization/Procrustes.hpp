@@ -180,10 +180,6 @@ namespace vc::optimization {
 
             return distance;
         }
-
-		bool solveErrorFunction() {
-			return true;
-		}
     };
 
     class MockProcrustes : public Procrustes, public MockOptimizationProblem {

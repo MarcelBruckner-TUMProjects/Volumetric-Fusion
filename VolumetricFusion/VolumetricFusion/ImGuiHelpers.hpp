@@ -120,7 +120,7 @@ namespace vc::imgui {
 	class PipelineGUI {
 	private:
 		std::shared_ptr<vc::capture::CaptureDevice> pipeline;
-	
+
 	public:
 		float alpha = 1.0f;
 
@@ -131,7 +131,7 @@ namespace vc::imgui {
 			ImGui::Text("Editable settings of pointclouds.");
 
 			ImGui::SliderFloat("Alpha", &alpha, 0.0f, 1.0f);
-			
+
 			ImGui::End();
 		}
 	};
@@ -145,8 +145,8 @@ namespace vc::imgui {
 		float rotationSpeed = 0.0f;
 		std::vector<float> alphas;
 
-		AllPipelinesGUI(std::vector<std::shared_ptr<vc::capture::CaptureDevice>>* pipelines) : 
-			pipelines(pipelines) 
+		AllPipelinesGUI(std::vector<std::shared_ptr<vc::capture::CaptureDevice>>* pipelines) :
+			pipelines(pipelines)
 		{
 			for (int i = 0; i < 4; i++)
 			{
@@ -280,19 +280,19 @@ namespace vc::imgui {
 	ImGuiIO init(GLFWwindow* window, int window_width, int window_height) {
 		static bool isInitialized = false;
 
-			ImGui::CreateContext();
-			ImGuiIO& io = ImGui::GetIO(); (void)io;
-			io.DisplaySize = ImVec2(window_width, window_height);
-			unsigned char* pixels;
-			int width = 100;
-			int height = 100;
-			io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-			ImGui_ImplGlfw_InitForOpenGL(window, true);
-			ImGui_ImplOpenGL3_Init(glsl_version);
+		ImGui::CreateContext();
+		ImGuiIO& io = ImGui::GetIO(); (void)io;
+		io.DisplaySize = ImVec2(window_width, window_height);
+		unsigned char* pixels;
+		int width = 100;
+		int height = 100;
+		io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+		ImGui_ImplGlfw_InitForOpenGL(window, true);
+		ImGui_ImplOpenGL3_Init(glsl_version);
 
-			ImGui::StyleColorsLight();
-			isInitialized = true;
-			return io;
+		ImGui::StyleColorsLight();
+		isInitialized = true;
+		return io;
 	}
 
 	float getFrameRate() {

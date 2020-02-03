@@ -40,7 +40,7 @@ namespace vc::capture {
 		std::shared_ptr < std::atomic_bool> calibrateCameras;
 
 		std::shared_ptr < std::thread> thread;
-		
+
 		rs2::device device;
 		int masterSlaveId = 0;
 
@@ -61,9 +61,9 @@ namespace vc::capture {
 			}
 		}
 
-		bool terminate() { 
+		bool terminate() {
 			stopThread();
-			try{
+			try {
 				this->pipeline->stop();
 				return true;
 			}
@@ -91,7 +91,7 @@ namespace vc::capture {
 			this->calibrateCameras->store(calibrate);
 		}
 
-		void renderColor(int pos_x,  int pos_y, const float aspect, const int viewport_width, const int viewport_height) {
+		void renderColor(int pos_x, int pos_y, const float aspect, const int viewport_width, const int viewport_height) {
 			if (data->filteredColorFrames) {
 				this->rendering->renderTexture(data->filteredColorFrames, pos_x, pos_y, aspect, viewport_width, viewport_height);
 			}
@@ -102,7 +102,7 @@ namespace vc::capture {
 				this->rendering->renderTexture(data->colorizedDepthFrames, pos_x, pos_y, aspect, viewport_width, viewport_height);
 			}
 		}
-		
+
 		void renderPointcloud(glm::mat4 model, glm::mat4 view, glm::mat4 projection,
 			Eigen::Matrix4d relativeTransformation, float alpha) {
 			if (data->filteredDepthFrames && data->filteredColorFrames) {
@@ -113,7 +113,7 @@ namespace vc::capture {
 
 		bool setResolutions(const std::vector<int> colorStream, const std::vector<int> depthStream, bool directResume = true) {
 			pauseThread();
-			try{
+			try {
 				this->pipeline->stop();
 			}
 			catch (rs2::error & e) {
@@ -155,7 +155,7 @@ namespace vc::capture {
 			this->thread = other.thread;
 		}
 
-		CaptureDevice(rs2::context context) : 
+		CaptureDevice(rs2::context context) :
 			rendering(std::make_shared<vc::rendering::Rendering>()),
 			data(std::make_shared<vc::data::Data>()),
 			pipeline(std::make_shared<rs2::pipeline>(context)),
