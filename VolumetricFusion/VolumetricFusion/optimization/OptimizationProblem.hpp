@@ -354,7 +354,7 @@ namespace vc::optimization {
 				return DBL_MAX;
 			}
 
-			std::vector<size_t> matchingHashes = vc::utils::findOverlap(
+			std::vector<int> matchingHashes = vc::utils::findOverlap(
 				characteristicPoints[from].getHashes(verbose), characteristicPoints[to].getHashes(verbose)
 			);
 

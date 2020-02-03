@@ -134,7 +134,7 @@ namespace vc::optimization {
 					}
 
 					ACharacteristicPoints toPoints = characteristicPoints[to];
-					std::vector<size_t> matchingHashes = vc::utils::findOverlap(fromPoints.getHashes(verbose), toPoints.getHashes(verbose));
+					std::vector<int> matchingHashes = vc::utils::findOverlap(fromPoints.getHashes(verbose), toPoints.getHashes(verbose));
 
 					auto& filteredFromPoints = fromPoints.getFilteredPoints(matchingHashes, verbose);
 					auto& filteredToPoints = toPoints.getFilteredPoints(matchingHashes, verbose);

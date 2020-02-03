@@ -92,7 +92,7 @@ double lastFrame = 0.0;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::CALIBRATED_POINTCLOUD);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
 //std::vector<vc::imgui::PipelineGUI> pipelineGuis;
 vc::imgui::AllPipelinesGUI* allPipelinesGui;
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
@@ -126,7 +126,7 @@ int main(int argc, char* argv[]) try {
 
 	google::InitGoogleLogging("Bundle Adjustment");
 	ceres::Solver::Summary summary;
-	folderSettings.recordingsFolder = "recordings/bundleAdjustmentTest/";
+	folderSettings.recordingsFolder = "recordings/allCameras/";
 
 	GLFWwindow* window = setupWindow();
 	   
