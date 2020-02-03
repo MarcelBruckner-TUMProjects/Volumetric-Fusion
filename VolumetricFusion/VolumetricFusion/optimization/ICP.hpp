@@ -22,6 +22,7 @@
 #include "PointCorrespondenceError.hpp"
 #include "ReprojectionError.hpp"
 #include "BundleAdjustment.hpp"
+#include "NearestNeighbor.hpp"
 #include <VolumetricFusion\CaptureDevice.hpp>
 
 namespace vc::optimization {

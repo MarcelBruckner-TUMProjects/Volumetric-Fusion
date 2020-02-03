@@ -86,6 +86,7 @@
     <ClInclude Include="optimization\CeresOptimizationProblem.hpp" />
     <ClInclude Include="optimization\CharacteristicPoints.hpp" />
     <ClInclude Include="optimization\ICP.hpp" />
+    <ClInclude Include="optimization\NearestNeighbor.hpp" />
     <ClInclude Include="optimization\OptimizationProblem.hpp" />
     <ClInclude Include="optimization\PointCorrespondenceError.hpp" />
     <ClInclude Include="optimization\Procrustes.hpp" />

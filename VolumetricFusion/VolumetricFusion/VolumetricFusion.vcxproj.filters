@@ -100,6 +100,9 @@
       <Filter>Optimization</Filter>
     </ClInclude>
     <ClInclude Include="Structs.hpp" />
+    <ClInclude Include="optimization\NearestNeighbor.hpp">
+      <Filter>Optimization</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
