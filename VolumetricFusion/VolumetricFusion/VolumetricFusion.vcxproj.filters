@@ -190,5 +190,8 @@
     <Filter Include="ImGui">
       <UniqueIdentifier>{b19f7266-a1c9-4945-a6ae-8d3a3f837cfd}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Filter">
+      <UniqueIdentifier>{9b7f3e8e-ccd7-4f3c-b515-f597e8fedbf0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>
