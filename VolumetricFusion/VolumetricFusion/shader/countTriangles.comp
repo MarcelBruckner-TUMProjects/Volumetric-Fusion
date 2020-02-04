@@ -43,7 +43,7 @@ vec3 unhash(uint hash){
 }
 
 int hashFunc(vec3 pos){
-    return int(pos.x + pos.y * sizeNormalized.x + pos.z * sizeNormalized.x * sizeNormalized.z); 
+    return int(pos.x + pos.y * sizeNormalized.x + pos.z * sizeNormalized.x * sizeNormalized.y); 
 }
 
 int[8] getHashes(vec3 pos){
