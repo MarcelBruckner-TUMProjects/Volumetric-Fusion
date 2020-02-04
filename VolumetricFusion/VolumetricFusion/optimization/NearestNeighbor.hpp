@@ -16,8 +16,8 @@ public:
 		m_maxDistance = maxDistance;
 	}
 
-	virtual void buildIndex(const std::vector<Eigen::Vector3f>& targetPoints) = 0;
-	virtual std::vector<Match> queryMatches(const std::vector<Eigen::Vector3f>& transformedPoints) = 0;
+	virtual void buildIndex(const std::vector<Eigen::Vector3d>& targetPoints) = 0;
+	virtual std::vector<Match> queryMatches(const std::vector<Eigen::Vector3d>& transformedPoints) = 0;
 
 protected:
 	float m_maxDistance;
@@ -32,11 +32,11 @@ class NearestNeighborSearchBruteForce : public NearestNeighborSearch {
 public:
 	NearestNeighborSearchBruteForce() : NearestNeighborSearch() {}
 
-	void buildIndex(const std::vector<Eigen::Vector3f>& targetPoints) {
+	void buildIndex(const std::vector<Eigen::Vector3d>& targetPoints) {
 		m_points = targetPoints;
 	}
 
-	std::vector<Match> queryMatches(const std::vector<Eigen::Vector3f>& transformedPoints) {
+	std::vector<Match> queryMatches(const std::vector<Eigen::Vector3d>& transformedPoints) {
 		const unsigned nMatches = transformedPoints.size();
 		std::vector<Match> matches(nMatches);
 		const unsigned nTargetPoints = m_points.size();
@@ -52,9 +52,9 @@ public:
 	}
 
 private:
-	std::vector<Eigen::Vector3f> m_points;
+	std::vector<Eigen::Vector3d> m_points;
 
-	Match getClosestPoint(const Eigen::Vector3f& p) {
+	Match getClosestPoint(const Eigen::Vector3d& p) {
 		int idx = -1;
 
 		float minDist = std::numeric_limits<float>::max();
@@ -95,7 +95,7 @@ public:
 		}
 	}
 
-	void buildIndex(const std::vector<Eigen::Vector3f>& targetPoints) {
+	void buildIndex(const std::vector<Eigen::Vector3d>& targetPoints) {
 		std::cout << "Initializing FLANN index with " << targetPoints.size() << " points." << std::endl;
 
 		// FLANN requires that all the points be flat. Therefore we copy the points to a separate flat array.
@@ -115,7 +115,7 @@ public:
 		std::cout << "FLANN index created." << std::endl;
 	}
 
-	std::vector<Match> queryMatches(const std::vector<Eigen::Vector3f>& transformedPoints) {
+	std::vector<Match> queryMatches(const std::vector<Eigen::Vector3d>& transformedPoints) {
 		if (!m_index) {
 			std::cout << "FLANN index needs to be build before querying any matches." << std::endl;
 			return {};
@@ -135,7 +135,7 @@ public:
 
 		// Do a knn search, searching for 1 nearest point and using 16 checks.
 		flann::SearchParams searchParams{ 16 };
-		searchParams.cores = 0;
+		searchParams.cores = 8;
 		m_index->knnSearch(query, indices, distances, 1, searchParams);
 
 		// Filter the matches.

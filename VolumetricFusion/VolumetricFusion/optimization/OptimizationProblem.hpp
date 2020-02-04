@@ -50,6 +50,7 @@ namespace vc::optimization {
 		bool verbose = false;
 
 		int numberOfPipelines = 0;
+		std::vector<std::shared_ptr<vc::capture::CaptureDevice>> pipelines;
 
 		std::vector<CharacteristicPointsRenderer> characteristicPointsRenderers;
 
@@ -251,6 +252,7 @@ namespace vc::optimization {
 			}
 
 			numberOfPipelines = pipelines.size();
+			this->pipelines = pipelines;
 
 			getCharacteristicPoints(pipelines);
 			return optimizeOnPoints();

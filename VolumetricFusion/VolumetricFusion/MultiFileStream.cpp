@@ -51,6 +51,7 @@ using namespace vc::enums;
 #include "optimization/optimizationProblem.hpp"
 #include "optimization/BundleAdjustment.hpp"
 #include "optimization/Procrustes.hpp"
+#include "optimization/ICP.hpp"
 #include "glog/logging.h"
 
 #pragma endregion
@@ -110,7 +111,7 @@ std::atomic_bool calibrateCameras = false;
 std::atomic_bool renderCoordinateSystem = false;
 
 vc::imgui::OptimizationProblemGUI* optimizationProblemGUI;
-vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::BundleAdjustment();
+vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::ICP();
 //vc::optimization::OptimizationProblem* optimizationProblem = new vc::optimization::Procrustes(true);
 vc::imgui::ProgramGUI* programGui;
 

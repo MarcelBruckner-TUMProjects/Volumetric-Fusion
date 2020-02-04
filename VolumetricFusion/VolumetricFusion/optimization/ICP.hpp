@@ -24,6 +24,8 @@
 #include "BundleAdjustment.hpp"
 #include "NearestNeighbor.hpp"
 #include <VolumetricFusion\CaptureDevice.hpp>
+#include "../../../include/librealsense2/hpp/rs_processing.hpp"
+#include "../../../include/librealsense2/hpp/rs_pipeline.hpp"
 
 namespace vc::optimization {
 
@@ -95,36 +97,36 @@ namespace vc::optimization {
 			return m_array;
 		}
 
-		/**
-		 * Converts the pose increment with rotation in SO3 notation and translation as 3D vector into
-		 * transformation 4x4 matrix.
-		 */
-		static Eigen::Matrix4d convertToMatrix(const PoseIncrement<double>& poseIncrement) {
-			// pose[0,1,2] is angle-axis rotation.
-			// pose[3,4,5] is translation.
-			double* pose = poseIncrement.getData();
-			double* scale = pose;
-			double* rotation = pose + 3;
-			double* translation = pose + 6;
+		///**
+		// * Converts the pose increment with rotation in SO3 notation and translation as 3D vector into
+		// * transformation 4x4 matrix.
+		// */
+		//static Eigen::Matrix4d convertToMatrix(const PoseIncrement<double>& poseIncrement) {
+		//	// pose[0,1,2] is angle-axis rotation.
+		//	// pose[3,4,5] is translation.
+		//	double* pose = poseIncrement.getData();
+		//	double* scale = pose;
+		//	double* rotation = pose + 3;
+		//	double* translation = pose + 6;
 
-			// Convert the rotation from SO3 to matrix notation (with column-major storage).
-			double rotationMatrix[9];
-			ceres::AngleAxisToRotationMatrix(rotation, rotationMatrix);
+		//	// Convert the rotation from SO3 to matrix notation (with column-major storage).
+		//	double rotationMatrix[9];
+		//	ceres::AngleAxisToRotationMatrix(rotation, rotationMatrix);
 
-			Eigen::Matrix4d scaleMatrix = Eigen::Matrix4d::Identity();
-			scaleMatrix(0, 0) = double(scale[0]);
-			scaleMatrix(1, 1) = double(scale[1]);
-			scaleMatrix(2, 2) = double(scale[2]);
+		//	Eigen::Matrix4d scaleMatrix = Eigen::Matrix4d::Identity();
+		//	scaleMatrix(0, 0) = double(scale[0]);
+		//	scaleMatrix(1, 1) = double(scale[1]);
+		//	scaleMatrix(2, 2) = double(scale[2]);
 
-			// Create the 4x4 transformation matrix.
-			Eigen::Matrix4d matrix;
-			matrix.setIdentity();
-			matrix(0, 0) = double(rotationMatrix[0]);	matrix(0, 1) = double(rotationMatrix[3]);	matrix(0, 2) = double(rotationMatrix[6]);	matrix(0, 3) = double(translation[0]);
-			matrix(1, 0) = double(rotationMatrix[1]);	matrix(1, 1) = double(rotationMatrix[4]);	matrix(1, 2) = double(rotationMatrix[7]);	matrix(1, 3) = double(translation[1]);
-			matrix(2, 0) = double(rotationMatrix[2]);	matrix(2, 1) = double(rotationMatrix[5]);	matrix(2, 2) = double(rotationMatrix[8]);	matrix(2, 3) = double(translation[2]);
+		//	// Create the 4x4 transformation matrix.
+		//	Eigen::Matrix4d matrix;
+		//	matrix.setIdentity();
+		//	matrix(0, 0) = double(rotationMatrix[0]);	matrix(0, 1) = double(rotationMatrix[3]);	matrix(0, 2) = double(rotationMatrix[6]);	matrix(0, 3) = double(translation[0]);
+		//	matrix(1, 0) = double(rotationMatrix[1]);	matrix(1, 1) = double(rotationMatrix[4]);	matrix(1, 2) = double(rotationMatrix[7]);	matrix(1, 3) = double(translation[1]);
+		//	matrix(2, 0) = double(rotationMatrix[2]);	matrix(2, 1) = double(rotationMatrix[5]);	matrix(2, 2) = double(rotationMatrix[8]);	matrix(2, 3) = double(translation[2]);
 
-			return matrix * scaleMatrix;
-		}
+		//	return matrix * scaleMatrix;
+		//}
 
 	private:
 		T* m_array;
@@ -134,7 +136,8 @@ namespace vc::optimization {
 
 	public:
 		ICP(bool verbose = false, long sleepDuration = -1l) 
-			:CeresOptimizationProblem(verbose, sleepDuration)
+			:CeresOptimizationProblem(verbose, sleepDuration),
+			m_nearestNeighborSearch{ std::make_unique<NearestNeighborSearchFlann>() }
 			//,m_nIterations{ 50 }
 		{
 			translations = std::vector<std::vector<std::vector<double>>>(4);
@@ -155,16 +158,68 @@ namespace vc::optimization {
 		//	m_nIterations = nIterations;
 		//}
 
-		std::map<unsigned long long, Eigen::Vector4d> transformPoints(std::map<unsigned long long, Eigen::Vector4d>& sourcePoints, std::vector<unsigned long long>& matchingHashes, Eigen::Matrix4d& pose) {
+		std::vector<Eigen::Vector3d> transformPoints(std::vector<Eigen::Vector3d> sourcePoints, Eigen::Matrix4d& pose) {
 			
-			std::map<unsigned long long, Eigen::Vector4d>& transformedPoints = std::map<unsigned long long, Eigen::Vector4d>();
-			
-			for(auto& hash : matchingHashes) {
-				Eigen::Vector4d point = pose * sourcePoints[hash];
-				transformedPoints[hash] = point;
+			std::vector<Eigen::Vector3d> transformedPoints;
+			transformedPoints.reserve(sourcePoints.size());
+
+			for(const auto& point : sourcePoints) {
+				Eigen::Vector4d homogeneousPoint(point(0), point(1), point(2), 1.0);
+
+				Eigen::Vector4d transformedPoint = pose * homogeneousPoint;
+
+				Eigen::Vector3d returnPoint(transformedPoint(0), transformedPoint(1), transformedPoint(2));
+
+				transformedPoints.push_back(returnPoint);
 			}
 
 			return transformedPoints;
+		}
+
+		//void savePLY() {
+
+		//	//pipelines[0]->data->pointclouds;
+		//	//std::shared_ptr<rs2::pipeline> pipe = pipelines[0]->pipeline->;
+		//	//pipelines[0]->data->filteredColorFrames
+		//	
+		//	
+
+		//	
+		//	//pointcloud pc = rs2::context().create_pointcloud();
+		//	//rs2::points points;
+
+		//	//std::cout << pipelines[0]->data->filteredDepthFrames.as<rs2::video_frame>().get_data_size() << std::endl;
+		//	//std::cout << pipelines[0]->data->filteredDepthFrames.get_data() << std::endl;
+
+
+		//	
+		//	//points.export_to_ply("temp.ply", color);// << std::endl;
+		//	//pipelines[0]->data->points.export_to_ply("temp.ply", pipelines[0]->data->filteredColorFrames.as<rs2::video_frame>());// << std::endl;
+		//	//std::cout << pipelines[0]->data->points.get_vertices() << std::endl;
+
+		//	//auto frames = pipelines[0]->pipeline->wait_for_frames();
+		//	//auto depth = frames.get_depth_frame();
+		//	//auto color = frames.get_color_frame();
+
+		//	//std::cout << depth.get_height() << std::endl;
+		//	//std::cout << depth.get_data() << std::endl;
+		//}
+
+
+		bool vc::optimization::OptimizationProblem::specific_optimize() {
+
+			if (!hasInitialization) {
+				initialize();
+				if (!hasInitialization) {
+					return false;
+				}
+			}
+
+			if (!solveErrorFunction()) {
+				return false;
+			}
+
+			return true;
 		}
 
 		void initialize() {
@@ -183,13 +238,41 @@ namespace vc::optimization {
 			}
 		}
 
+		std::vector<Eigen::Vector3d> convertToEigenVector(rs2::points points) {
+			
+			//int points_size = points.size();
+			int points_size = 1000;
+
+			std::vector<Eigen::Vector3d> eigen_points;
+			eigen_points.reserve(points_size);
+
+			auto vertices = points.get_vertices();
+
+			for (int i = 0; i < points_size; i++) {
+				Eigen::Vector3d point; 
+				point << vertices[i].x, vertices[i].y, vertices[i].z;
+				
+				eigen_points.push_back(point);
+			}
+
+			return eigen_points;
+
+		}
+
 		bool solveErrorFunction() {
 
 			std::vector<Eigen::Matrix4d> initialTransformations(OptimizationProblem::bestTransformations);
 
 			for (int from = 0; from < characteristicPoints.size(); from++) {
 				
-				ACharacteristicPoints fromPoints = characteristicPoints[from];
+				//ACharacteristicPoints fromPoints = characteristicPoints[from];
+
+				auto fromDepth = pipelines[from]->data->filteredDepthFrames.as<rs2::video_frame>();
+				auto fromColor = pipelines[from]->data->filteredColorFrames.as<rs2::video_frame>();
+				
+				pipelines[from]->data->pointclouds.map_to(fromColor);
+				auto fromPoints = pipelines[from]->data->pointclouds.calculate(fromDepth);
+				//auto fromVertices = fromPoints.get_vertices();
 
 				for (int to = 0; to < characteristicPoints.size(); to++) {
 
@@ -197,30 +280,32 @@ namespace vc::optimization {
 						continue;
 					}
 
-					ACharacteristicPoints toPoints = characteristicPoints[to];
+					//ACharacteristicPoints toPoints = characteristicPoints[to];
 
-					Eigen::Matrix4d pose = estimatePose(toPoints, fromPoints, Eigen::Matrix4d::Identity());
+					auto toDepth = pipelines[to]->data->filteredDepthFrames.as<rs2::video_frame>();
+					auto toColor = pipelines[to]->data->filteredColorFrames.as<rs2::video_frame>();
 
-					Eigen::Matrix3d rotationMatrix = pose.block<3, 3>(0, 0);
-					Eigen::Vector3d translation = pose.block<3, 1>(0, 3);
+					pipelines[to]->data->pointclouds.map_to(toColor);
+					auto toPoints = pipelines[to]->data->pointclouds.calculate(toDepth);
+					//auto toVertices = toPoints.get_vertices();
 
-					double rotation[9];
-					double angle_axis[3];
+					double pose[9];
+
+					std::vector<Eigen::Vector3d> toPointsEigen = convertToEigenVector(toPoints);
+					std::vector<Eigen::Vector3d> fromPointsEigen = convertToEigenVector(fromPoints);
+
+					estimatePose(toPointsEigen, fromPointsEigen, Eigen::Matrix4d::Identity(), pose);
 
 					for (int i = 0; i < 3; i++) {
-						for (int j = 0; j < 3; j++) {
-							rotation[i * 3 + j] = rotationMatrix(j, i);
-						}
+						scales[from][to].push_back(pose[i]);
 					}
 
-					ceres::RotationMatrixToAngleAxis(rotation, angle_axis);
-
 					for (int i = 0; i < 3; i++) {
-						rotations[from][to].push_back(angle_axis[i]);
+						rotations[from][to].push_back(pose[i+3]);
 					}
 
 					for (int i = 0; i < 3; i++) {
-						translations[from][to].push_back(translation(i));
+						translations[from][to].push_back(pose[i+6]);
 					}
 				}
 			}
@@ -235,16 +320,12 @@ namespace vc::optimization {
 			return true;
 		}
 
-		Eigen::Matrix4d estimatePose(ACharacteristicPoints& source, ACharacteristicPoints& target, Eigen::Matrix4d initialPose) {
+		void estimatePose(std::vector<Eigen::Vector3d>& source, std::vector<Eigen::Vector3d>& target, Eigen::Matrix4d initialPose, double *incrementArray) {
 
-			std::vector<unsigned long long> matchingHashes = vc::utils::findOverlap(source.getHashes(verbose), target.getHashes(verbose));
-
-			auto& sourcePoints = source.getFilteredPoints(matchingHashes, verbose);
-			auto& targetPoints = target.getFilteredPoints(matchingHashes, verbose);
+			m_nearestNeighborSearch->buildIndex(target);
 
 			Eigen::Matrix4d estimatedPose = initialPose;
 
-			double incrementArray[6];
 			auto poseIncrement = PoseIncrement<double>(incrementArray);
 			poseIncrement.setZero();
 
@@ -252,10 +333,18 @@ namespace vc::optimization {
 
 				//std::cout << "Iteration: " << i << std::endl;
 
-				auto transformedPoints = transformPoints(sourcePoints, matchingHashes, estimatedPose);
+				std::cout << "Matching points ..." << std::endl;
+				clock_t begin = clock();
+				
+				auto transformedPoints = transformPoints(source, estimatedPose);
+				auto matches = m_nearestNeighborSearch->queryMatches(transformedPoints);
+
+				clock_t end = clock();
+				double elapsedSecs = double(end - begin) / CLOCKS_PER_SEC;
+				std::cout << "FLANN query matches completed in " << elapsedSecs << " seconds." << std::endl;
 
 				ceres::Problem problem;
-				prepareConstraints(transformedPoints, targetPoints, matchingHashes, poseIncrement, problem);
+				prepareConstraints(transformedPoints, target, matches, poseIncrement, problem);
 
 				// Configure options for the solver.
 				ceres::Solver::Options options;
@@ -267,20 +356,22 @@ namespace vc::optimization {
 				//std::cout << summary.FullReport() << std::endl;
 
 				// Update the current pose estimate (we always update the pose from the left, using left-increment notation).
-				Eigen::Matrix4d matrix = PoseIncrement<double>::convertToMatrix(poseIncrement);
-				estimatedPose = PoseIncrement<double>::convertToMatrix(poseIncrement) * estimatedPose;
+				//Eigen::Matrix4d matrix = PoseIncrement<double>::convertToMatrix(poseIncrement);
+				//estimatedPose = PoseIncrement<double>::convertToMatrix(poseIncrement) * estimatedPose;
+				incrementArray = poseIncrement.getData();
 				poseIncrement.setZero();
 
 				//std::cout << "Optimization iteration done." << std::endl;
 			//}
 
 			//std::cout << "Pose: " << estimatedPose << std::endl << std::endl;
-
-			return estimatedPose;
+			
+			
 		}
 
 	private:
 		//unsigned m_nIterations;
+		std::unique_ptr<NearestNeighborSearch> m_nearestNeighborSearch;
 		
 		void configureSolver(ceres::Solver::Options& options) {
 			// Ceres options.
@@ -293,44 +384,22 @@ namespace vc::optimization {
 			options.num_threads = 8;
 		}
 
-		void prepareConstraints(std::map<unsigned long long, Eigen::Vector4d>& sourcePoints, std::map<unsigned long long, Eigen::Vector4d>& targetPoints, std::vector<unsigned long long>& matchingHashes, const PoseIncrement<double>& poseIncrement, ceres::Problem& problem) const {
+		void prepareConstraints(std::vector<Eigen::Vector3d>& sourcePoints, std::vector<Eigen::Vector3d>& targetPoints, const std::vector<Match> matches, const PoseIncrement<double>& poseIncrement, ceres::Problem& problem) const {
 			
-			//const unsigned nPoints = sourcePoints.size();
+			const unsigned nPoints = sourcePoints.size();
 
-			for (auto& hash : matchingHashes)
-			{
-				auto relativePoint = sourcePoints[hash];
-				auto basePoint = targetPoints[hash];
+			for (unsigned i = 0; i < nPoints; ++i) {
+				const auto match = matches[i];
+				if (match.idx >= 0) {
+					const auto& sourcePoint = sourcePoints[i];
+					const auto& targetPoint = targetPoints[match.idx];
 
-				bool valid = true;
-				for (int i = 0; i < 3; i++)
-				{
-					if (std::abs(relativePoint[i]) > 10e5) {
-						valid = false;
-						break;
-					}
+					//std::cout << "Point source: " << relativePoint(0) << " " << relativePoint(1) << " " << relativePoint(2) << std::endl;
+					//std::cout << "Point target: " << basePoint(0) << " " << basePoint(1) << " " << basePoint(2) << std::endl << std::endl;
+
+					ceres::CostFunction * cf = vc::optimization::PointToPointConstraint::create(sourcePoint, targetPoint, 0.5f);
+					problem.AddResidualBlock(cf, nullptr, poseIncrement.getData());
 				}
-				if (!valid) {
-					continue;
-				}
-
-				for (int i = 0; i < 3; i++)
-				{
-					if (std::abs(basePoint[i]) > 10e5) {
-						valid = false;
-						break;
-					}
-				}
-
-				if (!valid) {
-					continue;
-				}
-
-				//std::cout << "Point source: " << relativePoint(0) << " " << relativePoint(1) << " " << relativePoint(2) << std::endl;
-				//std::cout << "Point target: " << basePoint(0) << " " << basePoint(1) << " " << basePoint(2) << std::endl << std::endl;
-
-				ceres::CostFunction* cf = vc::optimization::PointToPointConstraint::create(relativePoint, basePoint, 0.5f);
-				problem.AddResidualBlock(cf, nullptr, poseIncrement.getData());
 			}
 		}
 
