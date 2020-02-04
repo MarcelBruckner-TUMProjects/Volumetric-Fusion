@@ -5,6 +5,7 @@
 #include <atomic>
 #include <string>
 #include <memory>
+#include <thread>
 #include "CaptureDevice.hpp"
 #include "Data.hpp"
 #include "optimization/OptimizationProblem.hpp"
@@ -225,6 +226,8 @@ namespace vc::imgui {
 		float truncationDistance;
 		bool wireframeMode = false;
 		bool useNormals = true;
+
+		bool isSaving = false;
 		
 		FusionGUI(vc::fusion::Voxelgrid* voxelgrid) :
 			voxelgrid(voxelgrid),
@@ -277,10 +280,22 @@ namespace vc::imgui {
 
 			ImGui::Separator();
 			
-			if (ImGui::Button("Save PLY")) {
-				voxelgrid->exportToPly();
+			if (!isSaving) {
+				if (ImGui::Button("Save PLY")) {
+					isSaving = true;
+					voxelgrid->copyTrianglesToCPU();
+					auto saveThread = std::thread([this]() {
+						voxelgrid->exportToPly();
+						isSaving = false;
+					});
+					saveThread.detach();
+				}
 			}
-
+			else {
+				ImGui::Text("Saving to PLY.");
+				ImGui::Text("This may take a moment!");
+			}
+			
 			ImGui::End();
 		}
 	};

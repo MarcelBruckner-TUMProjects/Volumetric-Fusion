@@ -64,6 +64,7 @@ namespace vc::fusion {
 
 		int num_gridPoints;
 		GLuint numTriangles = 0;
+		int numberOfTrianglesForExport = 0;
 
 		int hashFunc(int x, int y, int z) {
 			//std::cout << z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x << std::endl;
@@ -549,19 +550,31 @@ namespace vc::fusion {
 			return true;
 		}
 
-		void exportToPly() {
+		void copyTrianglesToCPU() {
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleBuffer);
 			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Triangle) * numTriangles, triangles.data());
-			
+
+			numberOfTrianglesForExport = numTriangles;
+		}
+
+		void exportToPly() {
+			std::stringstream filename;
+			filename << "plys/";
+			char mbstr[100];
+			std::time_t t = std::time(NULL);
+			std::strftime(mbstr, 100, "%F-%H-%M-%S", std::localtime(&t));
+			filename << mbstr;
+			filename << ".ply";
+
 			std::ofstream ply_file;
-			ply_file.open("plys/marching_cube.ply");
+			ply_file.open(filename.str());
 
 			ply_file << "ply\n";
 			ply_file << "format ascii 1.0\n";
 
 			ply_file << "comment Test comment\n";
 
-			ply_file << "element vertex " << triangles.size() * 3 << "\n";
+			ply_file << "element vertex " << numberOfTrianglesForExport * 3 << "\n";
 			ply_file << "property float x\n";
 			ply_file << "property float y\n";
 			ply_file << "property float z\n";
@@ -571,12 +584,12 @@ namespace vc::fusion {
 			ply_file << "property uchar blue\n";
 
 
-			ply_file << "element face " << triangles.size() << "\n";
+			ply_file << "element face " << numberOfTrianglesForExport << "\n";
 			ply_file << "property list uchar int vertex_indices\n";
 			ply_file << "end_header\n";
 
-			int i = 0;
-			for (auto triangle : triangles) {
+			for (int i = 0; i < numberOfTrianglesForExport; i++) {
+				auto triangle = triangles[i];
 				if (vc::utils::isValid(triangle.pos0) && vc::utils::isValid(triangle.pos1) && vc::utils::isValid(triangle.pos2)) {
 					for (int i = 0; i < 3; i++)
 					{
@@ -609,11 +622,9 @@ namespace vc::fusion {
 				else {
 					std::cout << "error with triangle " << i << std::endl;
 				}
-				i++;
-
 			}
 
-			for (int i = 0; i < triangles.size(); i++) {
+			for (int i = 0; i < numberOfTrianglesForExport; i++) {
 				ply_file << 3 << " " << i * 3 + 0 << " " << i * 3 + 1 << " " << i * 3 + 2 << "\n";
 			}
 
