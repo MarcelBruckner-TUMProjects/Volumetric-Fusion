@@ -92,7 +92,7 @@ double lastFrame = 0.0;
 // mouse
 bool mouseButtonDown[4] = { false, false, false, false };
 
-vc::settings::State state = vc::settings::State(CaptureState::STREAMING, RenderState::CALIBRATED_POINTCLOUD);
+vc::settings::State state = vc::settings::State(CaptureState::PLAYING, RenderState::CALIBRATED_POINTCLOUD);
 //std::vector<vc::imgui::PipelineGUI> pipelineGuis;
 vc::imgui::AllPipelinesGUI* allPipelinesGui;
 std::vector<std::shared_ptr<  vc::capture::CaptureDevice>> pipelines;
@@ -121,12 +121,17 @@ bool blockInput = false;
 float bg_color[3] = { 96.0 / 255, 96.0 / 255, 96.0 / 255 };
 
 int main(int argc, char* argv[]) try {	
-	//vc::processing::ChArUco::generateMarkers(std::vector<int>{6, 7, 8, 9 });
+	//std::vector<int> markerIds;
+	//for (size_t i = 0; i < 24; i++)
+	//{
+	//	markerIds.emplace_back(i);
+	//}
+	//vc::processing::ChArUco::generateMarkers(markerIds);
 	//return 0;
 
 	google::InitGoogleLogging("Bundle Adjustment");
 	ceres::Solver::Summary summary;
-	folderSettings.recordingsFolder = "recordings/bundleAdjustmentTest/";
+	folderSettings.recordingsFolder = "recordings/low_resolution_topdown/";
 
 	GLFWwindow* window = setupWindow();
 	   

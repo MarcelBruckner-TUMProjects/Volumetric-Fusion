@@ -56,7 +56,9 @@ namespace vc::optimization {
 
 
             if (matchingHashes.size() < 3) {
-                std::cerr << "At least 3 points are needed for Procrustes. Provided: " << matchingHashes.size() << std::endl;
+                if (verbose) {
+                    std::cerr << "At least 3 points are needed for Procrustes. Provided: " << matchingHashes.size() << std::endl;
+                }
 
                 *finalTranslation   = Eigen::Matrix4d::Identity();
                 *finalRotation      = Eigen::Matrix4d::Identity();

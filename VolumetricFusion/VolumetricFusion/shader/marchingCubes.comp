@@ -18,10 +18,13 @@ struct VtxData {
 struct TriData {
     vec4 pos0;
     vec4 color0;
+    vec4 normal0;
     vec4 pos1;
     vec4 color1;
+    vec4 normal1;
     vec4 pos2;
     vec4 color2;
+    vec4 normal2;
 };
 
 struct EdgeTableData {
@@ -218,12 +221,23 @@ void main(){
 			    triangles[t].pos0 = a.pos;
 			    triangles[t].pos1 = b.pos;
 			    triangles[t].pos2 = c.pos;
-			    triangles[t].color0 = vec4(a.color.xyz,1);
-			    triangles[t].color1 = vec4(b.color.xyz,1);
-			    triangles[t].color2 = vec4(c.color.xyz,1);
+
+                vec4 normal = vec4(normalize(cross(b.pos.xyz - a.pos.xyz, c.pos.xyz - a.pos.xyz)), 1);
+
+//                if(dot(normal.xyz, vec3(0,0,0)) > 0){
+//                    normal.xyz *= -1;
+//                }
+//
+			    triangles[t].color0 = vec4(a.color.xyz, 1);
+			    triangles[t].color1 = vec4(b.color.xyz, 1);
+			    triangles[t].color2 = vec4(c.color.xyz, 1);
 //			    triangles[t].color0 = vec4(1, 0, 0, 1);
 //			    triangles[t].color1 = vec4(0, 1, 0, 1);
 //			    triangles[t].color2 = vec4(0, 0, 1, 1);
+
+			    triangles[t].normal0 = normal;
+			    triangles[t].normal1 = normal;
+			    triangles[t].normal2 = normal;
             }
 	}
 }

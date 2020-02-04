@@ -30,6 +30,7 @@ namespace vc::capture {
 		std::shared_ptr < vc::rendering::Rendering> rendering;
 		std::shared_ptr < vc::processing::ChArUco> chArUco;
 		std::shared_ptr < vc::processing::EdgeEnhancement> edgeEnhancement;
+		std::shared_ptr < vc::processing::EdgeEnhancementOnColor> edgeEnhancementOnColor;
 		std::shared_ptr < vc::data::Data> data;
 		std::shared_ptr < vc::camera::PinholeCamera> rgb_camera;
 		std::shared_ptr < vc::camera::PinholeCamera> depth_camera;
@@ -44,7 +45,7 @@ namespace vc::capture {
 		rs2::device device;
 		int masterSlaveId = 0;
 
-		float thresholdDistance = 1.5f;
+		float thresholdDistance = 2.0f;
 
 		bool startPipeline() {
 			try {
@@ -145,6 +146,7 @@ namespace vc::capture {
 			this->data = other.data;
 			this->chArUco = other.chArUco;
 			this->edgeEnhancement = other.edgeEnhancement;
+			this->edgeEnhancementOnColor = other.edgeEnhancementOnColor;
 			this->pipeline = other.pipeline;
 			this->cfg = other.cfg;
 			this->rgb_camera = other.rgb_camera;
@@ -166,6 +168,7 @@ namespace vc::capture {
 			rgb_camera(std::make_shared<vc::camera::MockPinholeCamera>()),
 			chArUco(std::make_shared<vc::processing::ChArUco>()),
 			edgeEnhancement(std::make_shared<vc::processing::EdgeEnhancement>()),
+			edgeEnhancementOnColor(std::make_shared<vc::processing::EdgeEnhancementOnColor>()),
 			thread(std::make_shared<std::thread>(&vc::capture::CaptureDevice::captureThreadFunction, this))
 		{
 			//setCameras();
@@ -180,10 +183,13 @@ namespace vc::capture {
 			chArUco->startProcessing();
 			edgeEnhancement->depthScale = depth_camera->depthScale;
 			edgeEnhancement->startProcessing();
+			edgeEnhancementOnColor->startProcessing();
 			calibrateCameras->store(tmpCalibrate);
 		}
 
 		void captureThreadFunction() {
+			rs2::filter* thresholdFilter;
+
 			while (!stopped->load()) //While application is running
 			{
 				while (paused->load()) {
@@ -205,6 +211,9 @@ namespace vc::capture {
 					}
 
 					rs2::frame colorFrame = frameset.get_color_frame();
+					if (!colorFrame) { // Should not happen but if the pipeline is configured differently
+						return;       //  it might not provide depth and we don't want to crash
+					}
 
 					if (calibrateCameras->load()) {
 						// Send color frame for processing
@@ -212,21 +221,20 @@ namespace vc::capture {
 						// Wait for results
 						colorFrame = chArUco->processingQueues.wait_for_frame();
 					}
+
+					//edgeEnhancementOnColor->processingBlock->invoke(colorFrame);
+					//colorFrame = edgeEnhancementOnColor->processingQueues.wait_for_frame();
 					//else {
-					//	edgeEnhancement->processingBlock->invoke(depthFrame);
-					//	depthFrame = edgeEnhancement->processingQueues.wait_for_frame();
+						//edgeEnhancement->processingBlock->invoke(depthFrame);
+						//depthFrame = edgeEnhancement->processingQueues.wait_for_frame();
 					//}
 
 					data->frameId = frameset.get_color_frame().get_frame_number();
 					data->filteredColorFrames = colorFrame;
-
-					std::vector<rs2::filter*> filters;
-					filters.emplace_back(new rs2::threshold_filter(0.2, thresholdDistance)); 
-
-					for (auto&& filter : filters) {
-						depthFrame = filter->process(depthFrame);
-					}
-
+					
+					thresholdFilter = new rs2::threshold_filter(0.2, thresholdDistance);
+					depthFrame = thresholdFilter->process(depthFrame);
+					delete thresholdFilter;
 
 					// Push filtered & original data to their respective queues
 					data->filteredDepthFrames = depthFrame;

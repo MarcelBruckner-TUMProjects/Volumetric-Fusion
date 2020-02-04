@@ -18,10 +18,13 @@ namespace vc::fusion {
     struct Triangle {
         glm::vec4 pos0;
         glm::vec4 color0;
+        glm::vec4 normal0;
         glm::vec4 pos1;
         glm::vec4 color1;
+        glm::vec4 normal1;
         glm::vec4 pos2;
         glm::vec4 color2;
+        glm::vec4 normal2;
     };
     
     class GridCell {

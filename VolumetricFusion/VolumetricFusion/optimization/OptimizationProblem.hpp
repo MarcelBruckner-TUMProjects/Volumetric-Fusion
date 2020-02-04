@@ -325,7 +325,7 @@ namespace vc::optimization {
                         bestErrors[i] = error;
 
                         bestTransformations[i] = pathToMatrix(path);
-                        std::cout << vc::utils::toString("Transformation " + std::to_string(i), bestTransformations[i]);
+                        //std::cout << vc::utils::toString("Transformation " + std::to_string(i), bestTransformations[i]);
                     }
                 }
             }

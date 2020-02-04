@@ -176,7 +176,7 @@ namespace vc::imgui {
 				ImGui::SliderFloat(ss.str().c_str(), &alphas[i], 0.0f, 1.0f);
 				ss = std::stringstream();
 				ss << "Max distance" << "##" << i;
-				ImGui::SliderFloat(ss.str().c_str(), &(*pipelines)[i]->thresholdDistance, 0.2f, 3.0f);
+				ImGui::SliderFloat(ss.str().c_str(), &(*pipelines)[i]->thresholdDistance, 0.2f, 10.0f);
 			}
 
 			//ImGui::Separator();
@@ -224,7 +224,7 @@ namespace vc::imgui {
 		bool marchingCubes = false;
 		float truncationDistance;
 		bool wireframeMode = false;
-
+		
 		FusionGUI(vc::fusion::Voxelgrid* voxelgrid) :
 			voxelgrid(voxelgrid),
 			resolution(voxelgrid->resolution),
@@ -272,6 +272,12 @@ namespace vc::imgui {
 			ImGui::Checkbox("Marching cubes", &marchingCubes);
 			ImGui::Checkbox("Render mesh", &renderMesh);
 			ImGui::Checkbox("Wireframe mode", &wireframeMode);
+
+			ImGui::Separator();
+			
+			if (ImGui::Button("Save PLY")) {
+				voxelgrid->exportToPly();
+			}
 
 			ImGui::End();
 		}

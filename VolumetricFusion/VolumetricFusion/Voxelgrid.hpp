@@ -63,13 +63,14 @@ namespace vc::fusion {
 		//std::vector<float> weights;
 
 		int num_gridPoints;
+		GLuint numTriangles = 0;
 
 		int hashFunc(int x, int y, int z) {
 			//std::cout << z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x << std::endl;
 			return z * sizeNormalized[1] * sizeNormalized[0] + y * sizeNormalized[0] + x;
 		}
 
-		Voxelgrid(const float resolution = 0.05f, const Eigen::Vector3d size = Eigen::Vector3d(1.0, 1.0, 1.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 0.9), bool initializeShader = true)
+		Voxelgrid(const float resolution = 0.005f, const Eigen::Vector3d size = Eigen::Vector3d(1.0, 1.0, 1.0), const Eigen::Vector3d origin = Eigen::Vector3d(0.0, 0.0, 1.7), bool initializeShader = true)
 		{
 			if (initializeShader) {
 				initializeOpenGL();
@@ -205,10 +206,12 @@ namespace vc::fusion {
 			glBindVertexArray(triangleVertexArray);
 			glBindBuffer(GL_ARRAY_BUFFER, triangleBuffer);
 			//glBufferData(GL_ARRAY_BUFFER, sizeof(Triangle) * triangles.size(), triangles.data(), GL_DYNAMIC_DRAW);
-			glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+			glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 12 * sizeof(float), (void*)0);
 			glEnableVertexAttribArray(0);
-			glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(4 * sizeof(float)));
+			glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 12 * sizeof(float), (void*)(4 * sizeof(float)));
 			glEnableVertexAttribArray(1);
+			glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 12 * sizeof(float), (void*)(8 * sizeof(float)));
+			glEnableVertexAttribArray(2);
 
 			triangleShader->use();
 			triangleShader->setMat4("model", model);
@@ -329,7 +332,7 @@ namespace vc::fusion {
 			glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, atomicCounter);
 			glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), userCounters);
 			glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
-			GLuint numTriangles = userCounters[0];
+			numTriangles = userCounters[0];
 
 			//std::cout << vc::utils::toString("Calculated numTriangles", numTriangles);
 
@@ -344,30 +347,30 @@ namespace vc::fusion {
 			glDispatchCompute(num_gridPoints / MARCHING_CUBES_SHADER_LAYOUT_X, 1, 1);
 			glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleBuffer);
-			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Triangle) * numTriangles, triangles.data());
+			//glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleBuffer);
+			//glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Triangle) * numTriangles, triangles.data());
 
 
-			double maxAngle = 0;
-			for (int i = 0; i < 100 && i < numTriangles; i++)
-			{
-			    //std::cout << vc::utils::toString(std::to_string(i), &triangles[i]);
-			//    //for (int j = 0; j < 100 && j < numTriangles; j++)
-			//    //{
-			//    //    if (i != j && vc::utils::areEqual(&triangles[i], &triangles[j])) {
-			//    //        std::cout << vc::utils::asHeader("Overlap detected");
-			//    //        std::cout << vc::utils::toString(std::to_string(i), &triangles[i]);
-			//    //        std::cout << vc::utils::toString(std::to_string(j), &triangles[j]);
-			//    //    }
-			//    //}
+			//double maxAngle = 0;
+			//for (int i = 0; i < 100 && i < numTriangles; i++)
+			//{
+			//    //std::cout << vc::utils::toString(std::to_string(i), &triangles[i]);
+			////    //for (int j = 0; j < 100 && j < numTriangles; j++)
+			////    //{
+			////    //    if (i != j && vc::utils::areEqual(&triangles[i], &triangles[j])) {
+			////    //        std::cout << vc::utils::asHeader("Overlap detected");
+			////    //        std::cout << vc::utils::toString(std::to_string(i), &triangles[i]);
+			////    //        std::cout << vc::utils::toString(std::to_string(j), &triangles[j]);
+			////    //    }
+			////    //}
 
-				float angle = std::abs(triangles[i].pos0.x);
-				if (angle > maxAngle) {
-					maxAngle = angle;
-				}
-			}
+			//	float angle = std::abs(triangles[i].pos0.x);
+			//	if (angle > maxAngle) {
+			//		maxAngle = angle;
+			//	}
+			//}
 
-			std::cout << std::endl;
+			//std::cout << std::endl;
 
 			//exportToPly();
 		}
@@ -538,6 +541,79 @@ namespace vc::fusion {
 
 			return true;
 		}
+
+		void exportToPly() {
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleBuffer);
+			glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(Triangle) * numTriangles, triangles.data());
+			
+			std::ofstream ply_file;
+			ply_file.open("plys/marching_cube.ply");
+
+			ply_file << "ply\n";
+			ply_file << "format ascii 1.0\n";
+
+			ply_file << "comment Test comment\n";
+
+			ply_file << "element vertex " << triangles.size() * 3 << "\n";
+			ply_file << "property float x\n";
+			ply_file << "property float y\n";
+			ply_file << "property float z\n";
+
+			ply_file << "property uchar red\n";
+			ply_file << "property uchar green\n";
+			ply_file << "property uchar blue\n";
+
+
+			ply_file << "element face " << triangles.size() << "\n";
+			ply_file << "property list uchar int vertex_indices\n";
+			ply_file << "end_header\n";
+
+			int i = 0;
+			for (auto triangle : triangles) {
+				if (vc::utils::isValid(triangle.pos0) && vc::utils::isValid(triangle.pos1) && vc::utils::isValid(triangle.pos2)) {
+					for (int i = 0; i < 3; i++)
+					{
+						ply_file << triangle.pos0[i] << " ";
+					}
+					for (int i = 0; i < 3; i++)
+					{
+						ply_file << int(triangle.color0[i] * 255) << " ";
+					}
+					ply_file << "\n";
+					for (int i = 0; i < 3; i++)
+					{
+						ply_file << triangle.pos1[i] << " ";
+					}
+					for (int i = 0; i < 3; i++)
+					{
+						ply_file << int(triangle.color1[i] * 255) << " ";
+					}
+					ply_file << "\n";
+					for (int i = 0; i < 3; i++)
+					{
+						ply_file << triangle.pos2[i] << " ";
+					}
+					for (int i = 0; i < 3; i++)
+					{
+						ply_file << int(triangle.color2[i] * 255) << " ";
+					}
+					ply_file << "\n";
+				}
+				else {
+					std::cout << "error with triangle " << i << std::endl;
+				}
+				i++;
+
+			}
+
+			for (int i = 0; i < triangles.size(); i++) {
+				ply_file << 3 << " " << i * 3 + 0 << " " << i * 3 + 1 << " " << i * 3 + 2 << "\n";
+			}
+
+			ply_file.close();
+
+			std::cout << "Written ply" << std::endl;
+		}
 	};
 
 	class SingleCellMockVoxelGrid : public Voxelgrid {
@@ -599,5 +675,6 @@ namespace vc::fusion {
 			return;
 		}
 	};
+
 }
 #endif

@@ -70,23 +70,17 @@ void main(){
     vec3 projectedVoxelCenter = world2CameraProjection * (relativeTransformation * verts[hash].vtx_pos).xyz;
     
     if(projectedVoxelCenter.z <= 0.1) {
-//        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);
         return;
     }
 
     vec2 pixelCoordinate = projectedVoxelCenter.xy / projectedVoxelCenter.z;
-//    pixelCoordinate /= 2.0f;
     
     if(pixelCoordinate.x < 0 || pixelCoordinate.y < 0 || pixelCoordinate.x >= depthResolution.x || pixelCoordinate.y >= depthResolution.y) {
-//        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);
         return;
     }
 
     pixelCoordinate /= depthResolution;
     float realDepth = texture(depthFrame, pixelCoordinate).x * depthScale;
-//    verts[hash].vtx_tsdf = vec4(realDepth, depthResolution, depthScale);
-    
-//    return;
 
     if(realDepth <= 0) {
 //        verts[hash].vtx_tsdf = vec4(hash, 0, 0, INVALID_TSDF_VALUE);

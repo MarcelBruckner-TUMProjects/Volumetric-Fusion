@@ -10,6 +10,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/aruco/charuco.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
 
@@ -183,7 +184,7 @@ namespace vc::processing {
 			{
 				cv::Mat markerImage;
 				cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-				cv::aruco::drawMarker(dictionary, id, 4096, markerImage, 1);
+				cv::aruco::drawMarker(dictionary, id, 397, markerImage, 1);
 				std::stringstream ss;
 				ss << "charuco\\board_";
 				ss << "marker_" << id << ".png";
@@ -192,32 +193,63 @@ namespace vc::processing {
 		}
 	};
 
-	class EdgeEnhancement : public DepthProcessing {
-		//float factor = 8;
+	class EdgeEnhancementOnColor : public ColorProcessing {
 
 		// Inherited via DepthProcessing
 		void process(cv::Mat& image, unsigned long long frameId) {
 			//std::cout << vc::utils::asHeader("Edge Enhancement") << std::endl;
 
-			cv::Mat buf =
-			image.clone();
+			cv::Mat buf;
 
+			cv::cvtColor(image, buf, cv::COLOR_BGR2GRAY);
+			////std::cout << buf;
 
-			//buf.convertTo(buf, CV_32FC1, depthScale);
+			cv::Mat bil;
+			buf.copyTo(bil);
+			cv::bilateralFilter(buf, bil, 3, 50, 50);
+			//buf = bil;
+			cv::Mat can;
+			bil.copyTo(can);
+			cv::Canny(bil, can, 100, 300);
+
+			buf = can;
+			//buf.convertTo(buf, CV_16U, 1.0 / depthScale);
+
+			cv::cvtColor(buf, buf, cv::COLOR_GRAY2BGR);
+			cv::bitwise_and(image, buf, buf);
+			cv::bitwise_xor(image, buf, image);
+			
+			//std::cout << image << std::endl;
+			//image = buf;
+		}
+	};
+
+	class EdgeEnhancement : public DepthProcessing {
+		float factor = 1;
+
+		// Inherited via DepthProcessing
+		void process(cv::Mat& image, unsigned long long frameId) {
+			//std::cout << vc::utils::asHeader("Edge Enhancement") << std::endl;
+
+			//cv::Mat buf;
+			//buf.copySize(image);
+
+			//image.convertTo(buf, CV_8UC1, 1 / factor);
 			////std::cout << buf;
 
 			//cv::Mat bil;
 			//buf.copyTo(bil);
 			//cv::bilateralFilter(buf, bil, 5, 50, 50);
+			//buf = bil;
 
 			////cv::Mat can;
 			////bil.copyTo(can);
 			////cv::Canny(bil, can, 100, 300);
 
 			////buf = can;
-			//buf.convertTo(buf, CV_16U, 1.0 / depthScale);
+			//buf.convertTo(image, CV_16U, factor);
 
-			image = buf;
+			//image = buf;
 		}
 
 	public:
