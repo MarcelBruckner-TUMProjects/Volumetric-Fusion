@@ -290,7 +290,7 @@ int main(int argc, char* argv[]) try {
 				voxelgrid->renderGrid(model, view, projection);
 			}
 			if (fusionGUI->renderMesh) {
-				voxelgrid->renderMarchingCubes(model, view, projection, fusionGUI->wireframeMode);
+				voxelgrid->renderMarchingCubes(model, view, projection, fusionGUI->wireframeMode, fusionGUI->useNormals);
 			}
 		}
 

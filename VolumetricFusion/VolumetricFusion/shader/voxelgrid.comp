@@ -93,13 +93,13 @@ void main(){
     }
 //    float tsdf = clamp(, -truncationDistance, truncationDistance);
     
-//    float oldWeight = ;
-//    float oldTsdf = ;
-//    float newWeight = ;
+    float oldWeight = verts[hash].vtx_tsdf.z;
+    float oldTsdf = verts[hash].vtx_tsdf.y;
+    float newWeight = oldWeight + 1;
 
-    tsdf = (verts[hash].vtx_tsdf.y * verts[hash].vtx_tsdf.z + tsdf) / (verts[hash].vtx_tsdf.z + 1);
+    tsdf = (oldTsdf * oldWeight + tsdf) / (newWeight);
     
-    verts[hash].vtx_tsdf = vec4(hash, tsdf, (verts[hash].vtx_tsdf.z + 1), 0);
+    verts[hash].vtx_tsdf = vec4(hash, tsdf, newWeight, 0);
     
-    verts[hash].vtx_color = (verts[hash].vtx_color * verts[hash].vtx_tsdf.z + texture(colorFrame, pixelCoordinate)) / (verts[hash].vtx_tsdf.z + 1);
+    verts[hash].vtx_color = (verts[hash].vtx_color * oldWeight + texture(colorFrame, pixelCoordinate)) / (newWeight);
 }

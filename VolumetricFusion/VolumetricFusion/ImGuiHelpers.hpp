@@ -224,6 +224,7 @@ namespace vc::imgui {
 		bool marchingCubes = false;
 		float truncationDistance;
 		bool wireframeMode = false;
+		bool useNormals = true;
 		
 		FusionGUI(vc::fusion::Voxelgrid* voxelgrid) :
 			voxelgrid(voxelgrid),
@@ -272,6 +273,7 @@ namespace vc::imgui {
 			ImGui::Checkbox("Marching cubes", &marchingCubes);
 			ImGui::Checkbox("Render mesh", &renderMesh);
 			ImGui::Checkbox("Wireframe mode", &wireframeMode);
+			ImGui::Checkbox("Use normals", &useNormals);
 
 			ImGui::Separator();
 			
