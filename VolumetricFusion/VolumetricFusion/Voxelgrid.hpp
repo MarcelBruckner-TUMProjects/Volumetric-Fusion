@@ -75,6 +75,7 @@ namespace vc::fusion {
 			if (initializeShader) {
 				initializeOpenGL();
 			}
+			triangles.resize(200000);
 			reset(resolution, size, origin);
 		}
 
@@ -337,7 +338,7 @@ namespace vc::fusion {
 			glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
 			numTriangles = userCounters[0];
 
-			std::cout << vc::utils::toString("Calculated numTriangles", numTriangles);
+			//std::cout << vc::utils::toString("Calculated numTriangles", numTriangles);
 
 			if (numTriangles > triangles.size()) {
 				triangles.resize(numTriangles);

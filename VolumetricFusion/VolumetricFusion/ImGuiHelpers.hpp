@@ -242,7 +242,7 @@ namespace vc::imgui {
 			ImGui::Begin("Volumetric Fusion", nullptr, WINDOW_FLAGS);
 			ImGui::Text("Editable settings of the fusion stage.");
 
-			if (ImGui::SliderFloat("Resolution", &resolution, 0.003, 0.02)) {
+			if (ImGui::SliderFloat("Resolution", &resolution, 0.003, 0.01)) {
 				truncationDistance = resolution * 10;
 				resetVoxelgrid();
 			}
