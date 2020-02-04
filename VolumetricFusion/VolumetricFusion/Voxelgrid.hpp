@@ -57,7 +57,7 @@ namespace vc::fusion {
 		Eigen::Vector3d origin;
 
 		std::vector<Vertex> verts;
-		float truncationDistance = 0.15f;
+		float truncationDistance;
 
 		//std::vector<float> tsdf;
 		//std::vector<float> weights;
@@ -84,7 +84,9 @@ namespace vc::fusion {
 			this->size = size;
 			this->sizeHalf = size / 2.0f;
 			this->sizeNormalized = Eigen::Vector3i((size / resolution).cast<int>()) + Eigen::Vector3i(1, 1, 1);
+			this->truncationDistance = resolution * 10;
 			this->num_gridPoints = sizeNormalized[0] * sizeNormalized[1] * sizeNormalized[2];
+
 			resetVoxelgridBuffer();
 		}
 
@@ -335,10 +337,13 @@ namespace vc::fusion {
 			glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
 			numTriangles = userCounters[0];
 
-			//std::cout << vc::utils::toString("Calculated numTriangles", numTriangles);
+			std::cout << vc::utils::toString("Calculated numTriangles", numTriangles);
+
+			if (numTriangles > triangles.size()) {
+				triangles.resize(numTriangles);
+			}
 
 			marchingCubesComputeShader->setBool("onlyCount", false);
-			triangles = std::vector<vc::fusion::Triangle>(numTriangles);
 			zeroTriangleCounter();
 
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleBuffer);

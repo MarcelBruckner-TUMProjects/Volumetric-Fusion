@@ -37,10 +37,6 @@ namespace vc::optimization {
                         currentScales[i][j] = Eigen::Matrix4d::Identity();
                     }
                     else {
-                        std::stringstream ss;
-                        ss << "(" << i << ", " << j << ")";
-                        std::cout << vc::utils::asHeader(ss.str());
-
                         calculateRelativetranformation(characteristicPoints[i], characteristicPoints[j], &currentTranslations[i][j], &currentRotations[i][j], &currentScales[i][j]);
                     }                     
                 }
