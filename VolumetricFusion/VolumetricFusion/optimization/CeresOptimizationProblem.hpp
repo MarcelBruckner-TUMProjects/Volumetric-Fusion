@@ -118,17 +118,17 @@ namespace vc::optimization {
 			}
 		}
 
-		bool vc::optimization::OptimizationProblem::specific_optimize() {
-			if (!hasInitialization) {
-				initialize();
-			}
+		//bool vc::optimization::OptimizationProblem::specific_optimize() {
+		//	if (!hasInitialization) {
+		//		initialize();
+		//	}
 
-			if (!solveErrorFunction()) {
-				return false;
-			}
+		//	if (!solveErrorFunction()) {
+		//		return false;
+		//	}
 
-			return true;
-		}
+		//	return true;
+		//}
 
 		void calculateTransformations() {
 			for (int from = 0; from < translations.size(); from++) {

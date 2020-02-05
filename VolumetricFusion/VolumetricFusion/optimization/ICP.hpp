@@ -97,37 +97,6 @@ namespace vc::optimization {
 			return m_array;
 		}
 
-		///**
-		// * Converts the pose increment with rotation in SO3 notation and translation as 3D vector into
-		// * transformation 4x4 matrix.
-		// */
-		//static Eigen::Matrix4d convertToMatrix(const PoseIncrement<double>& poseIncrement) {
-		//	// pose[0,1,2] is angle-axis rotation.
-		//	// pose[3,4,5] is translation.
-		//	double* pose = poseIncrement.getData();
-		//	double* scale = pose;
-		//	double* rotation = pose + 3;
-		//	double* translation = pose + 6;
-
-		//	// Convert the rotation from SO3 to matrix notation (with column-major storage).
-		//	double rotationMatrix[9];
-		//	ceres::AngleAxisToRotationMatrix(rotation, rotationMatrix);
-
-		//	Eigen::Matrix4d scaleMatrix = Eigen::Matrix4d::Identity();
-		//	scaleMatrix(0, 0) = double(scale[0]);
-		//	scaleMatrix(1, 1) = double(scale[1]);
-		//	scaleMatrix(2, 2) = double(scale[2]);
-
-		//	// Create the 4x4 transformation matrix.
-		//	Eigen::Matrix4d matrix;
-		//	matrix.setIdentity();
-		//	matrix(0, 0) = double(rotationMatrix[0]);	matrix(0, 1) = double(rotationMatrix[3]);	matrix(0, 2) = double(rotationMatrix[6]);	matrix(0, 3) = double(translation[0]);
-		//	matrix(1, 0) = double(rotationMatrix[1]);	matrix(1, 1) = double(rotationMatrix[4]);	matrix(1, 2) = double(rotationMatrix[7]);	matrix(1, 3) = double(translation[1]);
-		//	matrix(2, 0) = double(rotationMatrix[2]);	matrix(2, 1) = double(rotationMatrix[5]);	matrix(2, 2) = double(rotationMatrix[8]);	matrix(2, 3) = double(translation[2]);
-
-		//	return matrix * scaleMatrix;
-		//}
-
 	private:
 		T* m_array;
 	};
@@ -189,12 +158,12 @@ namespace vc::optimization {
 		//	//rs2::points points;
 
 		//	//std::cout << pipelines[0]->data->filteredDepthFrames.as<rs2::video_frame>().get_data_size() << std::endl;
-		//	//std::cout << pipelines[0]->data->filteredDepthFrames.get_data() << std::endl;
+		//	std::cout << pipelines[0]->data->filteredDepthFrames.get_data() << std::endl;
 
-
-		//	
+		//	//pipelines[0]->data->pointclouds.
 		//	//points.export_to_ply("temp.ply", color);// << std::endl;
-		//	//pipelines[0]->data->points.export_to_ply("temp.ply", pipelines[0]->data->filteredColorFrames.as<rs2::video_frame>());// << std::endl;
+
+		//	pipelines[0]->data->pointclouds.calculate(pipelines[0]->data->filteredDepthFrames).export_to_ply("temp1.ply", pipelines[0]->data->filteredColorFrames.as<rs2::video_frame>());// << std::endl;
 		//	//std::cout << pipelines[0]->data->points.get_vertices() << std::endl;
 
 		//	//auto frames = pipelines[0]->pipeline->wait_for_frames();
@@ -241,7 +210,7 @@ namespace vc::optimization {
 		std::vector<Eigen::Vector3d> convertToEigenVector(rs2::points points) {
 			
 			//int points_size = points.size();
-			int points_size = 1000;
+			int points_size = 10000;
 
 			std::vector<Eigen::Vector3d> eigen_points;
 			eigen_points.reserve(points_size);
@@ -262,12 +231,13 @@ namespace vc::optimization {
 		bool solveErrorFunction() {
 
 			std::vector<Eigen::Matrix4d> initialTransformations(OptimizationProblem::bestTransformations);
+			bool onlyOnce = true;
 
 			for (int from = 0; from < characteristicPoints.size(); from++) {
 				
 				//ACharacteristicPoints fromPoints = characteristicPoints[from];
 
-				auto fromDepth = pipelines[from]->data->filteredDepthFrames.as<rs2::video_frame>();
+				auto fromDepth = pipelines[from]->data->filteredDepthFrames;
 				auto fromColor = pipelines[from]->data->filteredColorFrames.as<rs2::video_frame>();
 				
 				pipelines[from]->data->pointclouds.map_to(fromColor);
@@ -282,31 +252,49 @@ namespace vc::optimization {
 
 					//ACharacteristicPoints toPoints = characteristicPoints[to];
 
-					auto toDepth = pipelines[to]->data->filteredDepthFrames.as<rs2::video_frame>();
+					auto toDepth = pipelines[to]->data->filteredDepthFrames;
 					auto toColor = pipelines[to]->data->filteredColorFrames.as<rs2::video_frame>();
 
 					pipelines[to]->data->pointclouds.map_to(toColor);
 					auto toPoints = pipelines[to]->data->pointclouds.calculate(toDepth);
 					//auto toVertices = toPoints.get_vertices();
 
+					if (onlyOnce) {
+						fromPoints.export_to_ply("temp1.ply", fromColor);
+						toPoints.export_to_ply("temp2.ply", toColor);
+						onlyOnce = false;
+					}
+
 					double pose[9];
 
 					std::vector<Eigen::Vector3d> toPointsEigen = convertToEigenVector(toPoints);
 					std::vector<Eigen::Vector3d> fromPointsEigen = convertToEigenVector(fromPoints);
 
-					estimatePose(toPointsEigen, fromPointsEigen, Eigen::Matrix4d::Identity(), pose);
+					//Eigen::Matrix4d::Identity()
+					//bestTransformations[to]
+					// getCurrentTransformation(from, to)
+					estimatePose(fromPointsEigen, toPointsEigen, bestTransformations[to], pose);
 
+					std::cout << "Scale: ";
 					for (int i = 0; i < 3; i++) {
+						std::cout << pose[i] << " ";
 						scales[from][to].push_back(pose[i]);
 					}
+					std::cout << std::endl;
 
+					std::cout << "Rotation: ";
 					for (int i = 0; i < 3; i++) {
+						std::cout << pose[i+3] << " ";
 						rotations[from][to].push_back(pose[i+3]);
 					}
+					std::cout << std::endl;
 
+					std::cout << "Translation: ";
 					for (int i = 0; i < 3; i++) {
+						std::cout << pose[i+6] << " ";
 						translations[from][to].push_back(pose[i+6]);
 					}
+					std::cout << std::endl;
 				}
 			}
 
@@ -320,6 +308,35 @@ namespace vc::optimization {
 			return true;
 		}
 
+		void evaluate() {
+			bestTransformations[0] = Eigen::Matrix4d::Identity();
+			bestErrors[0] = 0;
+
+			for (int i = 1; i < characteristicPoints.size(); i++)
+			{
+				auto paths = enumerate(i);
+
+				std::cout << vc::utils::toString(paths);
+				for (auto& path : paths)
+				{
+
+					//double error = 0;
+
+					//for (int i = path.size() - 1; i >= 1; i--)
+					//{
+					//	error += calculateRelativeError(path[i], path[i - 1]);
+					//}
+
+					//if (error <= bestErrors[i]) {
+					//bestErrors[i] = error;
+
+						bestTransformations[i] = pathToMatrix(path);
+						std::cout << vc::utils::toString("Transformation " + std::to_string(i), bestTransformations[i]);
+					//}
+				}
+			}
+		}
+
 		void estimatePose(std::vector<Eigen::Vector3d>& source, std::vector<Eigen::Vector3d>& target, Eigen::Matrix4d initialPose, double *incrementArray) {
 
 			m_nearestNeighborSearch->buildIndex(target);
@@ -329,44 +346,33 @@ namespace vc::optimization {
 			auto poseIncrement = PoseIncrement<double>(incrementArray);
 			poseIncrement.setZero();
 
-			//for (int i = 0; i < m_nIterations; ++i) {
-
-				//std::cout << "Iteration: " << i << std::endl;
-
-				std::cout << "Matching points ..." << std::endl;
-				clock_t begin = clock();
+			std::cout << "Matching points ..." << std::endl;
+			clock_t begin = clock();
 				
-				auto transformedPoints = transformPoints(source, estimatedPose);
-				auto matches = m_nearestNeighborSearch->queryMatches(transformedPoints);
+			auto transformedPoints = transformPoints(source, estimatedPose);
+			auto matches = m_nearestNeighborSearch->queryMatches(transformedPoints);
 
-				clock_t end = clock();
-				double elapsedSecs = double(end - begin) / CLOCKS_PER_SEC;
-				std::cout << "FLANN query matches completed in " << elapsedSecs << " seconds." << std::endl;
+			clock_t end = clock();
+			std::cout << "Total number of matches " << matches.size() << std::endl;
+			double elapsedSecs = double(end - begin) / CLOCKS_PER_SEC;
+			std::cout << "FLANN query matches completed in " << elapsedSecs << " seconds." << std::endl;
 
-				ceres::Problem problem;
-				prepareConstraints(transformedPoints, target, matches, poseIncrement, problem);
+			ceres::Problem problem;
+			prepareConstraints(transformedPoints, target, matches, poseIncrement, problem);
 
-				// Configure options for the solver.
-				ceres::Solver::Options options;
-				configureSolver(options);
-				ceres::Solver::Summary summary;
+			// Configure options for the solver.
+			ceres::Solver::Options options;
+			configureSolver(options);
+			ceres::Solver::Summary summary;
 
-				ceres::Solve(options, &problem, &summary);
-				std::cout << summary.BriefReport() << std::endl;
-				//std::cout << summary.FullReport() << std::endl;
+			ceres::Solve(options, &problem, &summary);
+			std::cout << summary.BriefReport() << std::endl;
+			//std::cout << summary.FullReport() << std::endl;
 
-				// Update the current pose estimate (we always update the pose from the left, using left-increment notation).
-				//Eigen::Matrix4d matrix = PoseIncrement<double>::convertToMatrix(poseIncrement);
-				//estimatedPose = PoseIncrement<double>::convertToMatrix(poseIncrement) * estimatedPose;
-				incrementArray = poseIncrement.getData();
-				poseIncrement.setZero();
-
-				//std::cout << "Optimization iteration done." << std::endl;
-			//}
-
-			//std::cout << "Pose: " << estimatedPose << std::endl << std::endl;
-			
-			
+			// Update the current pose estimate (we always update the pose from the left, using left-increment notation).
+			//Eigen::Matrix4d matrix = PoseIncrement<double>::convertToMatrix(poseIncrement);
+			//estimatedPose = PoseIncrement<double>::convertToMatrix(poseIncrement) * estimatedPose;
+			incrementArray = poseIncrement.getData();
 		}
 
 	private:
@@ -379,7 +385,7 @@ namespace vc::optimization {
 			options.use_nonmonotonic_steps = false;
 			options.linear_solver_type = ceres::DENSE_QR;
 			options.minimizer_progress_to_stdout = 0;
-			options.max_num_iterations = 30;
+			options.max_num_iterations = 50;
 			options.update_state_every_iteration = true;
 			options.num_threads = 8;
 		}

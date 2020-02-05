@@ -316,6 +316,7 @@ namespace vc::optimization {
 				std::cout << vc::utils::toString(paths);
 				for (auto& path : paths)
 				{
+					
 					double error = 0;
 
 					for (int i = path.size() - 1; i >= 1; i--)
