@@ -16,6 +16,8 @@
 #include "../Rendering.hpp"
 #include "PointCorrespondenceError.hpp"
 #include "ReprojectionError.hpp"
+#include "NearestNeighbor.hpp"
+#include "NearestNeighbor.hpp"
 #include "../Utils.hpp"
 #include "../CaptureDevice.hpp"
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
@@ -31,9 +33,8 @@ namespace vc::optimization {
 
 		ACharacteristicPoints() {}
 
-		ACharacteristicPoints(
-			std::map<int, std::vector<Eigen::Vector4d>> markerCorners, std::map<int, Eigen::Vector4d> charucoCorners) :
-			markerCorners(markerCorners) {}
+		ACharacteristicPoints(std::map<int, std::vector<Eigen::Vector4d>> markerCorners, std::map<int, Eigen::Vector4d> charucoCorners)
+			:markerCorners(markerCorners) {}
 
 
 		std::vector<glm::vec4> getAllVerticesForRendering() {
@@ -114,6 +115,148 @@ namespace vc::optimization {
 		MockCharacteristicPoints(
 			std::map<int, std::vector<Eigen::Vector4d>> markerCorners, std::map<int, Eigen::Vector4d> charucoCorners) :
 			ACharacteristicPoints(markerCorners, charucoCorners) {}
+	};
+
+	class FLANNCharacteristicPoints : public ACharacteristicPoints {
+	private:
+		rs2::depth_frame* depth_frame;
+		int depth_width;
+		int depth_height;
+
+		rs2::frame* color_frame;
+		int color_width;
+		int color_height;
+
+		Eigen::Matrix3d cam2World;
+
+		float color2DepthWidth;
+		float color2DepthHeight;
+
+		std::mutex mutex;
+
+	public:
+		FLANNCharacteristicPoints() 
+			:ACharacteristicPoints()					
+		{}
+
+		FLANNCharacteristicPoints(std::shared_ptr<vc::capture::CaptureDevice> pipeline, int id, Eigen::Matrix4d transformation, std::unique_ptr<NearestNeighborSearch>& m_nearestNeighborSearch)
+			:ACharacteristicPoints()
+		{
+			std::unique_lock<std::mutex> lock(mutex);
+			
+			if (!setPipelineStuff(pipeline)) {
+				return;
+			}
+
+			pipeline->data->pointclouds.map_to(*color_frame);
+			//try {
+				auto points = pipeline->data->pointclouds.calculate(*depth_frame);
+			//}
+			//catch (const std::exception & e) {
+			//	std::cout << e.what() << std::endl;
+			//	return;
+			//}
+
+			//auto fromVertices = fromPoints.get_vertices();
+
+			if (id == 0) {
+				m_nearestNeighborSearch->buildIndex(convertToEigenVector(points));
+			}
+			else {
+
+				std::cout << "Matching points ..." << std::endl;
+				clock_t begin = clock();
+
+				auto transformedPoints = transformPoints(convertToEigenVector(points), transformation);
+				auto matches = m_nearestNeighborSearch->queryMatches(transformedPoints);
+
+				clock_t end = clock();
+
+				double elapsedSecs = double(end - begin) / CLOCKS_PER_SEC;
+				std::cout << "FLANN query matches completed in " << elapsedSecs << " seconds." << std::endl;
+			
+				int matchesCount = 0;
+
+				for (unsigned i = 0; i < transformedPoints.size(); ++i) {
+					const auto match = matches[i];
+					if (match.idx >= 0) {
+						i;
+						match.idx;
+						matchesCount++;
+					}
+				}
+				std::cout << matchesCount << std::endl;
+			}
+		}
+
+		bool setPipelineStuff(std::shared_ptr<vc::capture::CaptureDevice> pipe) {
+			try {
+				depth_frame = (rs2::depth_frame*) & pipe->data->filteredDepthFrames;
+				depth_width = depth_frame->as<rs2::video_frame>().get_width();
+				depth_height = depth_frame->as<rs2::video_frame>().get_height();
+
+				color_frame = &pipe->data->filteredColorFrames;
+				color_width = color_frame->as<rs2::video_frame>().get_width();
+				color_height = color_frame->as<rs2::video_frame>().get_height();
+
+				cam2World = pipe->depth_camera->cam2world;
+
+				color2DepthWidth = 1.0f * depth_width / color_width;
+				color2DepthHeight = 1.0f * depth_height / color_height;
+
+				return true;
+			}
+			catch (rs2::error & e) {
+				return false;
+			}
+		}
+
+		std::vector<Eigen::Vector3d> transformPoints(std::vector<Eigen::Vector3d> sourcePoints, Eigen::Matrix4d& pose) {
+
+			std::vector<Eigen::Vector3d> transformedPoints;
+			//transformedPoints.reserve(sourcePoints.size());
+
+			for (const auto& point : sourcePoints) {
+				Eigen::Vector4d homogeneousPoint(point(0), point(1), point(2), 1.0);
+
+				Eigen::Vector4d transformedPoint = pose * homogeneousPoint;
+
+				//std::cout << transformedPoint(0) << " " << transformedPoint(1) << " " << transformedPoint(2) << " " << transformedPoint(3) << std::endl;
+
+				Eigen::Vector3d returnPoint(transformedPoint(0), transformedPoint(1), transformedPoint(2));
+
+				transformedPoints.push_back(returnPoint);
+			}
+
+			return transformedPoints;
+		}
+
+		std::vector<Eigen::Vector3d> convertToEigenVector(rs2::points points) {
+
+			//int points_size = points.size();
+			int points_size = 100000;
+
+			std::vector<Eigen::Vector3d> eigen_points;
+			//eigen_points.reserve(points_size);
+
+			auto vertices = points.get_vertices();
+
+			for (int i = 0; i < points_size; i++) {
+
+				if (vertices[i].z > 0) {
+					Eigen::Vector3d point(vertices[i].x, vertices[i].y, vertices[i].z);
+
+					//std::cout << vertices[i].x << " " << vertices[i].y << " " << vertices[i].z << std::endl;
+
+					eigen_points.push_back(point);
+				}
+			}
+
+			std::cout << eigen_points.size() << std::endl;
+
+			return eigen_points;
+
+		}
 	};
 
 	class CharacteristicPoints : public ACharacteristicPoints {

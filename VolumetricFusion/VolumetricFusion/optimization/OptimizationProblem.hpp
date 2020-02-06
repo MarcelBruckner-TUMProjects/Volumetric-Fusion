@@ -74,6 +74,10 @@ namespace vc::optimization {
 			new float[4]{0.0f, 0.0f, 1.0f, 1.0f},
 			new float[4]{1.0f, 1.0f, 0.0f, 1.0f}
 		};
+		
+		virtual bool solveErrorFunction() { return false; };
+
+		virtual void initialize() {};
 
 		std::vector<ACharacteristicPoints> characteristicPoints = {
 			CharacteristicPoints(),
