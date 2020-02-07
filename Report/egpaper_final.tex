@@ -93,7 +93,7 @@ $$
 tsdf_{i+1}=\frac{tsdf_{i} * weight}{weight+1}
 $$
 
-Given that we were using a large number of gridpoints, computing tsdf values on the CPU was not feasible. So we had to move our tsdf voxelgrid implementation onto the GPU inorder to achieve realtime results. Since we were already using OpenGL for the rendering pipeline, we decided to use OpenGL compute shaders for parallelizing the tsdf voxelgrid implementation. We also had to find a tradeoff between voxel resolution and frame rate. With a lower voxel resolution, the frame rate dropped because more calculation had to be done. Furthermore, finding a good truncation distance was also very crucial for lowering the artefacts. The Table~\ref{tab:table2} summarizes the time comparisons between different voxel resolution. 
+Given that we were using a large number of gridpoints, computing tsdf values on the CPU was not feasible. So we had to move our tsdf voxelgrid implementation onto the GPU inorder to achieve realtime results. Since we were already using OpenGL for the rendering pipeline, we decided to use OpenGL Compute Shaders~\cite{Authors1} for parallelizing the tsdf voxelgrid implementation. We also had to find a tradeoff between voxel resolution and frame rate. With a lower voxel resolution, the frame rate dropped because more calculation had to be done. Furthermore, finding a good truncation distance was also very crucial for lowering the artefacts. The Table~\ref{tab:table2} summarizes the time comparisons between different voxel resolution. 
 
 %-------------------------------------------------------------------------
 \subsection{Surface Extraction}
@@ -103,7 +103,7 @@ Intially, we had voxelgrid points that were not initialized because they were ou
 
 %------------------------------------------------------------------------
 \section{Results}
-The result was really good with one cameras. But we had some artifats when we used multiple cameras. Some artifacts were visible around the edges.
+The result was really good with one cameras. But we had some artefacts when we used multiple cameras. Some artefacts were visible around the edges.
 
 \begin{table}[h!]
   \begin{center}
@@ -156,9 +156,12 @@ The result was really good with one cameras. But we had some artifats when we us
 \section{Future Work}
 Since we optimized for pose parameters for a limited number of markers, one of the further improvements that we can do in camera calibration is to use more correspondences which can found for example by using Nearest Neighbor Search and then use the Global Alignment techniques like Iterative Closest Points (ICP).
 
-%{\small
-%\bibliographystyle{ieee_fullname}
-%\bibliography{egbib}
-%}
+%------------------------------------------------------------------------
+\section{Group Member Contributions}
+
+{\small
+\bibliographystyle{ieee_fullname}
+\bibliography{egbib}
+}
 
 \end{document}
