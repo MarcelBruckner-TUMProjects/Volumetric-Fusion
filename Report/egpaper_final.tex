@@ -7,6 +7,12 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 
+\usepackage{media9}
+\usepackage{filecontents}
+%\usepackage{geometry}
+\usepackage{caption}
+\usepackage{subcaption}
+
 % Include other packages here, before hyperref.
 
 % If you comment hyperref and then uncomment it, you should delete
@@ -47,7 +53,7 @@ Moiz Sajid\\
 %%%%%%%%% BODY TEXT
 \section{Introduction}
 
-Volumetric Capture has been a extensively researched topic.
+Volumetric Capture has been a extensively researched topic~\cite{Authors4}.
 
 %------------------------------------------------------------------------
 \section{Reconstruction Pipeline}
@@ -55,6 +61,26 @@ Volumetric Capture has been a extensively researched topic.
 %-------------------------------------------------------------------------
 \subsection{RGB-D Frame Capture}
 We used three D415 Intel RealSense cameras for our setup. The reason for using Intel RealSense cameras is good API support that Intel provides for its RealSense cameras. Intel Realsense cameras work on the concept of Active Stereo. The frames from the cameras were time synchronized inorder to get better results for the calibration as well the final mesh reconstruction. For depth preprocessing, we used Threshold Filtering in which the depth of the objects that are certain distance away from the camera get discarded. 
+
+\begin{figure}
+  \centering
+  \begin{subfigure}[t]{.315\linewidth}
+    \centering\includegraphics[width=0.9\linewidth]{imgs/rgb}
+    \caption{RGB Image}
+    \label{fig:rgb}
+  \end{subfigure}
+  \begin{subfigure}[t]{.315\linewidth}
+    \centering\includegraphics[width=0.9\linewidth]{imgs/depth}
+    \caption{Depth Image}
+    \label{fig:depth}
+  \end{subfigure}
+  \begin{subfigure}[t]{.315\linewidth}
+    \centering\includegraphics[width=0.9\linewidth]{imgs/threshold}
+    \caption{Threshold Filtered Image}
+    \label{fig:threshold}
+  \end{subfigure}  
+  \caption{ }
+\end{figure}
 
 For further filtering, we used Hole Filing for ending gaps in the depth images, Spatial Filtering for smoothing the edges and Edge Enhancement Filter. All of these previous filters did not led to any significant improvements. We initally wanted to use four camera but due to bandwidth limitations we were not able to use color and the depth streams from all four cameras. We also had to limit the color and depth frame resolution which in our case was 848 by 480 for the color stream and 848 by 480 for the depth stream.
 
@@ -87,13 +113,24 @@ $$
 Further results have been sumarzied in Table~\ref{tab:table1}. One of the difficulties that we faced in camera calibration was visualizing the aligned points for which we had to write our own rendering pipeline in OpenGL. Another difficulty that we faced was with Ceres because we had to get ourselves acquainted with general working of the non-linear optimization framework. 
 %-------------------------------------------------------------------------
 \subsection{Voxelgrid TSDF}
-Once we have these aligned pointclouds, we fuse them into the voxelgrid. We project the voxelgrid into the depth frame of the camera and we calculate the difference  by subtracting the voxel depth from the actual depth value. For the truncated signed-distance function (tsdf) values we did the weighted averaging using the equation. The tsdf values were truncated between -1 and 1 with values having a negative value inside the surface and positive values outside the surface.
+Once we have these aligned pointclouds, we fuse them into the voxelgrid. We project the voxelgrid into the depth frame of the camera and we calculate the difference by subtracting the voxel depth from the actual depth value as in Equation (\ref{eq1}). For the truncated signed-distance function (tsdf) values we did the weighted averaging using the equation. The tsdf values were truncated between -1 and 1 with values having a negative value inside the surface and positive values outside the surface.
 
-$$
+\begin{equation}\label{eq1}
+tsdf=z_{voxel} - z_{depth}
+\end{equation}
+
+\begin{equation}\label{eq2}
 tsdf_{i+1}=\frac{tsdf_{i} * weight}{weight+1}
-$$
+\end{equation}
 
-Given that we were using a large number of gridpoints, computing tsdf values on the CPU was not feasible. So we had to move our tsdf voxelgrid implementation onto the GPU inorder to achieve realtime results. Since we were already using OpenGL for the rendering pipeline, we decided to use OpenGL Compute Shaders~\cite{Authors1} for parallelizing the tsdf voxelgrid implementation. We also had to find a tradeoff between voxel resolution and frame rate. With a lower voxel resolution, the frame rate dropped because more calculation had to be done. Furthermore, finding a good truncation distance was also very crucial for lowering the artefacts. The Table~\ref{tab:table2} summarizes the time comparisons between different voxel resolution. 
+Given that we were using a large number of gridpoints, computing tsdf values on the CPU was not feasible. So we had to move our tsdf voxelgrid implementation onto the GPU inorder to achieve realtime results. Since we were already using OpenGL for the rendering pipeline, we decided to use OpenGL Compute Shaders~\cite{Authors1} for parallelizing the tsdf voxelgrid implementation. We also had to find a tradeoff between voxel resolution and frame rate. With a lower voxel resolution, the frame rate dropped because more calculation had to be done. Furthermore, finding a good truncation distance was also very crucial for lowering the artefacts. The Table~\ref{tab:table2} summarizes the time comparisons between different voxel resolution.
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=0.6\linewidth]{imgs/tsdf}
+\end{center}
+ \caption{TSDF Represenation}
+\end{figure}
 
 %-------------------------------------------------------------------------
 \subsection{Surface Extraction}
@@ -105,17 +142,38 @@ Intially, we had voxelgrid points that were not initialized because they were ou
 \section{Results}
 The result was really good with one cameras. But we had some artefacts when we used multiple cameras. Some artefacts were visible around the edges.
 
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=0.65\linewidth]{imgs/res1}
+\end{center}
+ \caption{Result with using only one camera}
+\end{figure}
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=0.65\linewidth]{imgs/res2}
+\end{center}
+ \caption{Triangulation result with using only one camera}
+\end{figure}
+
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=0.65\linewidth]{imgs/res3}
+\end{center}
+ \caption{Result with using three cameras}
+\end{figure}
+
 \begin{table}[h!]
   \begin{center}
     \begin{tabular}{c|c|c|c p{4cm}}
-      \textbf{Algorithm} & \textbf{Iterations} & \textbf{Duration [ms]} & \textbf{Mean Squared Error}\\
+      \textbf{Algorithm} & \textbf{Iterations} & \textbf{Duration [ms]} & \textbf{MSE}\\
       \hline
-      Procrustes (ArUco) & 1 & 8 -20 & \textless 0.7 - 1.73\\
-      Point to Point (ArUco) & 1 - 20 & 900 - 1000 & \textless 0.1\\
-      Procrustes (ChArUco) & 1 & 20 - 40 & 0.25 - 1.29\\
-      Point to Point (ChArUco) & 1 - 20 & 18000 - 22000 & \textless 0.1\\
+      Procrustes (A)  & 1 & 8 - 20 & \textless 0.7 - 1.73\\
+      Point-to-Point (A) & 1 - 20 & 900 - 1000 & \textless 0.1\\
+      Procrustes (C) & 1 & 20 - 40 & 0.25 - 1.29\\
+      Point-to-Point (C) & 1 - 20 & 18000 - 22000 & \textless 0.1\\
     \end{tabular}
-     \caption{Comparisons between different optimization algorithms in terms of iterations, duration and Mean Squared Error}
+     \caption{Comparisons between different optimization algorithms in terms of iterations, duration and MSE (Mean Squared Error). A=ArUco and C=ChArUco}
      \label{tab:table1}
   \end{center}
 \end{table}
@@ -138,7 +196,7 @@ The result was really good with one cameras. But we had some artefacts when we u
 
 \begin{table}[h!]
   \begin{center}
-    \begin{tabular}{c|c|c|c p{4cm}}
+    \begin{tabular}{c|c|c p{4cm}}
       \textbf{Resolution [mm]} & \textbf{Duration [ms]} & \textbf{Gridpoints}\\
       \hline
       20 & \textless 1 & 7,000 - 10,000\\
