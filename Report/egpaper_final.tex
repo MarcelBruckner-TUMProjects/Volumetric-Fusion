@@ -32,10 +32,10 @@
 \title{Volumetric Capture}
 
 \author{Marcel Bruckner\\
-{\tt\small email@tum.de}
+{\tt\small marcel.bruckner@tum.de}
 \and
 Kevin Bein\\
-{\tt\small email@tum.de}\\
+{\tt\small kevin.bein@tum.de}\\
 Technical University of Munich
 \and
 Moiz Sajid\\
@@ -47,20 +47,31 @@ Moiz Sajid\\
 
 %%%%%%%%% ABSTRACT
 \begin{abstract}
-   In this project, our goal is to get realtime 3D mesh reconstruction using a muti-view camera capture setup. We used Intel RealSense cameras for data capture followed by calibration using the marker correspondences. Data is fused into the voxelgrid TSDF followed by Marching cubes for the surface extraction.  
+   Our goal in this project is to get a realtime 3D mesh reconstruction of humans using a muti-view camera capture setup. We used three Intel RealSense cameras for data capture rig. The cameras are calibrated using the marker correspondences. Finally, the data is fused into the single voxelgrid TSDF followed by Marching cubes for the final surface extraction. Both qualitative and quantitative results have been presented in this report.   
 \end{abstract}
 
 %%%%%%%%% BODY TEXT
 \section{Introduction}
 
-Volumetric Capture has been a extensively researched topic~\cite{Authors4}.
+Volumetric Capture is an extensively researched topic where the ultimate goal is to get an accurate 3D reconstruction in realtime. The first work in the area was done Cureless and Levoy~\cite{Authors4} in which they integrated data from one range image into cumulative weighted signed distance function. KinectFusion~\cite{Authors5} was another milestone in this area which proposed a realtime mapping system of indoor scenes using a single depth camera. DynamicFusion~\cite{Authors6} handles non-rigid scenes but our work mostly focussed on handling rigid scenes. 
+
+One of application areas of our project is Holoportation~\cite{Authors7} where 3D recontructed models were used for interactions between two persons using Microsoft HoloLens.
 
 %------------------------------------------------------------------------
 \section{Reconstruction Pipeline}
 
+\begin{figure}[t]
+\begin{center}
+\includegraphics[width=1.0\linewidth]{imgs/pipeline}
+\end{center}
+ \caption{Reconstruction pipeline used in this project: RGB-D Frame Capture, Correspondence Finding, Camera Calibration, Voxelgrid TSDF, Marching Cubes}
+\label{fig:long}
+\label{fig:onecol}
+\end{figure}
+
 %-------------------------------------------------------------------------
 \subsection{RGB-D Frame Capture}
-We used three D415 Intel RealSense cameras for our setup. The reason for using Intel RealSense cameras is good API support that Intel provides for its RealSense cameras. Intel Realsense cameras work on the concept of Active Stereo. The frames from the cameras were time synchronized inorder to get better results for the calibration as well the final mesh reconstruction. For depth preprocessing, we used Threshold Filtering in which the depth of the objects that are certain distance away from the camera get discarded. 
+We used three D415 Intel RealSense cameras for our capture setup. One of the benefits of using Intel RealSense cameras is that it provides good support and updates for its API. The Intel RealSense cameras work on the concept of Active Stereo in which a texture in projected for better better details. The RGB-D frames from the three cameras were time synchronized which not only helped us to get better results for the cameras calibration but also for the final mesh reconstruction. For depth image preprocessing, we used Threshold Filtering in which the depth of the objects that are a certain distance away from the camera get discarded.
 
 \begin{figure}
   \centering
@@ -82,35 +93,45 @@ We used three D415 Intel RealSense cameras for our setup. The reason for using I
   \caption{ }
 \end{figure}
 
-For further filtering, we used Hole Filing for ending gaps in the depth images, Spatial Filtering for smoothing the edges and Edge Enhancement Filter. All of these previous filters did not led to any significant improvements. We initally wanted to use four camera but due to bandwidth limitations we were not able to use color and the depth streams from all four cameras. We also had to limit the color and depth frame resolution which in our case was 848 by 480 for the color stream and 848 by 480 for the depth stream.
+For further filtering, we also tried using Hole Filing for ending gaps in the depth images, Spatial Filtering for smoothing the edges and Edge Enhancement Filter. All of these filters did not led to any significant improvements hence they were not used in the final mesh reconstruction. For captur setup, we initally wanted to use four camera but due to bandwidth limitations we were not able to use color and the depth streams from all four cameras at the same time instance. We also had to limit the color and depth frame resolution for faster processing. The resolution which we used for the color stream is 848 by 480 pixels and for the depth stream is 848 by 480 pixels.
 
 \begin{figure}[t]
 \begin{center}
-\includegraphics[width=1.0\linewidth]{imgs/pipeline}
+\includegraphics[width=0.6\linewidth]{imgs/cube}
 \end{center}
- \caption{Reconstruction pipeline used in this project: RGB-D Frame Capture, Correspondence Finding, Camera Calibration, Voxelgrid TSDF, Marching Cubes}
-\label{fig:long}
-\label{fig:onecol}
+ \caption{ArUco box cube with the detected marker identifiers. The markers were used for camera calibration}
+ \label{fig:cube}
 \end{figure}
   
 %-------------------------------------------------------------------------
 \subsection{Correspondence Finding}
-For correspondences, we used ArUco markers with each having a unique identifier. The markers were easily detected because we had significant camera view overlap. In the end, we just opted for one marker per side. Once we have the markers, we backproject the correspondences into the pointcloud. We also tried ChArUco markers which is basically a chesboard with arUco markers. But using the ChArUco markers 
+For correspondences, we used ArUco markers with each marker having a unique identifier. The markers were mounted on a cube box as shown in Figure \ref{fig:cube}. The markers were placed in such a way such that any one particular camera can easily detect two out of three markers. The cameras placed with significant view overlap. In the end, we just opted for one marker per side. It is also important to mention here that we also tried the ChArUco markers which is basically a chessboard with the ArUco markers. However, the ChArUco markers did not gave us good results. 
+
 %-------------------------------------------------------------------------
 \subsection{Camera Calibration}
-Once we have the marker locations, we backproject them into the 3D point clouds so that we can estimate the 3D pose between the cameras. 
+After getting the marker locations, we backprojected these correspondences into the 3D pointcloud using the depth information. The camera poses of the cameras were then estimated using OpenCV. Using these camera poses, we calculated relative transformatons between the cameras. Out of three camera, we selected the first camera's coordinate frame as the world coordinate frame and hence the poses from the other two cameras were aligned with respect to the first camera. The alignment we got from the camera calibration was not good which meant that it can be improved further.
 
 %-------------------------------------------------------------------------
 \subsection{Optimization}
-As the camera pose parameters that we got from the camera calibration were not good enough, we used two different approaches namely Procrutes and Point-to-Point correspondence error for optimizing the 3D pose paramters of the cameras further.
+As the camera pose parameters that we got from the camera calibration were not good enough, we used two different optimizations approaches namely Procrutes and Point-to-Point correspondence error for optimizing the 3D pose parameters of the cameras even further.
  
-In the Procrustes algorithm, we compute the vector between the center of gravity for getting the translation component and the Singular Value Decomposition of the known correspondences for getting the rotation component. The alignment we get from Procrustes is not robust enough and hence has a high Mean Squared Error (MSE). In order to further improve the results that we get from Procrustes, we used the Point-to-Point correspondence error. For the Point-to-Point correspondence error, we optimize for the following energy term:
+In the Procrustes algorithm, we compute the vector between the center of gravity for getting the translation component and the Singular Value Decomposition of the known correspondences for getting the rotation component. The alignment we get from Procrustes is not robust enough and hence has a high Mean Squared Error (MSE).\\
 
-$$
+\begin{equation}\label{eq3}
+USV^T=SVD(X^TX)
+\end{equation}
+
+\begin{equation}\label{eq4}
+R=UV^T
+\end{equation}
+
+In order to further improve the results that we get from Procrustes, we used the Point-to-Point correspondence error. For the Point-to-Point correspondence error, we optimize for the following energy term:
+
+\begin{equation}\label{eq5}
 \sum_{i}\sum_{j}\sum_{k} \left\Vert\left(X_{ik} - T_jR_j*X_{jk}\right)\right\Vert_2^2
-$$
+\end{equation}
 
-Further results have been sumarzied in Table~\ref{tab:table1}. One of the difficulties that we faced in camera calibration was visualizing the aligned points for which we had to write our own rendering pipeline in OpenGL. Another difficulty that we faced was with Ceres because we had to get ourselves acquainted with general working of the non-linear optimization framework. 
+Further results have been sumarzied in Table~\ref{tab:table1}. One of the difficulties that we faced in camera calibration was visualizing the aligned points for which we had to write our own rendering pipeline in OpenGL~\cite{Authors3}. Another difficulty that we faced was with Ceres because we had to get ourselves acquainted with general working of the non-linear optimization framework. 
 %-------------------------------------------------------------------------
 \subsection{Voxelgrid TSDF}
 Once we have these aligned pointclouds, we fuse them into the voxelgrid. We project the voxelgrid into the depth frame of the camera and we calculate the difference by subtracting the voxel depth from the actual depth value as in Equation (\ref{eq1}). For the truncated signed-distance function (tsdf) values we did the weighted averaging using the equation. The tsdf values were truncated between -1 and 1 with values having a negative value inside the surface and positive values outside the surface.
@@ -211,7 +232,7 @@ The result was really good with one cameras. But we had some artefacts when we u
 \end{table}
 
 %------------------------------------------------------------------------
-\section{Future Work}
+\section{Future Work and Conclusion}
 Since we optimized for pose parameters for a limited number of markers, one of the further improvements that we can do in camera calibration is to use more correspondences which can found for example by using Nearest Neighbor Search and then use the Global Alignment techniques like Iterative Closest Points (ICP).
 
 %------------------------------------------------------------------------
