@@ -113,9 +113,9 @@ After getting the marker locations, we backprojected these correspondences into 
 
 %-------------------------------------------------------------------------
 \subsection{Optimization}
-As the camera pose parameters that we got from the camera calibration were not good enough, we used two different optimizations approaches namely Procrutes and Point-to-Point correspondence error for optimizing the 3D pose parameters of the cameras even further.
+As the pose parameters that we got from the camera calibration were not good enough, we used two different optimizations approaches namely Procrutes and Point-to-Point correspondence error for optimizing the 3D pose parameters of the cameras even further.
  
-In the Procrustes algorithm, we compute the vector between the center of gravity for getting the translation component and the Singular Value Decomposition of the known correspondences for getting the rotation component. The alignment we get from Procrustes is not robust enough and hence has a high Mean Squared Error (MSE).\\
+In the Procrustes algorithm, we compute the vector between the center of gravity for getting the translation components and the Singular Value Decomposition of the known correspondences for getting the rotation components as shown in Equation (\ref{eq3}) and (\ref{eq4}). The alignment that we get from Procrustes is not robust enough and hence has a high Mean Squared Error (MSE).\\
 
 \begin{equation}\label{eq3}
 USV^T=SVD(X^TX)
@@ -134,7 +134,7 @@ In order to further improve the results that we get from Procrustes, we used the
 Further results have been sumarzied in Table~\ref{tab:table1}. One of the difficulties that we faced in camera calibration was visualizing the aligned points for which we had to write our own rendering pipeline in OpenGL~\cite{Authors3}. Another difficulty that we faced was with Ceres because we had to get ourselves acquainted with general working of the non-linear optimization framework. 
 %-------------------------------------------------------------------------
 \subsection{Voxelgrid TSDF}
-Once we have these aligned pointclouds, we fuse them into the voxelgrid. We project the voxelgrid into the depth frame of the camera and we calculate the difference by subtracting the voxel depth from the actual depth value as in Equation (\ref{eq1}). For the truncated signed-distance function (tsdf) values we did the weighted averaging using the equation. The tsdf values were truncated between -1 and 1 with values having a negative value inside the surface and positive values outside the surface.
+Once we have these aligned pointclouds, we fuse them into the voxelgrid. We project the voxelgrid into the depth frame of the camera and we calculate the difference by subtracting the voxel depth from the actual depth value using Equation (\ref{eq1}). For the truncated signed-distance function (tsdf) values we did the weighted averaging using the Equation (\ref{eq2}). The tsdf values were truncated between -1 and 1 with points having a negative value inside the surface and positive value outside the surface.
 
 \begin{equation}\label{eq1}
 tsdf=z_{voxel} - z_{depth}
@@ -144,7 +144,7 @@ tsdf=z_{voxel} - z_{depth}
 tsdf_{i+1}=\frac{tsdf_{i} * weight}{weight+1}
 \end{equation}
 
-Given that we were using a large number of gridpoints, computing tsdf values on the CPU was not feasible. So we had to move our tsdf voxelgrid implementation onto the GPU inorder to achieve realtime results. Since we were already using OpenGL for the rendering pipeline, we decided to use OpenGL Compute Shaders~\cite{Authors1} for parallelizing the tsdf voxelgrid implementation. We also had to find a tradeoff between voxel resolution and frame rate. With a lower voxel resolution, the frame rate dropped because more calculation had to be done. Furthermore, finding a good truncation distance was also very crucial for lowering the artefacts. The Table~\ref{tab:table2} summarizes the time comparisons between different voxel resolution.
+Given that we were using a large number of gridpoints, computing tsdf values on the CPU was not feasible. So we had to move our tsdf voxelgrid implementation onto the GPU inorder to achieve realtime results. Since we were already using OpenGL for the rendering pipeline, we decided to use OpenGL Compute Shaders~\cite{Authors1} for parallelizing the tsdf voxelgrid implementation. We also had to find a tradeoff between voxel resolution and frame rate. With a lower voxel resolution, the frame rate dropped because more calculations had to be done. Furthermore, finding a good truncation distance was also very crucial for lowering the artefacts. The Table~\ref{tab:table2} summarizes the time comparisons between different voxel resolutions.
 
 \begin{figure}[t]
 \begin{center}
@@ -161,13 +161,14 @@ Intially, we had voxelgrid points that were not initialized because they were ou
 
 %------------------------------------------------------------------------
 \section{Results}
-The result was really good with one cameras. But we had some artefacts when we used multiple cameras. Some artefacts were visible around the edges.
+The results that we get using one camea are really good as can be seen in Figure \ref{fig:res1}. Figure \ref{fig:res2} displays the triangulation results using one camera. However, we get artefacts when we use all three camera streams. The which artefacts which are mostly visible around the edges can be seen in Figure \ref{fig:res3}. This suggests that the camera pose parameters can be improved further.
 
 \begin{figure}[t]
 \begin{center}
 \includegraphics[width=0.65\linewidth]{imgs/res1}
 \end{center}
  \caption{Result with using only one camera}
+ \label{fig:res1}
 \end{figure}
 
 \begin{figure}[t]
@@ -175,6 +176,7 @@ The result was really good with one cameras. But we had some artefacts when we u
 \includegraphics[width=0.65\linewidth]{imgs/res2}
 \end{center}
  \caption{Triangulation result with using only one camera}
+ \label{fig:res2}
 \end{figure}
 
 \begin{figure}[t]
@@ -182,6 +184,7 @@ The result was really good with one cameras. But we had some artefacts when we u
 \includegraphics[width=0.65\linewidth]{imgs/res3}
 \end{center}
  \caption{Result with using three cameras}
+ \label{fig:res3}
 \end{figure}
 
 \begin{table}[h!]
