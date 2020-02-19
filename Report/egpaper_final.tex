@@ -35,7 +35,7 @@
 {\tt\small marcel.bruckner@tum.de}
 \and
 Kevin Bein\\
-{\tt\small kevin.bein@tum.de}\\
+{\tt\small kevin.bein@tum.de}\\[0.5em]
 Technical University of Munich
 \and
 Moiz Sajid\\
@@ -47,8 +47,18 @@ Moiz Sajid\\
 
 %%%%%%%%% ABSTRACT
 \begin{abstract}
-   Our goal in this project is to get a realtime 3D mesh reconstruction of humans using a muti-view camera capture setup. We used three Intel RealSense cameras for data capture rig. The cameras are calibrated using the marker correspondences. Finally, the data is fused into the single voxelgrid TSDF followed by Marching cubes for the final surface extraction. Both qualitative and quantitative results have been presented in this report.   
+   Our goal in this project is to get a realtime mesh reconstruction of dynamic scenes using a multi view camera capture setup. We use three Intel RealSense D415 depth cameras for RGB-D data capturing which are calibrated using known correspondences from markers. The data is fused into a voxelgrid representing the implicit surface and following a marching cubes algorithm is performed for the final surface extraction. Both qualitative and quantitative results are presented in this report.   
 \end{abstract}
+
+
+\begin{figure}[t]
+	\begin{center}
+		\includegraphics[width=1.0\linewidth]{imgs/pipeline}
+	\end{center}
+	\caption{Reconstruction pipeline used in this project: RGB-D Frame Capture, Correspondence Finding, Camera Calibration, Voxelgrid TSDF, Marching Cubes}
+	\label{fig:long}
+	\label{fig:onecol}
+\end{figure}
 
 %%%%%%%%% BODY TEXT
 \section{Introduction}
@@ -60,14 +70,6 @@ One of application areas of our project is Holoportation~\cite{Authors7} where 3
 %------------------------------------------------------------------------
 \section{Reconstruction Pipeline}
 
-\begin{figure}[t]
-\begin{center}
-\includegraphics[width=1.0\linewidth]{imgs/pipeline}
-\end{center}
- \caption{Reconstruction pipeline used in this project: RGB-D Frame Capture, Correspondence Finding, Camera Calibration, Voxelgrid TSDF, Marching Cubes}
-\label{fig:long}
-\label{fig:onecol}
-\end{figure}
 
 %-------------------------------------------------------------------------
 \subsection{RGB-D Frame Capture}
