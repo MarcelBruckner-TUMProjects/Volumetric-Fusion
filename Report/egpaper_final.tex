@@ -36,7 +36,7 @@
 \and
 Kevin Bein\\
 {\tt\small kevin.bein@tum.de}\\[0.5em]
-Technical University of Munich
+Technische Universit\"at M\"unchen
 \and
 Moiz Sajid\\
 {\tt\small moiz.sajid@tum.de}
@@ -45,11 +45,13 @@ Moiz Sajid\\
 \maketitle
 %\thispagestyle{empty}
 
+\newcommand{\intel}{Intel\textsuperscript{\textcopyright}}
 \newcommand{\fref}[1]{\mbox{Figure~\ref{#1}}}
+\newcommand{\rscamera}{\intel{} RealSense\texttrademark{} Depth Camera~D415 \cite{DepthCameraD415}}
 
 %%%%%%%%% ABSTRACT
 \begin{abstract}
-   Our goal in this project is to get a real time mesh reconstruction of dynamic scenes using a multi view camera capture setup. We use three Intel RealSense D415 depth cameras for RGB-D data capturing which are calibrated using known correspondences from markers. The data is fused into a voxelgrid representing the implicit surface and following a marching cubes algorithm is performed for the final surface extraction. Both qualitative and quantitative results are presented in this report.   
+   Our goal in this project is to get a real time mesh reconstruction of dynamic scenes using a multi view camera capture setup. We use three Intel RealSense D415 depth cameras for RGB-D data capturing which are calibrated using known correspondences from markers. The data is fused into a voxelgrid representing the implicit surface and following a marching cubes algorithm is performed for the final surface extraction. Both qualitative and quantitative results are presented.   
 \end{abstract}
 
 
@@ -64,51 +66,62 @@ Moiz Sajid\\
 %%%%%%%%% BODY TEXT
 \section{Introduction}
 
-Volumetric Capture is an extensively researched topic where the goal is to get an accurate 3D reconstruction of dynamic scenes in real time. The first work in the area was done by Cureless and Levoy~\cite{Authors4} in which they integrated data from one range image into a cumulative weighted signed distance function. KinectFusion~\cite{Authors5} was another milestone in this area which proposed a real time mapping system of indoor scenes using a single depth camera. DynamicFusion~\cite{Authors6} handles non-rigid scenes and reconstruction over time. Our work mostly focuses on reconstructing dynamic scenes on a per frame basis. 
-
+Volumetric Capture is an extensively researched topic where the goal is to get an accurate 3D reconstruction of dynamic scenes in real time. The first work in the area was done by Cureless and Levoy~\cite{Authors4} in which they integrated data from one range image into a cumulative weighted signed distance function. KinectFusion~\cite{Authors5} was another milestone in this area which proposed a real time mapping system of indoor scenes using a single depth camera. DynamicFusion~\cite{Authors6} handles non-rigid scenes and reconstruction over time. Our work mostly focuses on reconstructing dynamic scenes on a per frame basis.\\
 One application area of our project is Holoportation~\cite{Authors7} where 3D reconstructed models are used for VR interactions between two persons over huge distances.
 
+\begin{figure}
+	\centering
+	\begin{subfigure}[t]{.315\linewidth}
+		\centering\includegraphics[width=0.9\linewidth]{imgs/rgb}
+		\caption{RGB Image}
+		\label{fig:rgb}
+	\end{subfigure}
+	\begin{subfigure}[t]{.315\linewidth}
+		\centering\includegraphics[width=0.9\linewidth]{imgs/depth}
+		\caption{Depth Image}
+		\label{fig:depth}
+	\end{subfigure}
+	\begin{subfigure}[t]{.315\linewidth}
+		\centering\includegraphics[width=0.9\linewidth]{imgs/threshold}
+		\caption{Threshold filter}
+		\label{fig:threshold}
+	\end{subfigure}  
+	\caption{The color and depth images captured by the \mbox{cameras}}
+	\label{fig:rgbd-data}
+\end{figure}
 %------------------------------------------------------------------------
 \section{Reconstruction Pipeline}
-To perform the real time 3D reconstruction we implemented the pipeline which is exemplary displayed in \fref{fig:reconstruction-pipeline} and described in the following section.
+To perform the real time 3D reconstruction we implemented the pipeline which is exemplary displayed in \fref{fig:reconstruction-pipeline} and described in the following section.\\
+All tests were performed on a Laptop with an Intel\textsuperscript{\textregistered} Core\texttrademark{} \mbox{i7-6700HQ} CPU @ 2.60GHz~\cite{CPU}, 40GB of DDR4 RAM and a Nvidia GeForce GTX 970M~\cite{GTX970}.
 
 %-------------------------------------------------------------------------
 \subsection{RGB-D Frame Capture}
-We used three D415 Intel RealSense cameras for our capture setup. One of the benefits of using Intel RealSense cameras is that it provides good support and updates for its API. The Intel RealSense cameras work on the concept of Active Stereo in which a texture in projected for better better details. The RGB-D frames from the three cameras were time synchronized which not only helped us to get better results for the cameras calibration but also for the final mesh reconstruction. For depth image preprocessing, we used Threshold Filtering in which the depth of the objects that are a certain distance away from the camera get discarded.
+We use three \rscamera{} for our capture setup which work on the concept of active stereo depth. Two cameras are placed on the sides of the camera and the depth is calculated from a triangulation using the displacement. An infrared pattern is projected into the scene to enhance the details.\\
+We process the depth images using a threshold filter which discards pixels that are above or below a threshold set during runtime. We also tried different hole-filling, spatial and edge enhancing filters that did not improve the results and are not used in the final reconstruction.\\
+\fref{fig:rgbd-data} displays the raw RGB-D images and the filtered depth image.
 
-\begin{figure}
-  \centering
-  \begin{subfigure}[t]{.315\linewidth}
-    \centering\includegraphics[width=0.9\linewidth]{imgs/rgb}
-    \caption{RGB Image}
-    \label{fig:rgb}
-  \end{subfigure}
-  \begin{subfigure}[t]{.315\linewidth}
-    \centering\includegraphics[width=0.9\linewidth]{imgs/depth}
-    \caption{Depth Image}
-    \label{fig:depth}
-  \end{subfigure}
-  \begin{subfigure}[t]{.315\linewidth}
-    \centering\includegraphics[width=0.9\linewidth]{imgs/threshold}
-    \caption{Threshold Filtered Image}
-    \label{fig:threshold}
-  \end{subfigure}  
-  \caption{ }
-\end{figure}
+We tried to extend the three camera setup with a fourth one but were not able to integrate it due to bandwidth limitations. Furthermore, we had to limit the color and depth resolutions as well as framerates to enable three cameras and to allow a processing of the data in real time. The resolution we used for the color and depth stream is 848x480 px at 30 frames per second. \cite{RealSenseWhitepaper} gives more detail about the limitations of the cameras in a multi camera setup.
+\newpage
+The RGB-D images from the three cameras are time synchronized~\cite{RealSenseWhitepaper} what improves the results of the following camera calibration and the final mesh reconstruction.
 
-For further filtering, we also tried using Hole Filing for ending gaps in the depth images, Spatial Filtering for smoothing the edges and Edge Enhancement Filter. All of these filters did not led to any significant improvements hence they were not used in the final mesh reconstruction. For captur setup, we initally wanted to use four camera but due to bandwidth limitations we were not able to use color and the depth streams from all four cameras at the same time instance. We also had to limit the color and depth frame resolution for faster processing. The resolution which we used for the color stream is 848 by 480 pixels and for the depth stream is 848 by 480 pixels.
+\intel{} provides an excellent SDK~\cite{RealSenseSDK}, good support and updates for its API which made it easy to use the cameras.
 
-\begin{figure}[t]
-\begin{center}
-\includegraphics[width=0.6\linewidth]{imgs/cube}
-\end{center}
- \caption{ArUco box cube with the detected marker identifiers. The markers were used for camera calibration}
- \label{fig:cube}
-\end{figure}
-  
+%
+%For captur setup, we initally wanted to use four camera but due to bandwidth limitations we were not able to use color and the depth streams from all four cameras at the same time instance. We also had to limit the color and depth frame resolution for faster processing. 
+
 %-------------------------------------------------------------------------
 \subsection{Correspondence Finding}
 For correspondences, we used ArUco markers with each marker having a unique identifier. The markers were mounted on a cube box as shown in Figure \ref{fig:cube}. The markers were placed in such a way such that any one particular camera can easily detect two out of three markers. The cameras placed with significant view overlap. In the end, we just opted for one marker per side. It is also important to mention here that we also tried the ChArUco markers which is basically a chessboard with the ArUco markers. However, the ChArUco markers did not gave us good results. 
+
+
+\begin{figure}[t]
+	\begin{center}
+		\includegraphics[width=0.6\linewidth]{imgs/cube}
+	\end{center}
+	\caption{ArUco box cube with the detected marker identifiers. The markers were used for camera calibration}
+	\label{fig:cube}
+\end{figure}
+
 
 %-------------------------------------------------------------------------
 \subsection{Camera Calibration}
