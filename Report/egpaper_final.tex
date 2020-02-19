@@ -45,9 +45,11 @@ Moiz Sajid\\
 \maketitle
 %\thispagestyle{empty}
 
+\newcommand{\fref}[1]{\mbox{Figure~\ref{#1}}}
+
 %%%%%%%%% ABSTRACT
 \begin{abstract}
-   Our goal in this project is to get a realtime mesh reconstruction of dynamic scenes using a multi view camera capture setup. We use three Intel RealSense D415 depth cameras for RGB-D data capturing which are calibrated using known correspondences from markers. The data is fused into a voxelgrid representing the implicit surface and following a marching cubes algorithm is performed for the final surface extraction. Both qualitative and quantitative results are presented in this report.   
+   Our goal in this project is to get a real time mesh reconstruction of dynamic scenes using a multi view camera capture setup. We use three Intel RealSense D415 depth cameras for RGB-D data capturing which are calibrated using known correspondences from markers. The data is fused into a voxelgrid representing the implicit surface and following a marching cubes algorithm is performed for the final surface extraction. Both qualitative and quantitative results are presented in this report.   
 \end{abstract}
 
 
@@ -56,20 +58,19 @@ Moiz Sajid\\
 		\includegraphics[width=1.0\linewidth]{imgs/pipeline}
 	\end{center}
 	\caption{Reconstruction pipeline used in this project: RGB-D Frame Capture, Correspondence Finding, Camera Calibration, Voxelgrid TSDF, Marching Cubes}
-	\label{fig:long}
-	\label{fig:onecol}
+	\label{fig:reconstruction-pipeline}
 \end{figure}
 
 %%%%%%%%% BODY TEXT
 \section{Introduction}
 
-Volumetric Capture is an extensively researched topic where the ultimate goal is to get an accurate 3D reconstruction in realtime. The first work in the area was done Cureless and Levoy~\cite{Authors4} in which they integrated data from one range image into cumulative weighted signed distance function. KinectFusion~\cite{Authors5} was another milestone in this area which proposed a realtime mapping system of indoor scenes using a single depth camera. DynamicFusion~\cite{Authors6} handles non-rigid scenes but our work mostly focussed on handling rigid scenes. 
+Volumetric Capture is an extensively researched topic where the goal is to get an accurate 3D reconstruction of dynamic scenes in real time. The first work in the area was done by Cureless and Levoy~\cite{Authors4} in which they integrated data from one range image into a cumulative weighted signed distance function. KinectFusion~\cite{Authors5} was another milestone in this area which proposed a real time mapping system of indoor scenes using a single depth camera. DynamicFusion~\cite{Authors6} handles non-rigid scenes and reconstruction over time. Our work mostly focuses on reconstructing dynamic scenes on a per frame basis. 
 
-One of application areas of our project is Holoportation~\cite{Authors7} where 3D recontructed models were used for interactions between two persons using Microsoft HoloLens.
+One application area of our project is Holoportation~\cite{Authors7} where 3D reconstructed models are used for VR interactions between two persons over huge distances.
 
 %------------------------------------------------------------------------
 \section{Reconstruction Pipeline}
-
+To perform the real time 3D reconstruction we implemented the pipeline which is exemplary displayed in \fref{fig:reconstruction-pipeline} and described in the following section.
 
 %-------------------------------------------------------------------------
 \subsection{RGB-D Frame Capture}
@@ -146,7 +147,7 @@ tsdf=z_{voxel} - z_{depth}
 tsdf_{i+1}=\frac{tsdf_{i} * weight}{weight+1}
 \end{equation}
 
-Given that we were using a large number of gridpoints, computing tsdf values on the CPU was not feasible. So we had to move our tsdf voxelgrid implementation onto the GPU inorder to achieve realtime results. Since we were already using OpenGL for the rendering pipeline, we decided to use OpenGL Compute Shaders~\cite{Authors1} for parallelizing the tsdf voxelgrid implementation. We also had to find a tradeoff between voxel resolution and frame rate. With a lower voxel resolution, the frame rate dropped because more calculations had to be done. Furthermore, finding a good truncation distance was also very crucial for lowering the artefacts. The Table~\ref{tab:table2} summarizes the time comparisons between different voxel resolutions.
+Given that we were using a large number of gridpoints, computing tsdf values on the CPU was not feasible. So we had to move our tsdf voxelgrid implementation onto the GPU inorder to achieve real time results. Since we were already using OpenGL for the rendering pipeline, we decided to use OpenGL Compute Shaders~\cite{Authors1} for parallelizing the tsdf voxelgrid implementation. We also had to find a tradeoff between voxel resolution and frame rate. With a lower voxel resolution, the frame rate dropped because more calculations had to be done. Furthermore, finding a good truncation distance was also very crucial for lowering the artefacts. The Table~\ref{tab:table2} summarizes the time comparisons between different voxel resolutions.
 
 \begin{figure}[t]
 \begin{center}
@@ -157,9 +158,9 @@ Given that we were using a large number of gridpoints, computing tsdf values on 
 
 %-------------------------------------------------------------------------
 \subsection{Surface Extraction}
-For the iso-surface extraction, we used the Marching Cubes algorithm which converts the implicit surface representation to a polygonal mesh. We then iterated over the voxelgrid cells to determine the zero crossings and looked up the triangulation in the Marching Cubes table. This gives us the trianguled mesh as an final output. With a lower voxel resolution and more grid points, we were able to get more finer reconsturction. Again we had to utilize the OpenGL Compute Shader in order to achieve realtime results because the computations on the CPU were really slow.
+For the iso-surface extraction, we used the Marching Cubes algorithm which converts the implicit surface representation to a polygonal mesh. We then iterated over the voxelgrid cells to determine the zero crossings and looked up the triangulation in the Marching Cubes table. This gives us the trianguled mesh as an final output. With a lower voxel resolution and more grid points, we were able to get more finer reconsturction. Again we had to utilize the OpenGL Compute Shader in order to achieve real time results because the computations on the CPU were really slow.
 
-Intially, we had voxelgrid points that were not initialized because they were outside the camera view. As a result, we had a huge number of artefacts in the final mesh reconstruction which took a lot of time to figure out. We implemented a two pass OpenGL Compute Shader. In the first pass, we counted the number of triangles that will generated and only allocated space for them. In the second pass, we generate the triangles. We do this because the upper bound for the number of generated triangle is five times the number of voxelgrid points. For example if we have 200x200x200 grid points with a 5 millimeter voxel resolution, we roughly had 40 million number of possible triangles. We only generated a fraction of these triangles after the the triangle counting OpenGL Compute Shader pass. For a voxel resolution of 5mm resolution, the Marching Cubes algorithm took 15 milliseconds which was realtime capable. For 3 millimeter resolution, the results were not realtime capable however, we were to get fine mesh reconstructions.  The Table~\ref{tab:table2} summarizes the time comparisons between different voxel resolution. The Table~\ref{tab:table3} summarizes the time comparisons for running Marching Cubes between different voxel resolutions. 
+Intially, we had voxelgrid points that were not initialized because they were outside the camera view. As a result, we had a huge number of artefacts in the final mesh reconstruction which took a lot of time to figure out. We implemented a two pass OpenGL Compute Shader. In the first pass, we counted the number of triangles that will generated and only allocated space for them. In the second pass, we generate the triangles. We do this because the upper bound for the number of generated triangle is five times the number of voxelgrid points. For example if we have 200x200x200 grid points with a 5 millimeter voxel resolution, we roughly had 40 million number of possible triangles. We only generated a fraction of these triangles after the the triangle counting OpenGL Compute Shader pass. For a voxel resolution of 5mm resolution, the Marching Cubes algorithm took 15 milliseconds which was real time capable. For 3 millimeter resolution, the results were not real time capable however, we were to get fine mesh reconstructions.  The Table~\ref{tab:table2} summarizes the time comparisons between different voxel resolution. The Table~\ref{tab:table3} summarizes the time comparisons for running Marching Cubes between different voxel resolutions. 
 
 %------------------------------------------------------------------------
 \section{Results}
