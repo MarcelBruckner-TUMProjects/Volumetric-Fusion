@@ -228,18 +228,17 @@ Marcel Bruckner
 \begin{table}[h!]
   \begin{center}
     \begin{tabular}{c|c|c|c}
-      \textbf{Algorithm} & \textbf{Iter.} & \textbf{Time [ms]} & \textbf{MSE}\\
+      \textbf{Algorithm} & \textbf{Iter.} & \textbf{MSE} & \textbf{Time [ms]}\\
       \hline
-      Procrustes (A)  & 1 & 8 - 20 & \textless 0.7 - 1.73\\
-      Point-to-Point (A) & 1 - 20 & 900 - 1000 & \textless 0.1\\
-      Procrustes (C) & 1 & 20 - 40 & 0.25 - 1.29\\
-      Point-to-Point (C) & 1 - 20 & $\pm$ 20.000 & \textless 0.1\\
+      Procrustes (A)  & 1  & \textless 0.7 - 1.73 & 8 - 20\\
+      Point-to-Point (A) & 1 - 20  & \textless 0.1 & 900 - 1000\\
+      Procrustes (C) & 1  & 0.25 - 1.29 & 20 - 40\\
+      Point-to-Point (C) & 1 - 20  & \textless 0.1 & $\pm$ 20.000\\
     \end{tabular}
-     \caption{Comparisons between different optimization algorithms in terms of iterations, duration and MSE (Mean Squared Error). A = ArUco, C = ChArUco}
+     \caption{Comparisons between different optimization algorithms in terms of iterations, MSE (Mean Squared Error) and time. A = ArUco, C = ChArUco}
      \label{tab:camera-calibration}
   \end{center}
 \end{table}
-
 
 \begin{table}[h!]
   \begin{center}
@@ -281,7 +280,7 @@ Marcel Bruckner
 	\begin{center}
 		\includegraphics[width=0.5\linewidth]{imgs/res2}
 	\end{center}
-	\caption{Triangulation result with using only one camera}
+	\caption{Triangulated mesh of one of our group members using one camera.}
 	\label{fig:wireframe}
 \end{figure}
 
@@ -289,20 +288,43 @@ Marcel Bruckner
 	\begin{center}
 		\includegraphics[width=0.5\linewidth]{imgs/res1}
 	\end{center}
-	\caption{Result with using only one camera}
+	\caption{Reconstructed surface of one of our group members using one camera.}
 	\label{fig:res1}
 \end{figure}
-
 
 \begin{figure}[h!]
 	\begin{center}
 		\includegraphics[width=0.5\linewidth]{imgs/res3}
 	\end{center}
-	\caption{Result with using three cameras}
+	\caption{Reconstructed surface of one of our group members using all three cameras. We see the artifacts that arise in the parts where the pointclouds of the cameras overlap (face).}
 	\label{fig:reconstruction-all-cameras}
 \end{figure}
 
-\newpage
+\begin{figure}[h!]
+	\begin{center}
+		\includegraphics[width=0.5\linewidth]{imgs/res3}
+	\end{center}
+	\caption{Reconstructed surface of one of our group members using all three cameras. We see the artifacts that arise in the parts where the pointclouds of the cameras overlap (face).}
+	\label{fig:scene-1}
+\end{figure}
+
+\begin{figure}[h!]
+	\begin{center}
+		\includegraphics[width=0.5\linewidth]{imgs/res3}
+	\end{center}
+	\caption{Reconstructed surface of one of our group members using all three cameras. We see the artifacts that arise in the parts where the pointclouds of the cameras overlap (face).}
+	\label{fig:scene-2}
+\end{figure}
+
+\begin{figure}[h!]
+	\begin{center}
+		\includegraphics[width=0.5\linewidth]{imgs/res3}
+	\end{center}
+	\caption{Reconstructed surface of one of our group members using all three cameras. We see the artifacts that arise in the parts where the pointclouds of the cameras overlap (face).}
+	\label{fig:scene-3}
+\end{figure}
+
+\clearpage
 
 {\small
 \bibliographystyle{ieee_fullname}
