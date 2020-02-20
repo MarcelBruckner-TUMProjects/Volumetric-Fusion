@@ -92,7 +92,7 @@ One possible application area of our project is Holoportation~\cite{Authors7} in
 		\caption{Threshold filter}
 		\label{fig:threshold}
 	\end{subfigure}  
-	\caption{The color and depth images captured by the \mbox{cameras}}
+	\caption{The color and depth images captured by the \mbox{cameras} and the filtered depth image.}
 	\label{fig:rgbd-data}
 \end{figure}
 %------------------------------------------------------------------------
@@ -104,15 +104,15 @@ All tests were performed on a Laptop with an Intel\textsuperscript{\textregister
 %-------------------------------------------------------------------------
 \subsection{RGB-D Frame Capture}
 We use three \rscamera{} for our capture setup which work on the concept of active stereo depth. Two cameras are placed on the sides of the camera and the depth is calculated from a triangulation using the displacement. An infrared pattern is projected into the scene to enhance the details.\\
-We process the depth images using a threshold filter which discards pixels that are outside of a certain distance range during runtime. We also tried different hole-filling, spatial and edge enhancing filters that did not improve the results and thus, were not used in the final implementation.\\
+We process the depth images using a threshold filter which discards pixels that are outside of a certain distance range during runtime. We also tried different hole-filling, spatial and edge enhancing filters that did not improve the results and thus were not used in the final implementation.\\
 \fref{fig:rgbd-data} displays the raw RGB-D images and the filtered depth image.
 
-We tried to extend the three camera setup with a fourth one but were not able to integrate it due to USB bandwidth limitations. Furthermore, we had to limit the color and depth resolutions as well as the framerate for the cameras to not crash and to allow processing the input data in real time. The resolution we used for the color and depth stream is 848x480px at 30 frames per second. For further insight and details about the limitations of the camera in a multi camera setup refer to \cite{RealSenseWhitepaper}.
+We tried to extend the three camera setup with a fourth one but were not able to integrate it due to USB bandwidth limitations. Furthermore, we had to limit the color and depth resolutions as well as the framerate for the cameras to allow processing of the input data in real time. The resolution we used for the color and depth stream is 848x480~px at 30 frames per second. For further insight and details about the limitations of the cameras in a multi camera setup we refer you to \cite{RealSenseWhitepaper}.
 \newpage
 The RGB-D images from the three cameras are time synchronized~\cite{RealSenseWhitepaper} what improves the results of the following camera calibration and the final mesh reconstruction.
-The RGB-D images from the three cameras are time-synchronized through a hardware cable between the cameras~\cite{RealSenseWhitepaper}. This improves the results of the camera callibration and the final mesh reconstruction.
+The synchronization is carried out through a hardware cable between the cameras~\cite{RealSenseWhitepaper}. This improves the results of the camera calibration and the final mesh reconstruction.
 
-\intel{} provides an excellent SDK called RealSenseSDK~\cite{RealSenseSDK}, an extensive documentation and updates for its API which made it easy to use the cameras.
+\intel{} provides an excellent SDK called \mbox{RealSenseSDK~\cite{RealSenseSDK}}, an extensive documentation and updates for its API which made it easy to use the cameras.
 
 %------------------------------------------------------------------were-------
 \subsection{Correspondence Finding}
@@ -121,7 +121,7 @@ The markers are mounted on a wooden cube box as shown in \fref{fig:cube}.
 
 By placing the cameras such that each is looking towards one of the cube's corners, we can assure that all three markers are visible in every color image. This also ensures that between every pair of cameras we have an overlap of two markers for which the eight corner positions are detected sub pixel perfect. This gives us a total of $8*3=24$ constraints between every camera pair which are used in the next step to estimate the relative transformation between the markers.
 
-It is also important to mention that we tried \charuco{} which are a mixture of \aruco{} and a chessboard pattern which allow simultaneous detection and pose estimation. However, the \charuco{} did not give us good pose results and slowed down the calculation (\tref{tab:camera-calibration}). It also reduced the range of the cameras where the markers could be detected so we stuck to \aruco{}. 
+It is also important to mention that we tried \charuco{} which are a mixture of \aruco{} and a chessboard pattern which allow simultaneous detection and pose estimation. However, the \charuco{} did not give us good pose results and slowed down the calculation (\tref{tab:camera-calibration}). It also reduced the range of the cameras where the markers could be detected so we stick to \aruco{}. 
 %
 %
 \begin{figure}[t]
@@ -162,15 +162,13 @@ In order to improve the alignment which we get from Procrustes we use a Point-to
 \begin{equation}\label{eq5}
 \min_{T_{ij}, R_{ij}} \sum_{i}^{frame}\sum_{j}^{frame}\sum_{k}^{corres.} || X_{ik} - T_{ij}R_{ij}*X_{jk} ||_2^2
 \end{equation}
-A comparison of the results from this optimization can be seen in \tref{tab:camera-calibration}. It shows that the mean squared error is much lower using the transformation from the Point-to-Point optimization. On the other side it displays an increase of the duration for the estimation as it is an iterative optimization algorithm, but as the pose estimation is done only once in the beginning the increase is negligible.
 A comparison of the results from this optimization can be seen in \tref{tab:camera-calibration}. It shows that the mean squared error is much lower using the transformation from the Point-to-Point optimization. The increase in the duration of the estimation is due to the algorithm's iterative nature but as the pose estimation is done only once in the beginning the increase is negligible.
 %
 %-------------------------------------------------------------------------
 \subsection{Voxelgrid TSDF}
-We calculate a truncated signed distance field (TSDF) based on a voxelgrid to represent the implicit surface of the aligned pointclouds. The voxelgrid is a three-dimensional cuboid structure with points (voxels) filling it on a grid at a given resolution. An exemplary voxelgrid is displayed in \fref{fig:voxelgrid}. 
 We calculate a truncated signed distance field (TSDF) based on a voxelgrid to represent the implicit surface of the aligned pointclouds. The voxelgrid is a three-dimensional cuboid structure of a given resolution where the grid is filled with points (voxels). An exemplary voxelgrid is displayed in \fref{fig:voxelgrid}. 
 
-We fuse the aligned pointclouds into the voxelgrid by iterating over every voxel and projecting it into the depth frame of the camera. We can now lookup the surface depth value $z_{depth}$ at the projected position in the depth image and compare it to the depth of the voxel. This gives us the distance $d_i$ of the voxel to the surface in the $i$-th camera frame:
+We fuse the aligned pointclouds into the voxelgrid by iterating over every voxel and projecting it into the depth frame of the camera. We then lookup the surface depth value $z_{depth}$ at the projected position in the depth image and compare it to the depth of the voxel. This gives us the distance $d_i$ of the voxel to the surface in the $i$-th camera frame:
 \begin{equation}\label{eq1}
 d_i = z_{voxel} - z_{depth,i}
 \end{equation}
@@ -183,7 +181,7 @@ We do this integration for all three sets of points coming from the cameras. To 
 tsdf_{i+1}=\frac{tsdf_{i} * weight}{weight+1}
 \end{equation}
 
-As we compute the TSDF values for a large number of voxels we decided to parallelize the calculations on the GPU~(\sref{sec:reconstruction-pipeline}) to increase the performance through hardware accelerated parallelization. Since we are using \opengl{} for the rendering we decided to also use \opengl{} compute shaders~\cite{Authors1}. \tref{tab:voxelgrid} displays the duration for integrating all three camera frames into the voxelgrid at different resolutions and their respective number of voxels. \\
+As we compute the TSDF values for a large number of voxels we decided to parallelize the calculations on the GPU~(\sref{sec:reconstruction-pipeline}) to increase the performance through hardware accelerated parallelization. Since we are using \opengl{} for the rendering we decided to also use \opengl{} compute shaders~\cite{Authors1}. \tref{tab:voxelgrid} displays the duration for integrating all three camera frames into the voxelgrid at varying resolutions and their number of voxels. \\
 
 \begin{figure}[t]
 \begin{center}
@@ -198,7 +196,8 @@ As we compute the TSDF values for a large number of voxels we decided to paralle
 We extract the implicit surface represented by the voxelgrid using the Marching Cubes algorithm~\cite{MarchingCubes}.\\
 We iterate over all voxelcells that are spanned up by eight adjacent voxels in the voxelgrid. Within these cells the TSDF values for all eight corners are looked up in the voxelgrid and then used to find the zero-crossings along the edges between every pair of corners. We use these zero-crossings to look up the triangulation for the voxelcell based on the Marching Cubes tables described by \cite{MarchingCubes}. This gives us the triangulated mesh as a final output that approximates the implicit surface represented by the voxelgrid. \fref{fig:wireframe} shows a triangulation of one of our group members at a resolution of 10mm.
 
-We implemented a two pass OpenGL Compute Shader to calculate the triangulation. The upper bound for the number of triangles that can be generated during Marching Cubes is 5 times the number of voxelcells. This gives a possible count of $(200 * 200 * 200) * 5 = 40.000.000$ triangles for e.g. a voxelgrid of $200^3$ voxels. In reality, the numbers of actually generated triangles is much smaller with $200.000 - 250.000$ which displays the need of a two pass shader. The first pass only counts the number of triangles that will be generated and allocates memory. In the second pass we then generate the triangles and fill the memory that exactly fits the needs without overhead.\\
+We implemented a two pass \opengl{} compute shader to calculate the triangulation. The upper bound for the number of triangles that can be generated during Marching Cubes is 5 times the number of voxelcells. This gives a possible count of $(200 * 200 * 200) * 5 = 40.000.000$ triangles for e.g. a voxelgrid of $200^3$ voxels. In reality, the numbers of actually generated triangles is much smaller with $200.000 - 250.000$ which displays the need of a two pass shader. The first pass counts the number of triangles that will be generated and allocates memory. In the second pass we then generate the triangles and fill the memory that exactly fits the needs without overhead.
+
 \tref{tab:marching-cubes} displays the number of triangles that are generated by the algorithm at different resolutions and the respective durations. It can be seen that down to a 5mm resolution we are easily real time capable at 60 frames per second.
 
 %------------------------------------------------------------------------
@@ -209,7 +208,7 @@ We have achieved our goal to get a real time mesh reconstruction of dynamic scen
 
 %------------------------------------------------------------------------
 \section{Future Work}
-Since we optimized the relative transformations during camera calibration for a small number of markers (correspondences), a further improvement could be achieved by implementing a Nearest Neighbor Search. This would result in a much higher number of correspondences on which global alignment techniques like Iterative Closest Points (ICP) can be performed.
+Since we optimize the relative transformations during camera calibration for a small number of markers (correspondences), a further improvement could be achieved by implementing a Nearest Neighbor Search. This would result in a much higher number of correspondences on which global alignment techniques like Iterative Closest Points (ICP) can be performed.
 
 Furthermore, we currently see a high number of artifacts that are generated at the overlap of the three camera streams (\fref{fig:reconstruction-all-cameras}). To reduce these a next step could be to calculate normal maps for every depth stream and to use these to improve the weighted averaging during TSDF calculation.
 
@@ -218,13 +217,15 @@ Finally, in order to improve the whole reconstruction, the reconstructed scene c
 %------------------------------------------------------------------------
 \section{Group Member Contributions}
 \paragraph{Research}
+This includes the gathering of information as well as trying different approaches for the implementation. The contributions are ordered descending:\\
 Marcel Bruckner, Kevin Bein, Moiz Sajid
 
 \paragraph{Final Presentation \& Report}
+This includes the preparation of the final presentation and the production of this report. The contributions are not ordered:\\
 Marcel Bruckner, Kevin Bein, Moiz Sajid
 
 \paragraph{Code}
-Marcel Bruckner
+The code as it is by the end of this project was written by Marcel Bruckner. Much time was also spent by Kevin Bein trying different approaches but didn't make it in the final version of the project. 
 
 \newpage
 \section{Tables}
