@@ -48,6 +48,9 @@ Moiz Sajid\\
 \newcommand{\intel}{Intel\textsuperscript{\textcopyright}}
 \newcommand{\fref}[1]{\mbox{Figure~\ref{#1}}}
 \newcommand{\rscamera}{\intel{} RealSense\texttrademark{} Depth Camera~D415 \cite{DepthCameraD415}}
+\newcommand{\aruco}{ArUco~markers~\cite{ArUco}}
+\newcommand{\charuco}{ChArUco~markers~\cite{ChArUco}}
+\newcommand{\opencv}{OpenCV~\cite{OpenCV}}
 
 %%%%%%%%% ABSTRACT
 \begin{abstract}
@@ -111,14 +114,19 @@ The RGB-D images from the three cameras are time synchronized~\cite{RealSenseWhi
 
 %-------------------------------------------------------------------------
 \subsection{Correspondence Finding}
-For correspondences, we used ArUco markers with each marker having a unique identifier. The markers were mounted on a cube box as shown in Figure \ref{fig:cube}. The markers were placed in such a way such that any one particular camera can easily detect two out of three markers. The cameras placed with significant view overlap. In the end, we just opted for one marker per side. It is also important to mention here that we also tried the ChArUco markers which is basically a chessboard with the ArUco markers. However, the ChArUco markers did not gave us good results. 
+We use \aruco{} to find correspondences between the three camera streams. These markers have a unique identifier and can easily be detected in every color image using the \opencv{} library.\\
+The markers are mounted on a wooden cube box as shown in \fref{fig:cube}.
+
+By placing the cameras such that each one is looking on one of the cubes corners we can assure that in every color image three markers are visible. This also ensures that between every pair of cameras we have an overlap of two markers for which the eight corner positions are detected sub pixel perfect. This gives us a total of $8*3=24$ constraints between every pair of cameras which are used in the next step to estimate the relative transformation between the markers.
+
+It is also important to mention here that we tried \charuco{} which are a mixture of \aruco{} and a chessboard pattern which allow simultaneous detection and pose estimation. However, the \charuco{} did not give us good pose results, so we stick to \aruco{}. 
 
 
 \begin{figure}[t]
 	\begin{center}
 		\includegraphics[width=0.6\linewidth]{imgs/cube}
 	\end{center}
-	\caption{ArUco box cube with the detected marker identifiers. The markers were used for camera calibration}
+	\caption{Marker cube with the detected markers highlighted in green and their unique identifiers (red).}
 	\label{fig:cube}
 \end{figure}
 
