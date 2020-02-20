@@ -237,22 +237,28 @@ Furthermore, we spent many hours as a group in the beginning of the project to g
 \paragraph{Correspondence Finding}
 The correspondence finding as it is now was done by Marcel Bruckner. This includes the printing of the markers, the assembling of the marker cube and the code needed to detect the markers. Also much of the now not used ChArUco code was done by him.\\
 Kevin Bein helped in cutting out the wood for the cube and tried different approaches using the \charuco{}.
+
 \paragraph{Camera Calibration}
 The camera calibration was done by Marcel Bruckner. Procrustes and the Point-to-Point error function was implemented by him. Finding out the correct calibration parameters and setting up the cameras is contributed to him.\\
-Moiz Sajid implemented different approaches for single camera calibration and setting the intrinsic parameters.
+Moiz Sajid tried out chessboard pattern for calibrating two cameras which never made it to the final project because it was not feasible. Moiz Sajid worked on ICP using Marcel's correspondence finding code which never made it to the project since it essentially did the same what Marcel's existing implementation did (discovered late). ICP should have been implemented alongside FLANN however this essential use case was discovered very late.   
 
 \paragraph{Voxelgrid TSDF}
-The voxelgrid and TSDF calculation was entirely implemented by Marcel Bruckner.
+The voxelgrid and TSDF calculation (CPU and GPU) was entirely implemented by Marcel Bruckner.\\
+Moiz Sajid utilized the existing implementation of tsdf fusion using C++~\cite{Authors2} and Python~\cite{Authors8} which worked well but only for uncalibrated cameras hence was not used in the project. It could have been utilized alongside using other techniques for alignment. 
 
 \paragraph{Marching Cubes Surface Extraction}
-The Marching Cubes surface extraction was entirely implemented by Marcel Bruckner.
+The Marching Cubes surface extraction (CPU and GPU) was entirely implemented by Marcel Bruckner.\\
+Moiz Sajid worked on a working Marching Cubes CPU implementation which never made it to the final project because Marcel's Marching Cubes implementation was used instead for no particular reason. 
 
 \paragraph{Rendering}
-The rendering was entirely implemented by Marcel Bruckner.
+The rendering was entirely implemented by Marcel Bruckner.\\
+Moiz Sajid worked on Aljaz's code for point cloud rendering which never made it to the final project. Moiz Sajid also wrote shaders for displaying single frame mesh which again never made it to the final project. 
 
 \paragraph{Compute Shaders}
 The compute shaders were entirely implemented by Marcel Bruckner.
 
+\paragraph{Point Cloud Library (Not used in the project)}
+Moiz Sajid spent some time in building PCL and FLANN with Nvidia Cuda Support from source to see if it is feasible for the project.
 
 \newpage
 \section{Tables}
