@@ -214,6 +214,92 @@ Furthermore, we currently see a high number of artifacts that are generated at t
 
 Finally, in order to improve the whole reconstruction, the reconstructed scene could be tracked over time. By using the temporal information and the deformations between the frames a canonical model could be generated. This model allows to update only the parts that changed as well as reduce artifacts which would improve the reconstruction and the performance further.
 
+\newpage
+\section{Tables}
+\begin{table}[h!]
+	\begin{center}
+		\begin{tabular}{c|c|c|c}
+			\textbf{Algorithm} & \textbf{Iter.} & \textbf{MSE} & \textbf{Time [ms]}\\
+			\hline
+			Procrustes (A)  & 1  & \textless 0.7 - 1.73 & 8 - 20\\
+			Point-to-Point (A) & 1 - 20  & \textless 0.1 & 900 - 1000\\
+			Procrustes (C) & 1  & 0.25 - 1.29 & 20 - 40\\
+			Point-to-Point (C) & 1 - 20  & \textless 0.1 & $\pm$ 20.000\\
+		\end{tabular}
+		\caption{Comparisons between different optimization algorithms in terms of iterations, MSE (Mean Squared Error) and time. A = ArUco, C = ChArUco}
+		\label{tab:camera-calibration}
+	\end{center}
+\end{table}
+
+\begin{table}[h!]
+	\begin{center}
+		\begin{tabular}{c|c|c|c}
+			\textbf{Algorithm} & \textbf{Res. [mm]} & \textbf{Voxels} & \textbf{Time [ms]}\\
+			\hline
+			Voxelgrid & 20 & 125.000 & \textless 1\\
+			Voxelgrid & 10 & 1.000.000 & \textless 1\\
+			Voxelgrid & 5 & 8.000.000 & 5\\
+			Voxelgrid & 4 & 15.625.000 & 20\\
+			Voxelgrid & 3 & 37.000.000 & 50\\
+		\end{tabular}
+		\caption{Comparison of the time needed to calculate the TSDF values in a $1m^3$ voxelgrid for a multitude of voxelgrid resolution.}
+		\label{tab:voxelgrid}
+	\end{center}
+\end{table}
+
+\begin{table}[h!]
+	\begin{center}
+		\begin{tabular}{c|c|c|c}
+			\textbf{Algorithm} & \textbf{Res. [mm]} & \textbf{Triang. [$\pm 20\%$]}  & \textbf{Time [ms]}\\
+			\hline
+			March. Cubes & 20  & 10.000   & \textless 1\\
+			March. Cubes & 10  & 40.000  & \textless 1\\
+			March. Cubes & 5 & 200.000   & 15\\
+			March. Cubes & 4 & 400.000   & 35\\
+			March. Cubes & 3 & 800.000    & 80\\
+		\end{tabular}
+		\caption{Comparison of the time needed to calculate the triangulation of the implicit surface represented by a $1m^3$ voxelgrid using the Marching Cubes algorithm at varying resolutions.}
+		\label{tab:marching-cubes}
+	\end{center}
+\end{table}
+
+\clearpage
+\section{Images}
+\label{sec:images}
+
+\begin{figure}[h!]
+	\begin{center}
+		\includegraphics[width=0.9\linewidth]{imgs/res2}
+	\end{center}
+	\caption{Triangulated mesh of one of our group members using one camera. $1m^3$ voxelgrid at 10 mm resolution.}
+	\label{fig:wireframe}
+\end{figure}
+
+\begin{figure}[h!]
+	\begin{center}
+		\includegraphics[width=0.9\linewidth]{imgs/res3}
+	\end{center}
+	\caption{Reconstructed surface of one of our group members using all three cameras. The artifacts that arise in the parts where the pointclouds of the cameras overlap (face) can be seen. $1m^3$ voxelgrid at 5 mm resolution.}
+	\label{fig:reconstruction-all-cameras}
+\end{figure}
+
+\begin{figure}[h!]
+	\begin{center}
+		\includegraphics[width=0.9\linewidth]{imgs/cube_reconstructed.png}
+	\end{center}
+	\caption{Reconstructed surface of the marker cube using all three cameras. The artifacts that arise in the parts where the pointclouds of the cameras overlap (cube edges) can be seen. $1m^3$ voxelgrid at 5 mm resolution.}
+	\label{fig:scene-1}
+\end{figure}
+
+\begin{figure}[h!]
+	\begin{center}
+		\includegraphics[width=0.9\linewidth]{imgs/scene.png}
+	\end{center}
+	\caption{Reconstructed surface of an arbitrary scene using all three cameras. The ChArUco board (middle), a hole puncher (blue), a stapler (lower right) and a DSLR camera (top left) are displayed. $1m^3$ voxelgrid at 5 mm resolution.}
+	\label{fig:scene-2}
+\end{figure}
+
+\clearpage
 %------------------------------------------------------------------------
 \section{Group Member Contributions}
 \paragraph{Research}
@@ -252,7 +338,7 @@ Kevin Bein worked with the same existing tsdf implementation \cite{Authors2} ear
 \paragraph{Marching Cubes Surface Extraction}
 The Marching Cubes surface extraction (CPU and GPU) was entirely implemented by Marcel Bruckner.\\
 Kevin Bein implemented MC using the Point Cloud Library (PCL) to shorten development time but later disregarded the attempt due to the installation complexity of PCL and Marcel Bruckner finishig his native implementation earlier. \\
-Moiz Sajid worked on a working Marching Cubes CPU implementation which never made it to the final project because Marcel's Marching Cubes implementation was used instead for no particular reason. 
+Moiz Sajid worked on a working Marching Cubes CPU implementation which never made it to the final project because Marcel's Marching Cubes implementation was used instead as it run on GPU. 
 
 \paragraph{Rendering}
 The rendering was entirely implemented by Marcel Bruckner.\\
@@ -266,90 +352,6 @@ The compute shaders were entirely implemented by Marcel Bruckner.
 Kevin Bein spent a lot of time utilizing many parts of PCL for the project. He implemented working solutions for MC and tried out different other functionality. The fact that compiling PCL with GPU support did not work and the overal installation complexity of PCL plus the fact that, meanwhile, Marcel Bruckner succeeded in creating a working, custom implementation, ultimately lead to abandon the idea of further using PCL. \\
 Moiz Sajid spent some time in building PCL and FLANN with Nvidia Cuda Support from source to see if it is feasible for the project.
 
-\newpage
-\section{Tables}
-\begin{table}[h!]
-  \begin{center}
-    \begin{tabular}{c|c|c|c}
-      \textbf{Algorithm} & \textbf{Iter.} & \textbf{MSE} & \textbf{Time [ms]}\\
-      \hline
-      Procrustes (A)  & 1  & \textless 0.7 - 1.73 & 8 - 20\\
-      Point-to-Point (A) & 1 - 20  & \textless 0.1 & 900 - 1000\\
-      Procrustes (C) & 1  & 0.25 - 1.29 & 20 - 40\\
-      Point-to-Point (C) & 1 - 20  & \textless 0.1 & $\pm$ 20.000\\
-    \end{tabular}
-     \caption{Comparisons between different optimization algorithms in terms of iterations, MSE (Mean Squared Error) and time. A = ArUco, C = ChArUco}
-     \label{tab:camera-calibration}
-  \end{center}
-\end{table}
-
-\begin{table}[h!]
-  \begin{center}
-    \begin{tabular}{c|c|c|c}
-      \textbf{Algorithm} & \textbf{Res. [mm]} & \textbf{Voxels} & \textbf{Time [ms]}\\
-      \hline
-      Voxelgrid & 20 & 125.000 & \textless 1\\
-      Voxelgrid & 10 & 1.000.000 & \textless 1\\
-      Voxelgrid & 5 & 8.000.000 & 5\\
-      Voxelgrid & 4 & 15.625.000 & 20\\
-      Voxelgrid & 3 & 37.000.000 & 50\\
-    \end{tabular}
-     \caption{Comparison of the time needed to calculate the TSDF values in a $1m^3$ voxelgrid for a multitude of voxelgrid resolution.}
-     \label{tab:voxelgrid}
-  \end{center}
-\end{table}
-
-\begin{table}[h!]
-  \begin{center}
-    \begin{tabular}{c|c|c|c}
-      \textbf{Algorithm} & \textbf{Res. [mm]} & \textbf{Triang. [$\pm 20\%$]}  & \textbf{Time [ms]}\\
-      \hline
-      March. Cubes & 20  & 10.000   & \textless 1\\
-      March. Cubes & 10  & 40.000  & \textless 1\\
-      March. Cubes & 5 & 200.000   & 15\\
-      March. Cubes & 4 & 400.000   & 35\\
-      March. Cubes & 3 & 800.000    & 80\\
-    \end{tabular}
-     \caption{Comparison of the time needed to calculate the triangulation of the implicit surface represented by a $1m^3$ voxelgrid using the Marching Cubes algorithm at varying resolutions.}
-     \label{tab:marching-cubes}
-  \end{center}
-\end{table}
-
-\clearpage
-\section{Images}
-\label{sec:images}
-
-\begin{figure}[h!]
-	\begin{center}
-		\includegraphics[width=0.9\linewidth]{imgs/res2}
-	\end{center}
-	\caption{Triangulated mesh of one of our group members using one camera. $1m^3$ voxelgrid at 10 mm resolution.}
-	\label{fig:wireframe}
-\end{figure}
-
-\begin{figure}[h!]
-	\begin{center}
-		\includegraphics[width=0.9\linewidth]{imgs/res3}
-	\end{center}
-	\caption{Reconstructed surface of one of our group members using all three cameras. The artifacts that arise in the parts where the pointclouds of the cameras overlap (face) can be seen. $1m^3$ voxelgrid at 5 mm resolution.}
-	\label{fig:reconstruction-all-cameras}
-\end{figure}
-
-\begin{figure}[h!]
-	\begin{center}
-		\includegraphics[width=0.9\linewidth]{imgs/cube_reconstructed.png}
-	\end{center}
-	\caption{Reconstructed surface of the marker cube using all three cameras. The artifacts that arise in the parts where the pointclouds of the cameras overlap (cube edges) can be seen. $1m^3$ voxelgrid at 5 mm resolution.}
-	\label{fig:scene-1}
-\end{figure}
-
-\begin{figure}[h!]
-	\begin{center}
-		\includegraphics[width=0.9\linewidth]{imgs/scene.png}
-	\end{center}
-	\caption{Reconstructed surface of an arbitrary scene using all three cameras. The ChArUco board (middle), a hole puncher (blue), a stapler (lower right) and a DSLR camera (top left) are displayed. $1m^3$ voxelgrid at 5 mm resolution.}
-	\label{fig:scene-2}
-\end{figure}
 
 \clearpage
 
