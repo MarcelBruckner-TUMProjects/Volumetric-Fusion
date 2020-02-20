@@ -48,10 +48,12 @@ Moiz Sajid\\
 \newcommand{\intel}{Intel\textsuperscript{\textcopyright}}
 \newcommand{\fref}[1]{\mbox{Figure~\ref{#1}}}
 \newcommand{\tref}[1]{\mbox{Table~\ref{#1}}}
+\newcommand{\sref}[1]{\mbox{Section~\ref{#1}}}
 \newcommand{\rscamera}{\intel{} RealSense\texttrademark{} Depth Camera~D415 \cite{DepthCameraD415}}
 \newcommand{\aruco}{ArUco~markers~\cite{ArUco}}
 \newcommand{\charuco}{ChArUco~markers~\cite{ChArUco}}
 \newcommand{\opencv}{OpenCV~\cite{OpenCV}}
+\newcommand{\opengl}{OpenGL~\cite{OpenGL}}
 
 %%%%%%%%% ABSTRACT
 \begin{abstract}
@@ -95,12 +97,13 @@ One application area of our project is Holoportation~\cite{Authors7} where 3D re
 \end{figure}
 %------------------------------------------------------------------------
 \section{Reconstruction Pipeline}
+\label{sec:reconstruction-pipeline}
 To perform the real time 3D reconstruction we implemented the pipeline which is exemplary displayed in \fref{fig:reconstruction-pipeline} and described in the following section.\\
 All tests were performed on a Laptop with an Intel\textsuperscript{\textregistered} Core\texttrademark{} \mbox{i7-6700HQ} CPU @ 2.60GHz~\cite{CPU}, 40GB of DDR4 RAM and a Nvidia GeForce GTX 970M~\cite{GTX970}.
 
 %-------------------------------------------------------------------------
 \subsection{RGB-D Frame Capture}
-We use three \rscamera{} for our capture setup which work on the concept of active stereo depth. Two cameras are placed on the sides of the camera and the depth is calculated from a triangulation using the displacement. An infrared pattern is projected into the scene to enhance the details.\\
+We use three \rscamera{} for our capture setup which work on the concept of active stereo depth. Two cameras are placed on the sides of the camera and the depth is calculated from a triangulation using the displacement. An infrared pattern is projected into the scenweree to enhance the details.\\
 We process the depth images using a threshold filter which discards pixels that are above or below a threshold set during runtime. We also tried different hole-filling, spatial and edge enhancing filters that did not improve the results and are not used in the final reconstruction.\\
 \fref{fig:rgbd-data} displays the raw RGB-D images and the filtered depth image.
 
@@ -110,10 +113,7 @@ The RGB-D images from the three cameras are time synchronized~\cite{RealSenseWhi
 
 \intel{} provides an excellent SDK~\cite{RealSenseSDK}, good support and updates for its API which made it easy to use the cameras.
 
-%
-%For captur setup, we initally wanted to use four camera but due to bandwidth limitations we were not able to use color and the depth streams from all four cameras at the same time instance. We also had to limit the color and depth frame resolution for faster processing. 
-
-%-------------------------------------------------------------------------
+%------------------------------------------------------------------were-------
 \subsection{Correspondence Finding}
 We use \aruco{} to find correspondences between the three camera streams. These markers have a unique identifier and can easily be detected in every color image using the \opencv{} library.\\
 The markers are mounted on a wooden cube box as shown in \fref{fig:cube}.
@@ -143,7 +143,7 @@ The Procrustes algorithm aligns two pointclouds using known correspondences by e
 We calculate the center of gravity for every pointcloud by summing up the individual point positions and dividing by the number of points. This gives us for every set of points the mean point. The translation is then estimated by the difference between the centers of gravity.
 \begin{equation}
 	T_{ij} = C_i - C_j
-\end{equation}
+\end{equation}were
 \paragraph{Rotation}
 The rotation between two pointclouds can be estimated by optimizing over the unknown rotation $R_{ij}$. This is done by minimizing the mean squared error between the set of points $X_i$ and the $X_j$.
 \begin{equation}
@@ -162,25 +162,32 @@ In order to further improve the alignment that we get from Procrustes we use a P
 \min_{T_{ij}, R_{ij}} \sum_{i}^{frame}\sum_{j}^{frame}\sum_{k}^{corres.} || X_{ik} - T_{ij}R_{ij}*X_{jk} ||_2^2
 \end{equation}
 A comparison of the results from this optimization is given in \tref{tab:camera-calibration}. It shows that the mean squared error is much lower using the transformation from the Point-to-Point optimization. On the other side it displays an increase of the duration for the estimation as it is an iterative optimization algorithm, but as the pose estimation is done only once in the beginning the increase is negligible.
+%
 %-------------------------------------------------------------------------
 \subsection{Voxelgrid TSDF}
-Once we have these aligned pointclouds, we fuse them into the voxelgrid. We project the voxelgrid into the depth frame of the camera and we calculate the difference by subtracting the voxel depth from the actual depth value using Equation (\ref{eq1}). For the truncated signed-distance function (tsdf) values we did the weighted averaging using the Equation (\ref{eq2}). The tsdf values were truncated between -1 and 1 with points having a negative value inside the surface and positive value outside the surface.
+We calculate a truncated signed distance field (TSDF) based on a voxelgrid to represent the implicit surface of the aligned pointclouds. The voxelgrid is a three-dimensional cuboid structure with points (voxels) filling it on a grid at a given resolution. An exemplary voxelgrid is displayed in \fref{fig:voxelgrid}. 
 
+We fuse the aligned pointclouds into the voxelgrid by iterating over every voxel and projecting it into the depth frame of the camera. We can now lookup the surface depth value $z_{depth}$ at the projected position in the depth image and compare it to the depth of the voxel. This gives us the distance $d_i$ of the voxel to the surface in the $i$-th camera frame:
 \begin{equation}\label{eq1}
-tsdf=z_{voxel} - z_{depth}
+d_i = z_{voxel} - z_{depth,i}
 \end{equation}
-
+The final TSDF value is then calculated by truncating the distance with a given threshold $t$:
+\begin{equation}
+	tsdf_i = min(max(-t, d_i), t)
+\end{equation}
+We do this integration for all three sets of points coming from the cameras. To get a valid representation of the implicit surface for all pointclouds we perform a weighted averaging: 
 \begin{equation}\label{eq2}
 tsdf_{i+1}=\frac{tsdf_{i} * weight}{weight+1}
 \end{equation}
 
-Given that we were using a large number of gridpoints, computing tsdf values on the CPU was not feasible. So we had to move our tsdf voxelgrid implementation onto the GPU inorder to achieve real time results. Since we were already using OpenGL for the rendering pipeline, we decided to use OpenGL Compute Shaders~\cite{Authors1} for parallelizing the tsdf voxelgrid implementation. We also had to find a tradeoff between voxel resolution and frame rate. With a lower voxel resolution, the frame rate dropped because more calculations had to be done. Furthermore, finding a good truncation distance was also very crucial for lowering the artefacts. The Table~\ref{tab:table2} summarizes the time comparisons between different voxel resolutions.
+As we compute the TSDF values for a large number of voxels we had to parallelize the calculations using the GPU~(\sref{sec:reconstruction-pipeline}). Since we are using \opengl{} for the rendering we decided to use \opengl{} compute shaders~\cite{Authors1} for hardware accelerated parallelization. \tref{tab:voxelgrid} displays the duration for integrating all three camera frames into the voxelgrid at different resolutions and their respective number of voxels. \\
 
 \begin{figure}[t]
 \begin{center}
 \includegraphics[width=0.6\linewidth]{imgs/tsdf}
 \end{center}
- \caption{TSDF Represenation}
+ \caption{A two-dimensional voxelgrid with an implicit surface (red) and the respective TSDF values. The TSDF values are positive outside of the surface and negative inside. The zero-crossing represents the surface.}
+ \label{fig:voxelgrid}
 \end{figure}
 
 %-------------------------------------------------------------------------
@@ -235,23 +242,23 @@ The results that we get using one camea are really good as can be seen in Figure
 \begin{table}[h!]
   \begin{center}
     \begin{tabular}{c|c|c|c p{4cm}}
-      \textbf{Algorithm} & \textbf{Resolution [mm]} & \textbf{Gridpoints} & \textbf{Duration [ms]}\\
+      \textbf{Algorithm} & \textbf{Resolution [mm]} & \textbf{Voxels} & \textbf{Duration [ms]}\\
       \hline
-      All frames & 20 & 125,000 & \textless 1\\
-      All frames & 10 & 1,000,000 & \textless 1\\
-      All frames & 5 & 8,000,000 & 5\\
-      All frames & 4 & 15,625,000 & 20\\
-      All frames & 3 & 37,000,000 & 50\\
+      Voxelgrid & 20 & 125,000 & \textless 1\\
+      Voxelgrid & 10 & 1,000,000 & \textless 1\\
+      Voxelgrid & 5 & 8,000,000 & 5\\
+      Voxelgrid & 4 & 15,625,000 & 20\\
+      Voxelgrid & 3 & 37,000,000 & 50\\
     \end{tabular}
-     \caption{Time comparisons for calculating voxelgrid of different voxel resolutions as well as the number of gridpoints used. The voxelgrid measured 1 meter x 1 meter x 1 meter.}
-     \label{tab:table2}
+     \caption{Time comparisons for calculating voxelgrid of different voxel resolutions as well as the number of voxels used. The voxelgrid measured 1 meter x 1 meter x 1 meter.}
+     \label{tab:voxelgrid}
   \end{center}
 \end{table}
 
 \begin{table}[h!]
   \begin{center}
     \begin{tabular}{c|c|c p{4cm}}
-      \textbf{Resolution [mm]} & \textbf{Duration [ms]} & \textbf{Gridpoints}\\
+      \textbf{Resolution [mm]} & \textbf{Duration [ms]} & \textbf{Voxels}\\
       \hline
       20 & \textless 1 & 7,000 - 10,000\\
       10 & \textless 1 & 40,000 - 45,000\\
@@ -271,6 +278,7 @@ Since we optimized for pose parameters for a limited number of markers, one of t
 %------------------------------------------------------------------------
 \section{Group Member Contributions}
 
+\newpage
 {\small
 \bibliographystyle{ieee_fullname}
 \bibliography{egbib}
