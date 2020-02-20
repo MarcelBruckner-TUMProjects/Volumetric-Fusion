@@ -47,6 +47,7 @@ Moiz Sajid\\
 
 \newcommand{\intel}{Intel\textsuperscript{\textcopyright}}
 \newcommand{\fref}[1]{\mbox{Figure~\ref{#1}}}
+\newcommand{\tref}[1]{\mbox{Table~\ref{#1}}}
 \newcommand{\rscamera}{\intel{} RealSense\texttrademark{} Depth Camera~D415 \cite{DepthCameraD415}}
 \newcommand{\aruco}{ArUco~markers~\cite{ArUco}}
 \newcommand{\charuco}{ChArUco~markers~\cite{ChArUco}}
@@ -119,9 +120,9 @@ The markers are mounted on a wooden cube box as shown in \fref{fig:cube}.
 
 By placing the cameras such that each one is looking on one of the cubes corners we can assure that in every color image three markers are visible. This also ensures that between every pair of cameras we have an overlap of two markers for which the eight corner positions are detected sub pixel perfect. This gives us a total of $8*3=24$ constraints between every pair of cameras which are used in the next step to estimate the relative transformation between the markers.
 
-It is also important to mention here that we tried \charuco{} which are a mixture of \aruco{} and a chessboard pattern which allow simultaneous detection and pose estimation. However, the \charuco{} did not give us good pose results, so we stick to \aruco{}. 
-
-
+It is also important to mention here that we tried \charuco{} which are a mixture of \aruco{} and a chessboard pattern which allow simultaneous detection and pose estimation. However, the \charuco{} did not give us good pose results and slowed down the calculation (\tref{tab:camera-calibration}), so we stick to \aruco{}. 
+%
+%
 \begin{figure}[t]
 	\begin{center}
 		\includegraphics[width=0.6\linewidth]{imgs/cube}
@@ -129,33 +130,38 @@ It is also important to mention here that we tried \charuco{} which are a mixtur
 	\caption{Marker cube with the detected markers highlighted in green and their unique identifiers (red).}
 	\label{fig:cube}
 \end{figure}
-
-
+%
+%
 %-------------------------------------------------------------------------
 \subsection{Camera Calibration}
-After getting the marker locations, we backprojected these correspondences into the 3D pointcloud using the depth information. The camera poses of the cameras were then estimated using OpenCV. Using these camera poses, we calculated relative transformatons between the cameras. Out of three camera, we selected the first camera's coordinate frame as the world coordinate frame and hence the poses from the other two cameras were aligned with respect to the first camera. The alignment we got from the camera calibration was not good which meant that it can be improved further.
-
+We use the known marker positions in the color image and combine them with the depth information to calculate the 3D position of the marker corners. As we ensure to have an overlap of two markers between every pair of cameras we now have $8*3=24$ constraints (8 markers each with a x, y and z value). The 3D positions are then fed into two alignment algorithms to find the relative transformations between the cameras and to align the pointclouds based on the results.
+%
 %-------------------------------------------------------------------------
-\subsection{Optimization}
-As the pose parameters that we got from the camera calibration were not good enough, we used two different optimizations approaches namely Procrutes and Point-to-Point correspondence error for optimizing the 3D pose parameters of the cameras even further.
- 
-In the Procrustes algorithm, we compute the vector between the center of gravity for getting the translation components and the Singular Value Decomposition of the known correspondences for getting the rotation components as shown in Equation (\ref{eq3}) and (\ref{eq4}). The alignment that we get from Procrustes is not robust enough and hence has a high Mean Squared Error (MSE).\\
-
-\begin{equation}\label{eq3}
-USV^T=SVD(X^TX)
+\subsubsection{Procrustes}
+The Procrustes algorithm aligns two pointclouds using known correspondences by estimating the relative translation and rotation between the two sets of points.
+\paragraph{Translation}
+We calculate the center of gravity for every pointcloud by summing up the individual point positions and dividing by the number of points. This gives us for every set of points the mean point. The translation is then estimated by the difference between the centers of gravity.
+\begin{equation}
+	T_{ij} = C_i - C_j
 \end{equation}
-
-\begin{equation}\label{eq4}
-R=UV^T
+\paragraph{Rotation}
+The rotation between two pointclouds can be estimated by optimizing over the unknown rotation $R_{ij}$. This is done by minimizing the mean squared error between the set of points $X_i$ and the $X_j$.
+\begin{equation}
+	\min_{R_{ij}} || X_i - R_{ij} X_j ||^2_2
 \end{equation}
-
-In order to further improve the results that we get from Procrustes, we used the Point-to-Point correspondence error. For the Point-to-Point correspondence error, we optimize for the following energy term:
-
+Fortunately there exists a closed form solution for the rotation $R_{ij}$ which is based on the singular value decomposition of the matrix $X_i^T X_j$.
+\begin{align}
+	X_i^T X_j &= U \Sigma V^T \\
+	R_{ij} &= UV^T
+\end{align}
+\tref{tab:camera-calibration} displays the duration and mean squared error values after the Procrustes alignment. It shows a still fairly high error, so we had to further align the pointclouds.
+%
+\subsubsection{Point-to-Point Error}
+In order to further improve the alignment that we get from Procrustes we use a Point-to-Point correspondence error. We optimize for the relative translation $T_{ij}$ and rotation $R_{ij}$ over every pair of camera frames $i$ and $j$ and in each of these for the known correspondences $k$. We came up with the following energy term:
 \begin{equation}\label{eq5}
-\sum_{i}\sum_{j}\sum_{k} \left\Vert\left(X_{ik} - T_jR_j*X_{jk}\right)\right\Vert_2^2
+\min_{T_{ij}, R_{ij}} \sum_{i}^{frame}\sum_{j}^{frame}\sum_{k}^{corres.} || X_{ik} - T_{ij}R_{ij}*X_{jk} ||_2^2
 \end{equation}
-
-Further results have been sumarzied in Table~\ref{tab:table1}. One of the difficulties that we faced in camera calibration was visualizing the aligned points for which we had to write our own rendering pipeline in OpenGL~\cite{Authors3}. Another difficulty that we faced was with Ceres because we had to get ourselves acquainted with general working of the non-linear optimization framework. 
+A comparison of the results from this optimization is given in \tref{tab:camera-calibration}. It shows that the mean squared error is much lower using the transformation from the Point-to-Point optimization. On the other side it displays an increase of the duration for the estimation as it is an iterative optimization algorithm, but as the pose estimation is done only once in the beginning the increase is negligible.
 %-------------------------------------------------------------------------
 \subsection{Voxelgrid TSDF}
 Once we have these aligned pointclouds, we fuse them into the voxelgrid. We project the voxelgrid into the depth frame of the camera and we calculate the difference by subtracting the voxel depth from the actual depth value using Equation (\ref{eq1}). For the truncated signed-distance function (tsdf) values we did the weighted averaging using the Equation (\ref{eq2}). The tsdf values were truncated between -1 and 1 with points having a negative value inside the surface and positive value outside the surface.
@@ -221,8 +227,8 @@ The results that we get using one camea are really good as can be seen in Figure
       Procrustes (C) & 1 & 20 - 40 & 0.25 - 1.29\\
       Point-to-Point (C) & 1 - 20 & 18000 - 22000 & \textless 0.1\\
     \end{tabular}
-     \caption{Comparisons between different optimization algorithms in terms of iterations, duration and MSE (Mean Squared Error). A=ArUco and C=ChArUco}
-     \label{tab:table1}
+     \caption{Comparisons between different optimization algorithms in terms of iterations, duration and MSE (Mean Squared Error). A = ArUco, C = ChArUco}
+     \label{tab:camera-calibration}
   \end{center}
 \end{table}
 
