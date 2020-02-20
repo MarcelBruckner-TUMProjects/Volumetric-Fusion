@@ -227,37 +227,43 @@ The final presentation was prepared by Kevin Bein, extended by Marcel Bruckner a
 The \LaTeX{} setup for the final report and the first draft was done by Moiz Sajid. The final version was extended by Marcel Bruckner and proofread by Kevin Bein.
 
 \subsection{Code}
-The code as it is by the end of this project was written by Marcel Bruckner.
+The code, as it is by the end of this project, was written by Marcel Bruckner.
 % Much time was also spent by Kevin Bein trying different approaches but didn't make it in the final version of the project. 
 \paragraph{RGB-D Frame Capture}
-The capture classes and frame processing was implemented by Marcel Bruckner.\\
+The capture classes and frame processing were tested by Marcel Bruckner and Kevin Bein and finally implemented by Marcel Bruckner.\\
+Hardware synchronization was implemented by Kevin Bein.\\
 The depth map filtering was done by Marcel Bruckner and Kevin Bein.\\
 Furthermore, we spent many hours as a group in the beginning of the project to get to used to the RealSense SDK. 
 
 \paragraph{Correspondence Finding}
 The correspondence finding as it is now was done by Marcel Bruckner. This includes the printing of the markers, the assembling of the marker cube and the code needed to detect the markers. Also much of the now not used ChArUco code was done by him.\\
-Kevin Bein helped in cutting out the wood for the cube and tried different approaches using the \charuco{}.
+Kevin Bein tried many different approaches using the \charuco{} and explored the possibilites of OpenCV for usage in the project. He also helped with cutting out the wood for the cube.
 
 \paragraph{Camera Calibration}
 The camera calibration was done by Marcel Bruckner. Procrustes and the Point-to-Point error function was implemented by him. Finding out the correct calibration parameters and setting up the cameras is contributed to him.\\
+Kevin Bein worked on aligning correspondences via the calculated rotation/translations matrices and correcting and extending the initial rendering procedure to display the results. \\
 Moiz Sajid tried out chessboard pattern for calibrating two cameras which never made it to the final project because it was not feasible. Moiz Sajid worked on ICP using Marcel's correspondence finding code which never made it to the project since it essentially did the same what Marcel's existing implementation did (discovered late). ICP should have been implemented alongside FLANN however this essential use case was discovered very late.   
 
 \paragraph{Voxelgrid TSDF}
 The voxelgrid and TSDF calculation (CPU and GPU) was entirely implemented by Marcel Bruckner.\\
-Moiz Sajid utilized the existing implementation of tsdf fusion using C++~\cite{Authors2} and Python~\cite{Authors8} which worked well but only for uncalibrated cameras hence was not used in the project. It could have been utilized alongside using other techniques for alignment. 
+Moiz Sajid utilized the existing implementation of tsdf fusion using C++~\cite{Authors2} and Python~\cite{Authors8} which worked well but only for uncalibrated cameras hence was not used in the project. It could have been utilized alongside using other techniques for alignment. \\
+Kevin Bein worked with the same existing tsdf implementation \cite{Authors2} early on but gave away this part of the project to Marcel Bruckner and Moiz Sajid to focus on Rendering.
 
 \paragraph{Marching Cubes Surface Extraction}
 The Marching Cubes surface extraction (CPU and GPU) was entirely implemented by Marcel Bruckner.\\
+Kevin Bein implemented MC using the Point Cloud Library (PCL) to shorten development time but later disregarded the attempt due to the installation complexity of PCL and Marcel Bruckner finishig his native implementation earlier. \\
 Moiz Sajid worked on a working Marching Cubes CPU implementation which never made it to the final project because Marcel's Marching Cubes implementation was used instead for no particular reason. 
 
 \paragraph{Rendering}
 The rendering was entirely implemented by Marcel Bruckner.\\
+Kevin Bein early on worked a lot on tweaking the provided rendering routines from RealSense but after little success and a group decision to move on to a custom implementation experimented a lot with OpenGL shaders. A Phong lightning and voxelgrid shader rendering never made it into the final code. \\
 Moiz Sajid worked on Aljaz's code for point cloud rendering which never made it to the final project. Moiz Sajid also wrote shaders for displaying single frame mesh which again never made it to the final project. 
 
 \paragraph{Compute Shaders}
 The compute shaders were entirely implemented by Marcel Bruckner.
 
 \paragraph{Point Cloud Library (Not used in the project)}
+Kevin Bein spent a lot of time utilizing many parts of PCL for the project. He implemented working solutions for MC and tried out different other functionality. The fact that compiling PCL with GPU support did not work and the overal installation complexity of PCL plus the fact that, meanwhile, Marcel Bruckner succeeded in creating a working, custom implementation, ultimately lead to abandon the idea of further using PCL. \\
 Moiz Sajid spent some time in building PCL and FLANN with Nvidia Cuda Support from source to see if it is feasible for the project.
 
 \newpage
